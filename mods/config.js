@@ -49,7 +49,7 @@ const defaultConfig = {
   disabledSidebarContents: [],
   enableUpdater: true,
   enableCpuStressOptimization: true,
-  enableDecoderMonitor: true
+  enableDecoderMonitor: true,
   autoFrameRate: false
 };
 
@@ -94,7 +94,7 @@ export const configChangeEmitter = {
     this.listeners[type].forEach(cb => {
       try {
         cb.call(this, event)
-      } catch (_) {};
+      } catch (_) { };
     });
   }
 };
