@@ -21,6 +21,7 @@
   "repository": {
     "url": "https://github.com/JensorX/TizenTube"
   },
+<<<<<<< HEAD
   "license": "GPL-3.0-only",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -33,4 +34,7 @@
   "dependencies": {
     "ncc": "^0.3.6"
   }
+=======
+  "license": "GPL-3.0-only"
+>>>>>>> 4dfd9dc (fix)
 }
