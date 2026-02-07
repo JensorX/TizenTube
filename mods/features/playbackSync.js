@@ -54,11 +54,11 @@ class SubtlePlaybackSync {
     // Anpassungsparameter (Max Korrektur pro Tick)
     this.maxSubtleCorrection = 0.05;     // 50ms (fast unsichtbar)
     this.maxAggressiveCorrection = 0.15; // 150ms (leicht spürbar)
-    
+
     // Interval-Parameter
     this.minAdjustmentInterval = 2000;           // Normal 2s
     this.minAdjustmentIntervalAggressive = 1000; // 1s bei hohem Stress
-    
+
     this.intervalMs = 400; // Öfter prüfen für schnellere Reaktion
     this.enabled = true;
   }
@@ -90,6 +90,7 @@ class SubtlePlaybackSync {
 
     this.videoEl.addEventListener('ratechange', this._onRateChange);
     this.videoEl.addEventListener('seeked', this._onSeeked);
+    this.videoEl.addEventListener('play', this._onSeeked); // Reset on play too
     configChangeEmitter.addEventListener('configChange', this._onConfigChange);
 
     this.enabled = configRead('enableCpuStressOptimization');
@@ -102,6 +103,7 @@ class SubtlePlaybackSync {
     if (this.videoEl) {
       this.videoEl.removeEventListener('ratechange', this._onRateChange);
       this.videoEl.removeEventListener('seeked', this._onSeeked);
+      this.videoEl.removeEventListener('play', this._onSeeked);
       configChangeEmitter.removeEventListener('configChange', this._onConfigChange);
     }
     this.stop();
@@ -116,7 +118,7 @@ class SubtlePlaybackSync {
       this.lastRate = this.videoEl.playbackRate || 1;
       this.consecutiveHighDrifts = 0;
       this.lastDrift = 0;
-      
+
       const stats = this._getVideoStats();
       if (stats) {
         this.lastTotalFrames = this._getStatValue(stats, ['totalVideoFrames', 'total_video_frames', 'totalFrames']);
@@ -202,17 +204,24 @@ class SubtlePlaybackSync {
     const now = performance.now();
     const elapsedSeconds = (now - this.lastBaselineTime) / 1000;
     const rate = this.videoEl.playbackRate || 1;
+    const actualTime = this.videoEl.currentTime;
 
     // Nur bei hohem Speed (> 1.2x) aktiv werden
     if (rate <= 1.2) return;
 
     // 1. Frame-Drops prüfen (Delta)
     const recentDropRatio = this._updateDroppedFrameDelta();
+    // Critical Drop Rate = Force Sync!
+    if (recentDropRatio > this.droppedFrameRateCritical) {
+      console.warn(`[SubtleSync] CRITICAL DROPPED FAILURE (${(recentDropRatio * 100).toFixed(1)}%). Forcing Resync.`);
+      // Force aggressive sync even if drift seems low (trust actual visual lag)
+      this._applyCorrection(actualTime + 0.1, 0.5, 'FORCE_DROP_SYNC');
+      return;
+    }
     const hasStress = recentDropRatio > this.droppedFrameRateWarning;
 
     // 2. Drift berechnen
     const expectedTime = this.lastBaselineCurrentTime + (elapsedSeconds * rate);
-    const actualTime = this.videoEl.currentTime;
     const drift = expectedTime - actualTime;
     const absDrift = Math.abs(drift);
 
@@ -255,7 +264,7 @@ class SubtlePlaybackSync {
       const start = performance.now();
       this.videoEl.currentTime = targetTime;
       this.lastAdjustmentTime = start;
-      
+
       // Toast nur einmal pro Video zeigen
       const vid = this._getCurrentVideoId();
       if (vid !== this.currentVideoId) {
@@ -268,7 +277,7 @@ class SubtlePlaybackSync {
       }
 
       console.info(`[SubtleSync] [${mode}] Drift: ${drift.toFixed(3)}s. Syncing to: ${targetTime.toFixed(3)}s`);
-      
+
       // Nach Korrektur Baseline neu setzen
       this.lastBaselineTime = performance.now();
       this.lastBaselineCurrentTime = targetTime;
@@ -282,7 +291,7 @@ class SubtlePlaybackSync {
       this.videoEl.pause();
       // Kleiner Versatz um Puffer zu leeren
       this.videoEl.currentTime += 0.01;
-      
+
       setTimeout(() => {
         if (this.videoEl) {
           this.videoEl.play();
