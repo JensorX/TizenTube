@@ -121,8 +121,8 @@ class SubtlePlaybackSync {
 
       const stats = this._getVideoStats();
       if (stats) {
-        this.lastTotalFrames = this._getStatValue(stats, ['totalVideoFrames', 'total_video_frames', 'totalFrames']);
-        this.lastDroppedFrames = this._getStatValue(stats, ['droppedVideoFrames', 'dropped_video_frames', 'droppedFrames']);
+        this.lastTotalFrames = this._getStatValue(stats, ['tvf', 'totalVideoFrames', 'total_video_frames', 'totalFrames']);
+        this.lastDroppedFrames = this._getStatValue(stats, ['dvf', 'droppedVideoFrames', 'dropped_video_frames', 'droppedFrames']);
       }
     }
   }
@@ -182,8 +182,8 @@ class SubtlePlaybackSync {
     const stats = this._getVideoStats();
     if (!stats) return 0;
 
-    const totalFrames = this._getStatValue(stats, ['totalVideoFrames', 'total_video_frames', 'totalFrames']);
-    const droppedFrames = this._getStatValue(stats, ['droppedVideoFrames', 'dropped_video_frames', 'droppedFrames']);
+    const totalFrames = this._getStatValue(stats, ['tvf', 'totalVideoFrames', 'total_video_frames', 'totalFrames']);
+    const droppedFrames = this._getStatValue(stats, ['dvf', 'droppedVideoFrames', 'dropped_video_frames', 'droppedFrames']);
 
     const deltaTotal = totalFrames - this.lastTotalFrames;
     const deltaDropped = droppedFrames - this.lastDroppedFrames;
