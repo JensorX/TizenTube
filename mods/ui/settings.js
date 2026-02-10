@@ -322,6 +322,24 @@ export default function modernUI(update, parameters) {
                     ]
                 },
                 {
+                    name: 'Native Player (AVPlay)',
+                    icon: 'TV',
+                    value: null,
+                    menuId: 'tt-avplay-settings',
+                    menuHeader: {
+                        title: 'Native Player (AVPlay)',
+                        subtitle: 'Use Samsung native player for better performance and audio support'
+                    },
+                    options: [
+                        {
+                            name: 'Enable Native Player',
+                            icon: 'TV',
+                            value: 'enableAVPlay',
+                            subtitle: 'Experimental: Fixes Q Symphony & dropped frames'
+                        }
+                    ]
+                },
+                {
                     name: 'Preferred Video Quality',
                     icon: 'VIDEO_QUALITY',
                     value: null,

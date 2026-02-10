@@ -50,7 +50,8 @@ const defaultConfig = {
   enableUpdater: true,
   enableCpuStressOptimization: true,
   enableDecoderMonitor: true,
-  autoFrameRate: false
+  autoFrameRate: false,
+  enableAVPlay: false
 };
 
 let localConfig;
