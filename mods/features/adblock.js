@@ -48,8 +48,13 @@ JSON.parse = function () {
   }
 
   // AVPlay: Export streamingData for HybridPlayer
-  if (r?.streamingData && configRead('enableAVPlay')) {
-    window.__avplayStreamData = r.streamingData;
+  if (r?.streamingData) {
+    const isEnabled = configRead('enableAVPlay');
+    console.log('[AdBlock] streamingData found. enableAVPlay:', isEnabled);
+    if (isEnabled) {
+      console.log('[AdBlock] Exporting streamingData for AVPlay');
+      window.__avplayStreamData = r.streamingData;
+    }
   }
 
   // Drop "masthead" ad from home screen

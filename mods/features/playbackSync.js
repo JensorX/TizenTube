@@ -209,27 +209,31 @@ class SubtlePlaybackSync {
     // Nur bei hohem Speed (> 1.2x) aktiv werden
     if (rate <= 1.2) return;
 
-    // 1. Frame-Drops prüfen (Delta)
+    // 0. Absolute Minimum Cooldown Check (e.g. 1s)
+    // Don't even calculate stats if we are definitely too fast
+    const timeSinceLastAdjustment = now - this.lastAdjustmentTime;
+    if (timeSinceLastAdjustment < this.minAdjustmentIntervalAggressive) return;
+
+    // 1. Frame-Drops prüfen & Stress berechnen
     const recentDropRatio = this._updateDroppedFrameDelta();
-    // Critical Drop Rate = Force Sync!
+    const hasStress = recentDropRatio > this.droppedFrameRateWarning;
+
+    // 2. Variable Cooldown Check based on Stress
+    const requiredInterval = hasStress ? this.minAdjustmentIntervalAggressive : this.minAdjustmentInterval;
+    if (timeSinceLastAdjustment < requiredInterval) return;
+
+    // 3. Critical Drop Rate = Force Sync! (Now subject to cooldown)
     if (recentDropRatio > this.droppedFrameRateCritical) {
       console.warn(`[SubtleSync] CRITICAL DROPPED FAILURE (${(recentDropRatio * 100).toFixed(1)}%). Forcing Resync.`);
       // Force aggressive sync even if drift seems low (trust actual visual lag)
       this._applyCorrection(actualTime + 0.1, 0.5, 'FORCE_DROP_SYNC');
       return;
     }
-    const hasStress = recentDropRatio > this.droppedFrameRateWarning;
 
-    // 2. Drift berechnen
+    // 4. Drift berechnen
     const expectedTime = this.lastBaselineCurrentTime + (elapsedSeconds * rate);
     const drift = expectedTime - actualTime;
     const absDrift = Math.abs(drift);
-
-    // 3. Sync-Logik
-    const timeSinceLastAdjustment = now - this.lastAdjustmentTime;
-    const minInterval = hasStress ? this.minAdjustmentIntervalAggressive : this.minAdjustmentInterval;
-
-    if (timeSinceLastAdjustment < minInterval) return;
 
     // A: Kritischer Drift (> 3.5s) -> Letzter Ausweg: Kurzer Reset
     if (absDrift > this.resetThreshold) {

@@ -8,19 +8,60 @@ export class AVPlayController {
         this.player = null;
         this.state = 'NONE'; // NONE, IDLE, READY, PLAYING, PAUSED
         this.listeners = {};
-        this.isSupported = typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined';
+        this.isSupported = false;
+        // Optimization: check immediately but don't finalize isSupported until init/injection
     }
 
     init() {
-        if (!this.isSupported) {
-            console.warn('[AVPlay] Native API not available');
-            return false;
+        // 1. Check if already available
+        if (typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined') {
+            this.isSupported = true;
+            console.log('[AVPlay] Native API found and supported.');
+            return true;
         }
-        return true;
+
+        // 2. Not found, try to inject
+        console.warn('[AVPlay] webapis not found. Attempting to inject script...');
+        this.injectWebAPIs();
+        return false; // Async, so return false for now. HybridPlayer will retry/fail.
+    }
+
+    injectWebAPIs() {
+        if (document.querySelector('script[src*="webapis.js"]')) {
+            console.log('[AVPlay] webapis.js script tag already exists.');
+            return;
+        }
+
+        const script = document.createElement('script');
+        // Standard path on Tizen TV
+        script.src = '$WEBAPIS/webapis/webapis.js';
+        script.onload = () => {
+            console.log('[AVPlay] webapis.js loaded successfully!');
+            if (typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined') {
+                this.isSupported = true;
+                console.log('[AVPlay] webapis.avplay is now available.');
+            } else {
+                console.error('[AVPlay] webapis.js loaded but object still missing or incomplete');
+            }
+        };
+        script.onerror = () => {
+            console.error('[AVPlay] Failed to load webapis.js. Is this a Tizen TV?');
+        };
+        document.head.appendChild(script);
     }
 
     async open(url) {
-        if (!this.isSupported) return;
+        // Last ditch check in case it loaded in the meantime
+        if (!this.isSupported) {
+            if (typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined') {
+                this.isSupported = true;
+            }
+        }
+
+        if (!this.isSupported) {
+            console.error('[AVPlay] Cannot open: API not supported or not loaded');
+            throw new Error('AVPlay not supported');
+        }
 
         try {
             if (this.state !== 'NONE') {

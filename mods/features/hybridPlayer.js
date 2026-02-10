@@ -1,6 +1,7 @@
 import { configRead } from '../config.js';
 import { AVPlayController } from './avplayController.js';
 import { createDashManifest } from './dashManifestGenerator.js';
+import { showToast } from '../ui/ytUI.js';
 
 class HybridPlayer {
     constructor() {
@@ -15,7 +16,9 @@ class HybridPlayer {
 
     init() {
         // Initial config check
-        if (!configRead('enableAVPlay')) return;
+        const enabled = configRead('enableAVPlay');
+        console.log('[HybridPlayer] Init. enableAVPlay:', enabled);
+        if (!enabled) return;
 
         // Try AVPlay init
         if (!this.avplay.init()) {
@@ -89,6 +92,8 @@ class HybridPlayer {
         if (!configRead('enableAVPlay')) return;
 
         const streamData = window.__avplayStreamData;
+        console.log('[HybridPlayer] attemptStartAVPlay. StreamData exists:', !!streamData);
+
         if (!streamData || !streamData.adaptiveFormats) {
             console.warn('[HybridPlayer] No stream data available for AVPlay yet. Retrying...');
             // Retry logic could be added here
@@ -137,12 +142,22 @@ class HybridPlayer {
             const startTime = this.videoElement.currentTime * 1000;
             if (startTime > 0) this.avplay.seekTo(startTime);
 
+            showToast('TizenTube', 'Native Player (AVPlay) Active');
+
             // Hide loading spinner if present? 
             // The HTML5 player might be buffering or playing silently.
             // Ideally we want the HTML5 player to *think* it's playing so UI updates (progress bar).
             this.videoElement.play();
 
             this.startSyncLoop();
+
+            // Disable SubtlePlaybackSync if active to avoid conflicts and double-syncing
+            if (window.__ttSubtlePlaybackSync) {
+                console.log('[HybridPlayer] Disabling SubtlePlaybackSync to prevent conflicts');
+                window.__ttSubtlePlaybackSync.stop();
+                window.__ttSubtlePlaybackSync.enabled = false;
+            }
+
         } catch (e) {
             console.error('[HybridPlayer] AVPlay start failed:', e);
             this.restoreHTML5();
@@ -154,8 +169,16 @@ class HybridPlayer {
             this.avplay.stop();
             this.avplay.close();
             this.isAVPlayActive = false;
-            clearInterval(this.syncInterval);
+            if (this.syncInterval) clearInterval(this.syncInterval);
             this.restoreHTML5();
+
+            // Re-enable SubtlePlaybackSync
+            if (window.__ttSubtlePlaybackSync) {
+                // Restore original drift sync
+                window.__ttSubtlePlaybackSync.enabled = configRead('enableCpuStressOptimization');
+                window.__ttSubtlePlaybackSync.start();
+                console.log('[HybridPlayer] Re-enabling SubtlePlaybackSync');
+            }
         }
     }
 
@@ -173,22 +196,28 @@ class HybridPlayer {
     }
 
     startSyncLoop() {
+        let lastSyncTime = 0;
+        const SYNC_COOLDOWN = 2000; // 2s cooldown
+        const SYNC_THRESHOLD = 2500; // 2.5s drift triggers sync
+
         this.syncInterval = setInterval(() => {
             if (!this.isAVPlayActive) return;
 
-            // Simple Sync: Mirror HTML5 seek to AVPlay if diff is large
-            // But we actually want AVPlay to drive the master time?
-            // Actually, since HTML5 is just "dummy" playing, user interacts with HTML5 UI.
-            // User drags scrubber -> HTML5 video time updates -> We verify diff -> Seek AVPlay.
-
             const html5Time = this.videoElement.currentTime * 1000;
-            // We can't easily get AVPlay time synchronously.
-            // But strict sync is less important than responding to seeks.
+            const now = Date.now();
 
-            if (Math.abs(html5Time - this.lastTime) > 2000) {
-                // User likely sought
-                // console.log('[HybridPlayer] Seek detected, syncing AVPlay');
+            if (now - lastSyncTime < SYNC_COOLDOWN) {
+                this.lastTime = html5Time;
+                return;
+            }
+
+            const diff = Math.abs(html5Time - this.lastTime);
+
+            // Only sync on large jumps (Seek)
+            if (diff > SYNC_THRESHOLD) {
+                console.log(`[HybridPlayer] Sync trigger: diff=${diff}ms. Seek AVPlay -> ${html5Time}ms`);
                 this.avplay.seekTo(html5Time);
+                lastSyncTime = now;
             }
             this.lastTime = html5Time;
 
