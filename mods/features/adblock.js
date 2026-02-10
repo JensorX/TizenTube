@@ -47,6 +47,11 @@ JSON.parse = function () {
     }
   }
 
+  // AVPlay: Export streamingData for HybridPlayer
+  if (r?.streamingData && configRead('enableAVPlay')) {
+    window.__avplayStreamData = r.streamingData;
+  }
+
   // Drop "masthead" ad from home screen
   if (
     r?.contents?.tvBrowseRenderer?.content?.tvSurfaceContentRenderer?.content
