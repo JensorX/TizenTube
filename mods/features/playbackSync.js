@@ -30,6 +30,7 @@ class SubtlePlaybackSync {
     // Anpassungs-Tracking
     this.lastAdjustmentTime = 0;
     this.consecutiveHighDrifts = 0;
+    this.consecutiveForceSyncs = 0;
     this.lastDrift = 0;
 
     // Frame-Drop Tracking (Delta-basiert)
@@ -117,6 +118,7 @@ class SubtlePlaybackSync {
       this.lastBaselineCurrentTime = this.videoEl.currentTime;
       this.lastRate = this.videoEl.playbackRate || 1;
       this.consecutiveHighDrifts = 0;
+      this.consecutiveForceSyncs = 0;
       this.lastDrift = 0;
 
       const stats = this._getVideoStats();
@@ -222,12 +224,28 @@ class SubtlePlaybackSync {
     const requiredInterval = hasStress ? this.minAdjustmentIntervalAggressive : this.minAdjustmentInterval;
     if (timeSinceLastAdjustment < requiredInterval) return;
 
-    // 3. Critical Drop Rate = Force Sync! (Now subject to cooldown)
+    // 3. Critical Drop Rate = Force Sync! (Now subject to cooldown & backoff)
     if (recentDropRatio > this.droppedFrameRateCritical) {
-      console.warn(`[SubtleSync] CRITICAL DROPPED FAILURE (${(recentDropRatio * 100).toFixed(1)}%). Forcing Resync.`);
+      this.consecutiveForceSyncs++;
+
+      // Exponential Backoff / Give Up
+      if (this.consecutiveForceSyncs > 5) {
+        console.warn(`[SubtleSync] Giving up on sync. Too many consecutive critical drops (${this.consecutiveForceSyncs}).`);
+        showToast('TizenTube', 'Sync gave up (Too many drops). Waiting 8s...');
+        // Set a long cooldown (e.g. 10s) before trying again
+        this.lastAdjustmentTime = now + 8000;
+        this.consecutiveForceSyncs = 0; // Reset to try again later
+        return;
+      }
+
+      console.warn(`[SubtleSync] CRITICAL DROPPED FAILURE (${(recentDropRatio * 100).toFixed(1)}%). Forcing Resync (${this.consecutiveForceSyncs}).`);
+      showToast('TizenTube', `Force Sync (${this.consecutiveForceSyncs}/5): Drops critical`);
       // Force aggressive sync even if drift seems low (trust actual visual lag)
       this._applyCorrection(actualTime + 0.1, 0.5, 'FORCE_DROP_SYNC');
       return;
+    } else {
+      // Reset counter if we stabilised
+      if (this.consecutiveForceSyncs > 0) this.consecutiveForceSyncs--;
     }
 
     // 4. Drift berechnen

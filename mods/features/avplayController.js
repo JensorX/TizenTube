@@ -9,6 +9,7 @@ export class AVPlayController {
         this.state = 'NONE'; // NONE, IDLE, READY, PLAYING, PAUSED
         this.listeners = {};
         this.isSupported = false;
+        this.injectionPromise = null;
         // Optimization: check immediately but don't finalize isSupported until init/injection
     }
 
@@ -32,26 +33,41 @@ export class AVPlayController {
             return;
         }
 
-        const script = document.createElement('script');
-        // Standard path on Tizen TV
-        script.src = '$WEBAPIS/webapis/webapis.js';
-        script.onload = () => {
-            console.log('[AVPlay] webapis.js loaded successfully!');
-            if (typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined') {
-                this.isSupported = true;
-                console.log('[AVPlay] webapis.avplay is now available.');
-            } else {
-                console.error('[AVPlay] webapis.js loaded but object still missing or incomplete');
-            }
-        };
-        script.onerror = () => {
-            console.error('[AVPlay] Failed to load webapis.js. Is this a Tizen TV?');
-        };
-        document.head.appendChild(script);
+        this.injectionPromise = new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            // Standard path on Tizen TV
+            script.src = '$WEBAPIS/webapis/webapis.js';
+            script.onload = () => {
+                console.log('[AVPlay] webapis.js loaded successfully!');
+                if (typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined') {
+                    this.isSupported = true;
+                    console.log('[AVPlay] webapis.avplay is now available.');
+                    resolve(true);
+                } else {
+                    console.error('[AVPlay] webapis.js loaded but object still missing or incomplete');
+                    resolve(false); // Loaded but failed check
+                }
+            };
+            script.onerror = () => {
+                console.error('[AVPlay] Failed to load webapis.js. Is this a Tizen TV?');
+                reject(new Error('Failed to load $WEBAPIS/webapis/webapis.js'));
+            };
+            document.head.appendChild(script);
+        });
     }
 
     async open(url) {
-        // Last ditch check in case it loaded in the meantime
+        // Wait for injection if it's in progress
+        if (this.injectionPromise) {
+            console.log('[AVPlay] Waiting for injection to complete...');
+            try {
+                await this.injectionPromise;
+            } catch (e) {
+                console.error('[AVPlay] Injection failed, cannot open.');
+            }
+        }
+
+        // Re-check support
         if (!this.isSupported) {
             if (typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined') {
                 this.isSupported = true;
@@ -60,7 +76,7 @@ export class AVPlayController {
 
         if (!this.isSupported) {
             console.error('[AVPlay] Cannot open: API not supported or not loaded');
-            throw new Error('AVPlay not supported');
+            throw new Error('Native API (webapis) missing. Is this a Tizen TV?');
         }
 
         try {

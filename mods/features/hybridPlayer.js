@@ -20,10 +20,10 @@ class HybridPlayer {
         console.log('[HybridPlayer] Init. enableAVPlay:', enabled);
         if (!enabled) return;
 
-        // Try AVPlay init
-        if (!this.avplay.init()) {
-            console.warn('[HybridPlayer] AVPlay init failed, feature disabled');
-            return;
+        // Try AVPlay init (might be async injection)
+        const avPlayInitResult = this.avplay.init();
+        if (!avPlayInitResult) {
+            console.warn('[HybridPlayer] AVPlay init pending (injection?) or failed. Continuing attachment anyway...');
         }
 
         // Wait for player element
@@ -94,9 +94,32 @@ class HybridPlayer {
         const streamData = window.__avplayStreamData;
         console.log('[HybridPlayer] attemptStartAVPlay. StreamData exists:', !!streamData);
 
-        if (!streamData || !streamData.adaptiveFormats) {
-            console.warn('[HybridPlayer] No stream data available for AVPlay yet. Retrying...');
-            // Retry logic could be added here
+        if (!streamData) {
+            console.warn('[HybridPlayer] No stream data immediately available. Polling...');
+            // Poll for up to 5 seconds
+            let attempts = 0;
+            const pollInterval = setInterval(() => {
+                attempts++;
+                if (window.__avplayStreamData) {
+                    clearInterval(pollInterval);
+                    console.log(`[HybridPlayer] Stream data found after ${attempts} attempts.`);
+                    this.startAVPlayWithData(window.__avplayStreamData);
+                } else if (attempts > 10) { // 5 seconds (500ms * 10)
+                    clearInterval(pollInterval);
+                    console.warn('[HybridPlayer] Timed out waiting for stream data.');
+                    showToast('TizenTube', 'AVPlay: Stream Data Timeout');
+                }
+            }, 500);
+            return;
+        }
+
+        // Immediate start
+        this.startAVPlayWithData(streamData);
+    }
+
+    async startAVPlayWithData(streamData) {
+        if (!streamData.adaptiveFormats) {
+            showToast('TizenTube', 'AVPlay: Invalid Stream Data');
             return;
         }
 
@@ -108,6 +131,7 @@ class HybridPlayer {
 
         if (!bestVideo || !bestAudio) {
             console.error('[HybridPlayer] Could not find suitable streams');
+            showToast('TizenTube', 'AVPlay: No suitable streams found');
             return;
         }
 
@@ -117,6 +141,7 @@ class HybridPlayer {
         const manifestUrl = createDashManifest(bestVideo, bestAudio);
         if (!manifestUrl) {
             console.error('[HybridPlayer] Manifest generation failed');
+            showToast('TizenTube', 'AVPlay: Manifest Gen Failed');
             return;
         }
 
@@ -160,6 +185,7 @@ class HybridPlayer {
 
         } catch (e) {
             console.error('[HybridPlayer] AVPlay start failed:', e);
+            showToast('TizenTube', `AVPlay Failed: ${e.message || e}`);
             this.restoreHTML5();
         }
     }
