@@ -28,31 +28,58 @@ export class AVPlayController {
     }
 
     injectWebAPIs() {
-        if (document.querySelector('script[src*="webapis.js"]')) {
-            console.log('[AVPlay] webapis.js script tag already exists.');
-            return;
-        }
+        if (this.injectionPromise) return;
 
-        this.injectionPromise = new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            // Standard path on Tizen TV
-            script.src = '$WEBAPIS/webapis/webapis.js';
-            script.onload = () => {
-                console.log('[AVPlay] webapis.js loaded successfully!');
+        this.injectionPromise = new Promise((resolve) => {
+            const checkAndResolve = () => {
                 if (typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined') {
                     this.isSupported = true;
-                    console.log('[AVPlay] webapis.avplay is now available.');
+                    console.log('[AVPlay] webapis.avplay detected!');
                     resolve(true);
-                } else {
-                    console.error('[AVPlay] webapis.js loaded but object still missing or incomplete');
-                    resolve(false); // Loaded but failed check
+                    return true;
                 }
+                return false;
             };
-            script.onerror = () => {
-                console.error('[AVPlay] Failed to load webapis.js. Is this a Tizen TV?');
-                reject(new Error('Failed to load $WEBAPIS/webapis/webapis.js'));
+
+            if (checkAndResolve()) return;
+
+            const existingScript = document.querySelector('script[src*="webapis.js"]');
+
+            const performInjection = (force = false) => {
+                if (force) {
+                    console.warn('[AVPlay] Object missing despite script tag. Forcing re-injection...');
+                    const oldScript = document.querySelector('script[src*="webapis.js"]');
+                    if (oldScript) oldScript.remove();
+                } else {
+                    console.log('[AVPlay] Injecting webapis.js...');
+                }
+
+                const script = document.createElement('script');
+                script.src = '$WEBAPIS/webapis/webapis.js';
+                script.onload = () => {
+                    console.log('[AVPlay] webapis.js loaded.');
+                    if (!checkAndResolve()) {
+                        console.error('[AVPlay] webapis.js loaded but object still missing.');
+                        resolve(false);
+                    }
+                };
+                script.onerror = () => {
+                    console.error('[AVPlay] Failed to load webapis.js.');
+                    resolve(false);
+                };
+                document.head.appendChild(script);
             };
-            document.head.appendChild(script);
+
+            if (existingScript) {
+                console.log('[AVPlay] Existing script tag found. Waiting 2s for activation...');
+                setTimeout(() => {
+                    if (!checkAndResolve()) {
+                        performInjection(true); // Aggressive re-inject
+                    }
+                }, 2000);
+            } else {
+                performInjection(false);
+            }
         });
     }
 
@@ -61,9 +88,13 @@ export class AVPlayController {
         if (this.injectionPromise) {
             console.log('[AVPlay] Waiting for injection to complete...');
             try {
-                await this.injectionPromise;
+                // Race injection against a 3s timeout
+                const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Injection Timeout')), 3000));
+                await Promise.race([this.injectionPromise, timeout]);
             } catch (e) {
-                console.error('[AVPlay] Injection failed, cannot open.');
+                console.error('[AVPlay] Injection failed or timed out:', e);
+                showToast('Injection failed or timed out');
+                // If it timed out, we might still proceed to check manually if it magically appeared
             }
         }
 
