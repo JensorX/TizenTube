@@ -74,7 +74,8 @@ class HybridPlayer {
             if (enabled) {
                 showToast('TizenTube', 'Native Player Enabled');
                 // If on watch page, try to start immediately
-                if (location.pathname.startsWith('/watch')) {
+                // Simple check for "watch" in URL or Hash
+                if (location.pathname.includes('/watch') || (location.hash && location.hash.includes('/watch')) || (location.hash && location.hash.includes('?v='))) {
                     this.handleNavigation();
                 }
             } else {
