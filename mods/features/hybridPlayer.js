@@ -1,4 +1,4 @@
-import { configRead } from '../config.js';
+import { configRead, configChangeEmitter } from '../config.js';
 import { AVPlayController } from './avplayController.js';
 import { createDashManifest } from './dashManifestGenerator.js';
 import { showToast } from '../ui/ytUI.js';
@@ -18,7 +18,10 @@ class HybridPlayer {
         // Initial config check
         const enabled = configRead('enableAVPlay');
         console.log('[HybridPlayer] Init. enableAVPlay:', enabled);
-        if (!enabled) return;
+        if (enabled) {
+            showToast('TizenTube', 'HybridPlayer Initialized');
+        }
+
 
         // Try AVPlay init (might be async injection)
         const avPlayInitResult = this.avplay.init();
@@ -34,6 +37,12 @@ class HybridPlayer {
                 clearInterval(checkForPlayer);
                 this.attachListeners();
                 console.log('[HybridPlayer] Initialized and listeners attached');
+
+                // If we are already on a watch page, trigger navigation logic immediately
+                if (location.pathname.startsWith('/watch')) {
+                    console.log('[HybridPlayer] Already on watch page, triggering start...');
+                    this.handleNavigation();
+                }
             }
         }, 500);
     }
@@ -48,8 +57,26 @@ class HybridPlayer {
             this.html5Player.addEventListener('onStateChange', (e) => this.handleStateChange(e));
         }
 
-        // Also listen to config changes to enable/disable on the fly
-        // (Assuming a way to listen to config changes exists, e.g. custom event)
+        // Listen to config changes
+        configChangeEmitter.addEventListener('configChange', (e) => this.handleConfigChange(e));
+    }
+
+    handleConfigChange(e) {
+        if (e.detail.key === 'enableAVPlay') {
+            const enabled = e.detail.value;
+            console.log('[HybridPlayer] Config changed. enableAVPlay:', enabled);
+
+            if (enabled) {
+                showToast('TizenTube', 'Native Player Enabled');
+                // If on watch page, try to start immediately
+                if (location.pathname.startsWith('/watch')) {
+                    this.handleNavigation();
+                }
+            } else {
+                showToast('TizenTube', 'Native Player Disabled');
+                this.stopAVPlay();
+            }
+        }
     }
 
     handleNavigation() {

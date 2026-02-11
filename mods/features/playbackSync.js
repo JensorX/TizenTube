@@ -57,8 +57,8 @@ class SubtlePlaybackSync {
     this.maxAggressiveCorrection = 0.15; // 150ms (leicht spürbar)
 
     // Interval-Parameter
-    this.minAdjustmentInterval = 2000;           // Normal 2s
-    this.minAdjustmentIntervalAggressive = 1000; // 1s bei hohem Stress
+    this.minAdjustmentInterval = 5000;           // Normal 5s (was 2s)
+    this.minAdjustmentIntervalAggressive = 8000; // 8s bei hohem Stress (was 1s) - let CPU breathe!
 
     this.intervalMs = 400; // Öfter prüfen für schnellere Reaktion
     this.enabled = true;
@@ -224,23 +224,23 @@ class SubtlePlaybackSync {
     const requiredInterval = hasStress ? this.minAdjustmentIntervalAggressive : this.minAdjustmentInterval;
     if (timeSinceLastAdjustment < requiredInterval) return;
 
-    // 3. Critical Drop Rate = Force Sync! (Now subject to cooldown & backoff)
+    // 3. Critical Drop Rate = Force Sync!
     if (recentDropRatio > this.droppedFrameRateCritical) {
       this.consecutiveForceSyncs++;
 
       // Exponential Backoff / Give Up
-      if (this.consecutiveForceSyncs > 5) {
-        console.warn(`[SubtleSync] Giving up on sync. Too many consecutive critical drops (${this.consecutiveForceSyncs}).`);
-        showToast('TizenTube', 'Sync gave up (Too many drops). Waiting 8s...');
-        // Set a long cooldown (e.g. 10s) before trying again
-        this.lastAdjustmentTime = now + 8000;
-        this.consecutiveForceSyncs = 0; // Reset to try again later
+      // Reduced threshold to 3 trials, Increased wait to 15s
+      if (this.consecutiveForceSyncs > 3) {
+        // console.warn removed
+        // showToast('TizenTube', 'Sync gave up (Too many drops). Waiting 15s...');
+        this.lastAdjustmentTime = now + 15000;
+        this.consecutiveForceSyncs = 0;
         return;
       }
 
-      console.warn(`[SubtleSync] CRITICAL DROPPED FAILURE (${(recentDropRatio * 100).toFixed(1)}%). Forcing Resync (${this.consecutiveForceSyncs}).`);
-      showToast('TizenTube', `Force Sync (${this.consecutiveForceSyncs}/5): Drops critical`);
-      // Force aggressive sync even if drift seems low (trust actual visual lag)
+      // console.warn removed
+      // showToast('TizenTube', `Force Sync...`); // User removed this, keeping it silent
+
       this._applyCorrection(actualTime + 0.1, 0.5, 'FORCE_DROP_SYNC');
       return;
     } else {
@@ -255,14 +255,14 @@ class SubtlePlaybackSync {
 
     // A: Kritischer Drift (> 3.5s) -> Letzter Ausweg: Kurzer Reset
     if (absDrift > this.resetThreshold) {
-      console.warn(`[SubtleSync] CRITICAL DRIFT (${absDrift.toFixed(2)}s). Performing Emergency Reset.`);
+      // console.warn removed
       this._performEmergencyReset();
       return;
     }
 
-    // B: Großer Drift (> 1.5s) -> Harter Sprung (nicht mehr subtil, aber nötig)
+    // B: Großer Drift (> 1.5s) -> Harter Sprung
     if (absDrift > this.hardJumpThreshold) {
-      console.warn(`[SubtleSync] LARGE DRIFT (${absDrift.toFixed(2)}s). Performing Hard Sync.`);
+      // console.warn removed
       this._applyCorrection(expectedTime, absDrift, 'HARD');
       return;
     }
