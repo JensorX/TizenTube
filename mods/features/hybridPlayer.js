@@ -27,6 +27,7 @@ class HybridPlayer {
         const avPlayInitResult = this.avplay.init();
         if (!avPlayInitResult) {
             console.warn('[HybridPlayer] AVPlay init pending (injection?) or failed. Continuing attachment anyway...');
+            showToast('TizenTube', 'AVPlay init pending (injection?) or failed. Continuing attachment anyway...');
         }
 
         // Wait for player element
@@ -39,8 +40,9 @@ class HybridPlayer {
                 console.log('[HybridPlayer] Initialized and listeners attached');
 
                 // If we are already on a watch page, trigger navigation logic immediately
-                if (location.pathname.startsWith('/watch')) {
+                if (location.pathname.includes('/watch') || (location.hash && location.hash.includes('/watch')) || (location.hash && location.hash.includes('?v='))) {
                     console.log('[HybridPlayer] Already on watch page, triggering start...');
+                    showToast('TizenTube', 'Already on watch page, triggering start...');
                     this.handleNavigation();
                 }
             }
@@ -50,6 +52,9 @@ class HybridPlayer {
     attachListeners() {
         // Use 'yt-navigate-finish' for video changes
         window.addEventListener('yt-navigate-finish', () => this.handleNavigation());
+
+        // Use 'hashchange' as backup (common in TV UIs / Cobalt)
+        window.addEventListener('hashchange', () => this.handleNavigation());
 
         // Monitor playback state via existing player API if possible, or video events
         // TizenTube often hooks into 'onStateChange' on the player element
@@ -80,8 +85,14 @@ class HybridPlayer {
     }
 
     handleNavigation() {
-        // Check if we are on a watch page
-        if (!location.pathname.startsWith('/watch')) {
+        // Check if we are on a watch page (Path or Hash)
+        const isWatchPath = location.pathname.startsWith('/watch');
+        // Check hash like #/watch?v=... or just plain query mechanism if path is /
+        const isWatchHash = location.hash && (location.hash.includes('/watch') || location.hash.includes('?v='));
+
+        console.log(`[HybridPlayer] handleNavigation. Path: ${location.pathname}, Hash: ${location.hash}`);
+
+        if (!isWatchPath && !isWatchHash) {
             this.stopAVPlay();
             return;
         }
@@ -90,6 +101,7 @@ class HybridPlayer {
         const videoId = this.getVideoId();
         if (videoId && videoId !== this.currentVideoId) {
             console.log(`[HybridPlayer] Video changed: ${this.currentVideoId} -> ${videoId}`);
+            showToast('TizenTube', `Video Detected: ${videoId}`);
             this.currentVideoId = videoId;
             // Stop previous playback
             this.stopAVPlay();
@@ -298,7 +310,27 @@ class HybridPlayer {
     }
 
     getVideoId() {
-        return this.html5Player?.getVideoData?.()?.video_id;
+        // 1. Try player API
+        let vid = this.html5Player?.getVideoData?.()?.video_id;
+        if (vid) return vid;
+
+        // 2. Try URL Search Params
+        const params = new URLSearchParams(location.search);
+        vid = params.get('v');
+        if (vid) return vid;
+
+        // 3. Try Hash Params (SponsorBlock style)
+        if (location.hash) {
+            // covers #/watch?v=VIDEO_ID or #?v=VIDEO_ID
+            const hashParts = location.hash.split('?');
+            if (hashParts.length > 1) {
+                const hashParams = new URLSearchParams(hashParts[1]);
+                vid = hashParams.get('v');
+                if (vid) return vid;
+            }
+        }
+
+        return null;
     }
 }
 
