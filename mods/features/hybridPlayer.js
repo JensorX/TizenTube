@@ -145,13 +145,13 @@ class HybridPlayer {
                 showToast('TizenTube', 'AVPlay: Waiting for Stream Data...');
                 // Poll for up to 5 seconds
                 let attempts = 0;
-                const pollInterval = setInterval(() => {
+                const pollInterval = setInterval(async () => { // Made async to allow await
                     attempts++;
                     if (window.__avplayStreamData) {
                         clearInterval(pollInterval);
                         console.log(`[HybridPlayer] Stream data found after ${attempts} attempts.`);
                         showToast('TizenTube', 'AVPlay: Stream Data Found');
-                        this.startAVPlayWithData(window.__avplayStreamData);
+                        await this.startAVPlayWithData(window.__avplayStreamData);
                     } else if (attempts > 10) { // 5 seconds (500ms * 10)
                         clearInterval(pollInterval);
                         console.warn('[HybridPlayer] Timed out waiting for stream data.');
@@ -171,68 +171,65 @@ class HybridPlayer {
     }
 
     async startAVPlayWithData(streamData) {
-        if (!streamData.adaptiveFormats) {
-            showToast('TizenTube', 'AVPlay: Invalid Stream Data');
-            return;
-        }
-
-        console.log('[HybridPlayer] Attempting to start AVPlay...');
-
-        // 1. Select Best Streams (Video + Audio)
-        const bestVideo = this.selectBestVideoStream(streamData.adaptiveFormats);
-        const bestAudio = this.selectBestAudioStream(streamData.adaptiveFormats);
-
-        if (!bestVideo || !bestAudio) {
-            console.error('[HybridPlayer] Could not find suitable streams');
-            showToast('TizenTube', 'AVPlay: No suitable streams found');
-            return;
-        }
-
-        console.log(`[HybridPlayer] Selected Streams: Video=${bestVideo.height}p (${bestVideo.mimeType}), Audio=${bestAudio.bitrate}bps`);
-
-        // 2. Generate Local DASH Manifest
-        const manifestUrl = createDashManifest(bestVideo, bestAudio);
-        if (!manifestUrl) {
-            console.error('[HybridPlayer] Manifest generation failed');
-            showToast('TizenTube', 'AVPlay: Manifest Gen Failed');
-            return;
-        }
-
-        // 3. Prepare HTML5 Player (Mute & Hide to save resources)
-        this.videoElement.muted = true;
-        this.videoElement.style.opacity = '0';
-        this.videoElement.style.visibility = 'hidden'; // Force hide
-
-        // Make YouTube player container transparent so AVPlay (underneath) is visible
-        this.html5Player.style.background = 'transparent';
-        const playerApi = document.getElementById('player-api');
-        if (playerApi) playerApi.style.background = 'transparent';
-
-        // Also remove black background from video element itself
-        this.videoElement.style.background = 'transparent';
-
-        // 4. Start AVPlay
         try {
-            console.log('[HybridPlayer] Opening AVPlay with manifest:', manifestUrl);
+            if (!streamData.adaptiveFormats) {
+                showToast('TizenTube', 'AVPlay: No stream formats found');
+                return;
+            }
+
+            console.log('[HybridPlayer] Selection Phase...');
+            showToast('TizenTube', 'AVPlay: Selecting Streams...');
+
+            // 1. Select Best Streams (Video + Audio)
+            const bestVideo = this.selectBestVideoStream(streamData.adaptiveFormats);
+            const bestAudio = this.selectBestAudioStream(streamData.adaptiveFormats);
+
+            if (!bestVideo || !bestAudio) {
+                console.error('[HybridPlayer] No suitable streams found');
+                showToast('TizenTube', 'AVPlay: No suitable streams found');
+                return;
+            }
+
+            console.log(`[HybridPlayer] Manifest Phase: Video=${bestVideo.height}p, Audio=${bestAudio.bitrate}`);
+            showToast('TizenTube', 'AVPlay: Generating Manifest...');
+
+            // 2. Generate Local DASH Manifest
+            const manifestUrl = createDashManifest(bestVideo, bestAudio);
+            if (!manifestUrl) {
+                console.error('[HybridPlayer] Manifest generation failed');
+                showToast('TizenTube', 'AVPlay: Manifest Gen Failed');
+                return;
+            }
+
+            // 3. Prepare HTML5 Player (Mute & Hide to save resources)
+            this.videoElement.muted = true;
+            this.videoElement.style.opacity = '0';
+            this.videoElement.style.visibility = 'hidden';
+
+            this.html5Player.style.background = 'transparent';
+            const playerApi = document.getElementById('player-api');
+            if (playerApi) playerApi.style.background = 'transparent';
+            this.videoElement.style.background = 'transparent';
+
+            // 4. Start AVPlay
+            console.log('[HybridPlayer] Opening AVPlay...');
             showToast('TizenTube', 'AVPlay: Opening Native Player...');
 
-            // Try to set source to HDMI (activates internal video layer for some models)
+            // Wake up Video Layer
             if (typeof tizen !== 'undefined' && tizen.tvwindow) {
                 try {
-                    tizen.tvwindow.setSource({
-                        type: 'TV',
-                        number: 1
-                    }, () => console.log('[HybridPlayer] tvwindow source set'), (e) => console.error('[HybridPlayer] tvwindow error', e));
+                    tizen.tvwindow.setSource({ type: 'TV', number: 1 },
+                        () => console.log('[HybridPlayer] tvwindow source set'),
+                        (e) => console.error('[HybridPlayer] tvwindow error', e));
                 } catch (err) { }
             }
 
             await this.avplay.open(manifestUrl);
-            showToast('TizenTube', 'AVPlay: Prepared. Starting...');
+            showToast('TizenTube', 'AVPlay: Ready. Syncing...');
 
             this.avplay.play();
             this.isAVPlayActive = true;
 
-            // Sync initial time
             const startTime = this.videoElement.currentTime * 1000;
             if (startTime > 0) this.avplay.seekTo(startTime);
 
@@ -240,13 +237,10 @@ class HybridPlayer {
             this.videoElement.play();
             this.startSyncLoop();
 
-            // Disable SubtlePlaybackSync if active to avoid conflicts and double-syncing
             if (window.__ttSubtlePlaybackSync) {
-                console.log('[HybridPlayer] Disabling SubtlePlaybackSync to prevent conflicts');
                 window.__ttSubtlePlaybackSync.stop();
                 window.__ttSubtlePlaybackSync.enabled = false;
             }
-
         } catch (e) {
             console.error('[HybridPlayer] AVPlay start failed:', e);
             showToast('TizenTube', `AVPlay Failed: ${e.message || e}`);
