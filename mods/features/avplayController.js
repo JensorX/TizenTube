@@ -154,10 +154,29 @@ export class AVPlayController {
                 };
 
                 webapis.avplay.setListener(listener);
+                console.log('[AVPlay] Calling prepareAsync...');
+
+                let isFinalized = false;
+                const prepareTimeout = setTimeout(() => {
+                    if (!isFinalized) {
+                        isFinalized = true;
+                        console.error('[AVPlay] prepareAsync timed out after 5s');
+                        reject(new Error('Prepare Timeout (5s)'));
+                    }
+                }, 5000);
+
                 webapis.avplay.prepareAsync(() => {
+                    if (isFinalized) return;
+                    isFinalized = true;
+                    clearTimeout(prepareTimeout);
+                    console.log('[AVPlay] prepareAsync success');
                     this.state = 'READY';
                     resolve();
                 }, (err) => {
+                    if (isFinalized) return;
+                    isFinalized = true;
+                    clearTimeout(prepareTimeout);
+                    console.error('[AVPlay] prepareAsync failed:', err);
                     reject(err);
                 });
             });

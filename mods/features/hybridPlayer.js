@@ -201,6 +201,7 @@ class HybridPlayer {
         // 3. Prepare HTML5 Player (Mute & Hide to save resources)
         this.videoElement.muted = true;
         this.videoElement.style.opacity = '0';
+        this.videoElement.style.visibility = 'hidden'; // Force hide
 
         // Make YouTube player container transparent so AVPlay (underneath) is visible
         this.html5Player.style.background = 'transparent';
@@ -212,8 +213,23 @@ class HybridPlayer {
 
         // 4. Start AVPlay
         try {
+            console.log('[HybridPlayer] Opening AVPlay with manifest:', manifestUrl);
+            showToast('TizenTube', 'AVPlay: Opening Native Player...');
+
+            // Try to set source to HDMI (activates internal video layer for some models)
+            if (typeof tizen !== 'undefined' && tizen.tvwindow) {
+                try {
+                    tizen.tvwindow.setSource({
+                        type: 'TV',
+                        number: 1
+                    }, () => console.log('[HybridPlayer] tvwindow source set'), (e) => console.error('[HybridPlayer] tvwindow error', e));
+                } catch (err) { }
+            }
+
             await this.avplay.open(manifestUrl);
-            this.avplay.play(); // Auto-play
+            showToast('TizenTube', 'AVPlay: Prepared. Starting...');
+
+            this.avplay.play();
             this.isAVPlayActive = true;
 
             // Sync initial time
@@ -221,12 +237,7 @@ class HybridPlayer {
             if (startTime > 0) this.avplay.seekTo(startTime);
 
             showToast('TizenTube', 'Native Player (AVPlay) Active');
-
-            // Hide loading spinner if present? 
-            // The HTML5 player might be buffering or playing silently.
-            // Ideally we want the HTML5 player to *think* it's playing so UI updates (progress bar).
             this.videoElement.play();
-
             this.startSyncLoop();
 
             // Disable SubtlePlaybackSync if active to avoid conflicts and double-syncing
