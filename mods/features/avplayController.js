@@ -55,51 +55,32 @@ export class AVPlayController {
 
             if (checkAndResolve()) return;
 
-            // Paths to try
-            const candidatePaths = [
-                '$WEBAPIS/webapis/webapis.js', // Standard macro
-                'file:///usr/share/nginx/html/webapis/webapis.js', // Common Tizen 2.4+
-                'file:///usr/tv/webapis/webapis.js' // Legacy
-            ];
+            console.log('[AVPlay] Waiting for webapis injection...');
 
-            let attempt = 0;
+            // Poll for webapis (in case CDP injection is slow)
+            let attempts = 0;
+            const maxAttempts = 20; // 10 seconds
 
-            const tryNextPath = () => {
-                if (attempt >= candidatePaths.length) {
-                    console.error('[AVPlay] All injection attempts failed.');
-                    resolve(false);
+            const poll = setInterval(() => {
+                attempts++;
+                if (checkAndResolve()) {
+                    clearInterval(poll);
                     return;
                 }
 
-                const path = candidatePaths[attempt];
-                console.log(`[AVPlay] Injecting webapis.js from: ${path}`);
+                if (attempts >= maxAttempts) {
+                    clearInterval(poll);
+                    console.error('[AVPlay] WebAPIs not found after waiting.');
 
-                const script = document.createElement('script');
-                script.src = path;
-
-                script.onload = () => {
-                    console.log(`[AVPlay] Script loaded: ${path}`);
-                    if (!checkAndResolve()) {
-                        console.warn('[AVPlay] Script loaded but object missing. Trying next...');
-                        attempt++;
-                        tryNextPath();
-                    }
-                };
-
-                script.onerror = () => {
-                    console.warn(`[AVPlay] Failed to load: ${path}`);
-                    attempt++;
-                    tryNextPath();
-                };
-
-                document.head.appendChild(script);
-            };
-
-            // Remove any existing broken scripts first
-            const existing = document.querySelectorAll('script[src*="webapis.js"]');
-            existing.forEach(s => s.remove());
-
-            tryNextPath();
+                    // Final fallback: try standard macro injection
+                    console.log('[AVPlay] Trying fallback injection...');
+                    const d = document.createElement('script');
+                    d.src = '$WEBAPIS/webapis/webapis.js';
+                    d.onload = () => checkAndResolve() || resolve(false);
+                    d.onerror = () => resolve(false);
+                    document.head.appendChild(d);
+                }
+            }, 500);
         });
     }
 
