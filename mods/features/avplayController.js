@@ -14,17 +14,29 @@ export class AVPlayController {
     }
 
     init() {
-        // 1. Check if already available
+        // 1. Check current window
         if (typeof webapis !== 'undefined' && typeof webapis.avplay !== 'undefined') {
             this.isSupported = true;
-            console.log('[AVPlay] Native API found and supported.');
+            console.log('[AVPlay] Native API found in current window.');
             return true;
         }
 
-        // 2. Not found, try to inject
+        // 2. Check parent window (if in iframe/module)
+        try {
+            if (window.parent && window.parent.webapis && window.parent.webapis.avplay) {
+                this.isSupported = true;
+                window.webapis = window.parent.webapis; // Alias for easier usage
+                console.log('[AVPlay] Native API found in parent window. Aliased.');
+                return true;
+            }
+        } catch (e) {
+            console.warn('[AVPlay] Parent window access failed:', e);
+        }
+
+        // 3. Not found, try to inject
         console.warn('[AVPlay] webapis not found. Attempting to inject script...');
         this.injectWebAPIs();
-        return false; // Async, so return false for now. HybridPlayer will retry/fail.
+        return false;
     }
 
     injectWebAPIs() {
@@ -43,43 +55,51 @@ export class AVPlayController {
 
             if (checkAndResolve()) return;
 
-            const existingScript = document.querySelector('script[src*="webapis.js"]');
+            // Paths to try
+            const candidatePaths = [
+                '$WEBAPIS/webapis/webapis.js', // Standard macro
+                'file:///usr/share/nginx/html/webapis/webapis.js', // Common Tizen 2.4+
+                'file:///usr/tv/webapis/webapis.js' // Legacy
+            ];
 
-            const performInjection = (force = false) => {
-                if (force) {
-                    console.warn('[AVPlay] Object missing despite script tag. Forcing re-injection...');
-                    const oldScript = document.querySelector('script[src*="webapis.js"]');
-                    if (oldScript) oldScript.remove();
-                } else {
-                    console.log('[AVPlay] Injecting webapis.js...');
+            let attempt = 0;
+
+            const tryNextPath = () => {
+                if (attempt >= candidatePaths.length) {
+                    console.error('[AVPlay] All injection attempts failed.');
+                    resolve(false);
+                    return;
                 }
 
+                const path = candidatePaths[attempt];
+                console.log(`[AVPlay] Injecting webapis.js from: ${path}`);
+
                 const script = document.createElement('script');
-                script.src = '$WEBAPIS/webapis/webapis.js';
+                script.src = path;
+
                 script.onload = () => {
-                    console.log('[AVPlay] webapis.js loaded.');
+                    console.log(`[AVPlay] Script loaded: ${path}`);
                     if (!checkAndResolve()) {
-                        console.error('[AVPlay] webapis.js loaded but object still missing.');
-                        resolve(false);
+                        console.warn('[AVPlay] Script loaded but object missing. Trying next...');
+                        attempt++;
+                        tryNextPath();
                     }
                 };
+
                 script.onerror = () => {
-                    console.error('[AVPlay] Failed to load webapis.js.');
-                    resolve(false);
+                    console.warn(`[AVPlay] Failed to load: ${path}`);
+                    attempt++;
+                    tryNextPath();
                 };
+
                 document.head.appendChild(script);
             };
 
-            if (existingScript) {
-                console.log('[AVPlay] Existing script tag found. Waiting 2s for activation...');
-                setTimeout(() => {
-                    if (!checkAndResolve()) {
-                        performInjection(true); // Aggressive re-inject
-                    }
-                }, 2000);
-            } else {
-                performInjection(false);
-            }
+            // Remove any existing broken scripts first
+            const existing = document.querySelectorAll('script[src*="webapis.js"]');
+            existing.forEach(s => s.remove());
+
+            tryNextPath();
         });
     }
 
