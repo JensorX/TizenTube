@@ -4,7 +4,10 @@
  */
 
 export function createDashManifest(video, audio) {
-  if (!video || !audio) return null;
+  if (!video || !audio || !video.url || !audio.url) {
+    console.error('[DashManifest] Missing required metadata or URLs', { video: !!video, audio: !!audio, vUrl: !!video?.url, aUrl: !!audio?.url });
+    return null;
+  }
 
   // Basic MPD template
   // We use a high minBufferTime to ensure AVPlay buffers enough before starting
@@ -22,7 +25,7 @@ export function createDashManifest(video, audio) {
      mediaPresentationDuration="PT${durationS}S">
   <Period>
     <!-- Video Adaptation Set -->
-    <AdaptationSet mimeType="${video.mimeType.split(';')[0]}" contentType="video" subsegmentAlignment="true" startWithSAP="1">
+    <AdaptationSet mimeType="${(video.mimeType || '').split(';')[0]}" contentType="video" subsegmentAlignment="true" startWithSAP="1">
       <Representation id="video" bandwidth="${video.bitrate}" width="${video.width || 0}" height="${video.height || 0}" codecs="${extractCodec(video.mimeType)}">
         <BaseURL>${escapeXml(video.url)}</BaseURL>
         <SegmentBase indexRange="${videoIndexRange}">
@@ -32,7 +35,7 @@ export function createDashManifest(video, audio) {
     </AdaptationSet>
 
     <!-- Audio Adaptation Set -->
-    <AdaptationSet mimeType="${audio.mimeType.split(';')[0]}" contentType="audio" subsegmentAlignment="true" startWithSAP="1">
+    <AdaptationSet mimeType="${(audio.mimeType || '').split(';')[0]}" contentType="audio" subsegmentAlignment="true" startWithSAP="1">
       <Representation id="audio" bandwidth="${audio.bitrate}" codecs="${extractCodec(audio.mimeType)}" audioSamplingRate="48000">
         <BaseURL>${escapeXml(audio.url)}</BaseURL>
         <SegmentBase indexRange="${audioIndexRange}">
@@ -47,11 +50,13 @@ export function createDashManifest(video, audio) {
 }
 
 function extractCodec(mimeType) {
+  if (!mimeType) return '';
   const match = mimeType.match(/codecs="([^"]+)"/);
   return match ? match[1] : '';
 }
 
 function escapeXml(unsafe) {
+  if (!unsafe) return '';
   return unsafe.replace(/[<>&'"]/g, function (c) {
     switch (c) {
       case '<': return '&lt;';
