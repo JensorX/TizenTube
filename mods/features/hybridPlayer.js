@@ -178,6 +178,15 @@ class HybridPlayer {
                 return;
             }
 
+            // Diagnostic: Show raw format counts
+            const vFormats = streamData.adaptiveFormats.filter(f => f.mimeType.startsWith('video/'));
+            console.log(`[HybridPlayer] Formats: ${streamData.adaptiveFormats.length} (Video: ${vFormats.length})`);
+
+            // On-screen diagnostic for TV
+            const sample = streamData.adaptiveFormats[0];
+            const sampleInfo = sample ? `Sample: ${sample.mimeType.split(';')[0]} | URL: ${!!sample.url} | Cipher: ${!!(sample.signatureCipher || sample.cipher)}` : 'No Sample';
+            showToast('TizenTube Raw', sampleInfo);
+
             console.log('[HybridPlayer] Selection Phase...');
             showToast('TizenTube', 'AVPlay: Selecting Streams...');
 
@@ -187,7 +196,15 @@ class HybridPlayer {
 
             if (!bestVideo || !bestAudio) {
                 console.error('[HybridPlayer] No suitable streams found');
-                showToast('TizenTube', 'AVPlay: No suitable streams found');
+
+                // Detailed failure toast
+                const fmts = streamData.adaptiveFormats;
+                const vAll = fmts.filter(f => f.mimeType.startsWith('video/'));
+                const vDecrypted = vAll.map(f => signatureDecrypter.decrypt(f));
+                const vWithUrl = vDecrypted.filter(f => f.url);
+
+                showToast('TizenTube Test', `No Streams. V: ${vAll.length} -> Url: ${vWithUrl.length}`);
+
                 return;
             }
 
@@ -325,16 +342,28 @@ class HybridPlayer {
         // Filter for video and existence of URL or Cipher
         // Supported codecs (VP9/AV1) preferred on Tizen. 
         // We filter out avc1 for high res as it's usually capped at 1080p and higher CPU usage.
-        const videoStreams = formats.map(f => signatureDecrypter.decrypt(f))
+
+        // Decrypt first
+        const decryptedFormats = formats.map(f => signatureDecrypter.decrypt(f));
+
+        const videoStreams = decryptedFormats
             .filter(f => f.mimeType.startsWith('video/') && f.url && !f.mimeType.includes('avc1'));
 
         if (videoStreams.length === 0) {
-            // Fallback to any video stream with URL
-            const fallbackStreams = formats.map(f => signatureDecrypter.decrypt(f))
+            console.warn('[HybridPlayer] Strict video filter returned 0. Trying fallback...');
+
+            // Fallback 1: Allow avc1
+            const fallbackAvc = decryptedFormats
                 .filter(f => f.mimeType.startsWith('video/') && f.url);
-            if (fallbackStreams.length === 0) return null;
-            fallbackStreams.sort((a, b) => b.height - a.height);
-            return fallbackStreams[0];
+
+            if (fallbackAvc.length > 0) {
+                console.log('[HybridPlayer] Found streams in fallback (allowing avc1).');
+                fallbackAvc.sort((a, b) => b.height - a.height);
+                return fallbackAvc.find(s => s.height <= h) || fallbackAvc[0];
+            }
+
+            console.error('[HybridPlayer] No video streams with URL found even after fallback.');
+            return null;
         }
 
         // Sort: Height DESC
@@ -346,10 +375,15 @@ class HybridPlayer {
 
     selectBestAudioStream(formats) {
         // Filter for audio and existence of URL or Cipher
-        const audioStreams = formats.map(f => signatureDecrypter.decrypt(f))
+        const decryptedFormats = formats.map(f => signatureDecrypter.decrypt(f));
+
+        const audioStreams = decryptedFormats
             .filter(f => f.mimeType.startsWith('audio/') && f.url);
 
-        if (audioStreams.length === 0) return null;
+        if (audioStreams.length === 0) {
+            console.error('[HybridPlayer] No audio streams with URL found.');
+            return null;
+        }
 
         // Sort: Bitrate DESC
         audioStreams.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
