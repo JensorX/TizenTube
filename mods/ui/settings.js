@@ -322,6 +322,12 @@ export default function modernUI(update, parameters) {
                     ]
                 },
                 {
+                    name: 'Performance Mode (HTML5)',
+                    icon: 'SPEED',
+                    value: 'enablePerformanceMode',
+                    subtitle: 'Prioritize stability: H.264 only, no previews, less animations'
+                },
+                {
                     name: 'Native Player (AVPlay)',
                     icon: 'TV',
                     value: null,

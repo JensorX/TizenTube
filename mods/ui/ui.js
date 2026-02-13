@@ -36,13 +36,14 @@ function execute_once_dom_loaded() {
 
   // Fix UI issues.
   const ui = configRead('enableFixedUI');
+  const performanceMode = configRead('enablePerformanceMode');
   if (ui) {
     try {
-      window.tectonicConfig.featureSwitches.isLimitedMemory = false;
-      window.tectonicConfig.clientData.legacyApplicationQuality = 'full-animation';
-      window.tectonicConfig.featureSwitches.enableAnimations = true;
-      window.tectonicConfig.featureSwitches.enableOnScrollLinearAnimation = true;
-      window.tectonicConfig.featureSwitches.enableListAnimations = true;
+      window.tectonicConfig.featureSwitches.isLimitedMemory = performanceMode ? true : false;
+      window.tectonicConfig.clientData.legacyApplicationQuality = performanceMode ? 'low' : 'full-animation';
+      window.tectonicConfig.featureSwitches.enableAnimations = performanceMode ? false : true;
+      window.tectonicConfig.featureSwitches.enableOnScrollLinearAnimation = performanceMode ? false : true;
+      window.tectonicConfig.featureSwitches.enableListAnimations = performanceMode ? false : true;
     } catch (e) { }
   }
 
@@ -191,7 +192,7 @@ function execute_once_dom_loaded() {
   document.addEventListener('keyup', eventHandler, true);
   if (configRead('showWelcomeToast')) {
     setTimeout(() => {
-      showToast('Welcome to TizenTubeAV 2.1.21', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
+      showToast('Welcome to TizenTubeAV 2.1.22', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
     }, 2000);
   }
 

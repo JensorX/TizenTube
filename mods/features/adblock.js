@@ -45,14 +45,30 @@ JSON.parse = function () {
     }
   }
 
-  if (r?.streamingData?.adaptiveFormats && configRead('videoPreferredCodec') !== 'any') {
+  if (r?.streamingData?.adaptiveFormats) {
     const preferredCodec = configRead('videoPreferredCodec');
-    const hasPreferredCodec = r.streamingData.adaptiveFormats.find(format => format.mimeType.includes(preferredCodec));
-    if (hasPreferredCodec) {
-      r.streamingData.adaptiveFormats = r.streamingData.adaptiveFormats.filter(format => {
-        if (format.mimeType.startsWith('audio/')) return true;
-        return format.mimeType.includes(preferredCodec);
-      });
+    const performanceMode = configRead('enablePerformanceMode');
+
+    // In performance mode, we HEAVILY prioritize avc1 (hardware accelerated)
+    // and cap resolution to 1080p for HTML5 stability.
+    const effectiveCodec = (performanceMode && preferredCodec === 'any') ? 'avc1' : preferredCodec;
+
+    if (effectiveCodec !== 'any') {
+      const hasEffectiveCodec = r.streamingData.adaptiveFormats.find(format => format.mimeType.includes(effectiveCodec));
+      if (hasEffectiveCodec) {
+        r.streamingData.adaptiveFormats = r.streamingData.adaptiveFormats.filter(format => {
+          if (format.mimeType.startsWith('audio/')) return true;
+
+          let match = format.mimeType.includes(effectiveCodec);
+
+          // If in performance mode, we also cap at 1080p (1920x1080) for avc1
+          if (performanceMode && match && format.height > 1080) {
+            match = false;
+          }
+
+          return match;
+        });
+      }
     }
   }
 
@@ -262,7 +278,7 @@ function processShelves(shelves, shouldAddPreviews = true) {
 }
 
 function addPreviews(items) {
-  if (!configRead('enablePreviews')) return;
+  if (!configRead('enablePreviews') || configRead('enablePerformanceMode')) return;
   for (const item of items) {
     if (item.tileRenderer) {
       const watchEndpoint = item.tileRenderer.onSelectCommand;
