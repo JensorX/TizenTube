@@ -182,8 +182,23 @@ class HybridPlayer {
             const vFormats = streamData.adaptiveFormats.filter(f => f.mimeType.startsWith('video/'));
             console.log(`[HybridPlayer] Formats: ${streamData.adaptiveFormats.length} (Video: ${vFormats.length})`);
 
-            // On-screen diagnostic for TV
+            // On-screen diagnostic for TV - show actual object keys
             const sample = streamData.adaptiveFormats[0];
+            const sampleKeys = sample ? Object.keys(sample).join(', ') : 'No keys';
+            showToast('TizenTube Keys', sampleKeys);
+
+            // Check for manifest URLs or other URL sources in streamingData
+            const sdKeys = Object.keys(streamData).join(', ');
+            showToast('TizenTube SD-Keys', sdKeys);
+
+            // Check if dashManifestUrl or hlsManifestUrl exist
+            if (streamData.dashManifestUrl) {
+                showToast('TizenTube DASH', streamData.dashManifestUrl.substring(0, 80));
+            }
+            if (streamData.hlsManifestUrl) {
+                showToast('TizenTube HLS', streamData.hlsManifestUrl.substring(0, 80));
+            }
+
             const sampleInfo = sample ? `Sample: ${sample.mimeType.split(';')[0]} | URL: ${!!sample.url} | Cipher: ${!!(sample.signatureCipher || sample.cipher)}` : 'No Sample';
             showToast('TizenTube Raw', sampleInfo);
 
