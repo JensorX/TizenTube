@@ -179,28 +179,33 @@ class HybridPlayer {
             }
 
             // Diagnostic: Show raw format counts
-            const vFormats = streamData.adaptiveFormats.filter(f => f.mimeType.startsWith('video/'));
-            console.log(`[HybridPlayer] Formats: ${streamData.adaptiveFormats.length} (Video: ${vFormats.length})`);
+            const vFormats = streamData.adaptiveFormats?.filter(f => f.mimeType.startsWith('video/')) || [];
+            console.log(`[HybridPlayer] Formats: ${streamData.adaptiveFormats?.length} (Video: ${vFormats.length})`);
 
-            // On-screen diagnostic for TV - show actual object keys
-            const sample = streamData.adaptiveFormats[0];
-            const sampleKeys = sample ? Object.keys(sample).join(', ') : 'No keys';
-            showToast('TizenTube Keys', sampleKeys);
+            // Check for server-side ABR manifest (DASH) - Priority #1 for YouTube TV
+            if (streamData.serverAbrStreamingUrl) {
+                console.log('[HybridPlayer] Found serverAbrStreamingUrl, using it for AVPlay...');
+                showToast('TizenTube', 'AVPlay: Using Server Manifest...');
 
-            // Check for manifest URLs or other URL sources in streamingData
-            const sdKeys = Object.keys(streamData).join(', ');
-            showToast('TizenTube SD-Keys', sdKeys);
+                // Mute HTML5 player
+                this.videoElement.muted = true;
+                this.videoElement.style.opacity = '0';
 
-            // Check if dashManifestUrl or hlsManifestUrl exist
-            if (streamData.dashManifestUrl) {
-                showToast('TizenTube DASH', streamData.dashManifestUrl.substring(0, 80));
+                // Start AVPlay with remote manifest
+                try {
+                    await this.avPlayController.open(streamData.serverAbrStreamingUrl);
+                    await this.avPlayController.prepareAsync();
+                    this.avPlayController.play();
+                } catch (e) {
+                    console.error('[HybridPlayer] AVPlay Server Manifest failed:', e);
+                    showToast('TizenTube', `AVPlay Error: ${e.message}`);
+                    // Fallback to manual selection if this fails? 
+                    // Unlikely to work if formats have no URLs, but we can let it fall through or return.
+                    // If server manifest fails and streams have no URLs, we are dead anyway.
+                    return;
+                }
+                return;
             }
-            if (streamData.hlsManifestUrl) {
-                showToast('TizenTube HLS', streamData.hlsManifestUrl.substring(0, 80));
-            }
-
-            const sampleInfo = sample ? `Sample: ${sample.mimeType.split(';')[0]} | URL: ${!!sample.url} | Cipher: ${!!(sample.signatureCipher || sample.cipher)}` : 'No Sample';
-            showToast('TizenTube Raw', sampleInfo);
 
             console.log('[HybridPlayer] Selection Phase...');
             showToast('TizenTube', 'AVPlay: Selecting Streams...');
@@ -213,13 +218,11 @@ class HybridPlayer {
                 console.error('[HybridPlayer] No suitable streams found');
 
                 // Detailed failure toast
-                const fmts = streamData.adaptiveFormats;
+                const fmts = streamData.adaptiveFormats || [];
                 const vAll = fmts.filter(f => f.mimeType.startsWith('video/'));
-                const vDecrypted = vAll.map(f => signatureDecrypter.decrypt(f));
-                const vWithUrl = vDecrypted.filter(f => f.url);
+                const vWithUrl = vAll.filter(f => f.url);
 
                 showToast('TizenTube Test', `No Streams. V: ${vAll.length} -> Url: ${vWithUrl.length}`);
-
                 return;
             }
 
@@ -247,6 +250,15 @@ class HybridPlayer {
             // 4. Start AVPlay
             console.log('[HybridPlayer] Opening AVPlay...');
             showToast('TizenTube', 'AVPlay: Opening Native Player...');
+
+            try {
+                await this.avPlayController.open(manifestUrl);
+                await this.avPlayController.prepareAsync(); // Using wrapper's simplified prepare
+                this.avPlayController.play();
+            } catch (e) {
+                console.error('[HybridPlayer] AVPlay Launch Failed:', e);
+                showToast('TizenTube', `AVPlay Launch Error: ${e.message}`);
+            }
 
             // Wake up Video Layer
             if (typeof tizen !== 'undefined' && tizen.tvwindow) {
