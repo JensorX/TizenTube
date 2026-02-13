@@ -309,23 +309,38 @@ class HybridPlayer {
     }
 
     selectBestVideoStream(formats) {
-        // Implement logic to pick based on configRead('preferredVideoQuality') or max
-        // For now, pick max resolution video/mp4 or webm that AVPlay supports
-        // Tizen supports VP9 and H264. VP9 (webm) usually higher res.
+        const preferredQuality = configRead('preferredVideoQuality');
+        const h = (preferredQuality === 'auto' || isNaN(parseInt(preferredQuality))) ? 1080 : parseInt(preferredQuality);
 
-        const videoFormats = formats.filter(f => f.mimeType.startsWith('video/'));
-        // Sort: Height DESC, Bitrate DESC
-        videoFormats.sort((a, b) => b.height - a.height || b.bitrate - a.bitrate);
+        // Filter for video and existence of URL
+        // Supported codecs (VP9/AV1) preferred on Tizen. 
+        // We filter out avc1 for high res as it's usually capped at 1080p and higher CPU usage.
+        const videoStreams = formats.filter(f => f.mimeType.startsWith('video/') && f.url && !f.mimeType.includes('avc1'));
+        if (videoStreams.length === 0) {
+            // Fallback to any video stream with URL
+            const fallbackStreams = formats.filter(f => f.mimeType.startsWith('video/') && f.url);
+            if (fallbackStreams.length === 0) return null;
+            fallbackStreams.sort((a, b) => b.height - a.height);
+            return fallbackStreams[0];
+        }
 
-        // TODO: Filter by codec config if needed
-        return videoFormats[0];
+        // Sort: Height DESC
+        videoStreams.sort((a, b) => b.height - a.height);
+
+        // Find best quality <= preferred, or closest available
+        return videoStreams.find(s => s.height <= h) || videoStreams[videoStreams.length - 1];
     }
 
     selectBestAudioStream(formats) {
-        const audioFormats = formats.filter(f => f.mimeType.startsWith('audio/'));
+        // Filter for audio and existence of URL
+        const audioStreams = formats.filter(f => f.mimeType.startsWith('audio/') && f.url);
+        if (audioStreams.length === 0) return null;
+
         // Sort: Bitrate DESC
-        audioFormats.sort((a, b) => b.bitrate - a.bitrate);
-        return audioFormats[0];
+        audioStreams.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
+
+        // Prefer opus if available
+        return audioStreams.find(s => s.mimeType.includes('opus')) || audioStreams[0];
     }
 
     getVideoId() {
