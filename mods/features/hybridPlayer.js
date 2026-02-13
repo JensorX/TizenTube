@@ -2,6 +2,7 @@ import { configRead, configChangeEmitter } from '../config.js';
 import { AVPlayController } from './avplayController.js';
 import { createDashManifest } from './dashManifestGenerator.js';
 import { showToast } from '../ui/ytUI.js';
+import { signatureDecrypter } from './signatureDecrypter.js';
 
 class HybridPlayer {
     constructor() {
@@ -312,13 +313,16 @@ class HybridPlayer {
         const preferredQuality = configRead('preferredVideoQuality');
         const h = (preferredQuality === 'auto' || isNaN(parseInt(preferredQuality))) ? 1080 : parseInt(preferredQuality);
 
-        // Filter for video and existence of URL
+        // Filter for video and existence of URL or Cipher
         // Supported codecs (VP9/AV1) preferred on Tizen. 
         // We filter out avc1 for high res as it's usually capped at 1080p and higher CPU usage.
-        const videoStreams = formats.filter(f => f.mimeType.startsWith('video/') && f.url && !f.mimeType.includes('avc1'));
+        const videoStreams = formats.map(f => signatureDecrypter.decrypt(f))
+            .filter(f => f.mimeType.startsWith('video/') && f.url && !f.mimeType.includes('avc1'));
+
         if (videoStreams.length === 0) {
             // Fallback to any video stream with URL
-            const fallbackStreams = formats.filter(f => f.mimeType.startsWith('video/') && f.url);
+            const fallbackStreams = formats.map(f => signatureDecrypter.decrypt(f))
+                .filter(f => f.mimeType.startsWith('video/') && f.url);
             if (fallbackStreams.length === 0) return null;
             fallbackStreams.sort((a, b) => b.height - a.height);
             return fallbackStreams[0];
@@ -332,8 +336,10 @@ class HybridPlayer {
     }
 
     selectBestAudioStream(formats) {
-        // Filter for audio and existence of URL
-        const audioStreams = formats.filter(f => f.mimeType.startsWith('audio/') && f.url);
+        // Filter for audio and existence of URL or Cipher
+        const audioStreams = formats.map(f => signatureDecrypter.decrypt(f))
+            .filter(f => f.mimeType.startsWith('audio/') && f.url);
+
         if (audioStreams.length === 0) return null;
 
         // Sort: Bitrate DESC

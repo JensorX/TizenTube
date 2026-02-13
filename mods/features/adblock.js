@@ -36,6 +36,15 @@ JSON.parse = function () {
     r.paidContentOverlay = null;
   }
 
+  // AVPlay: Export original streamingData for HybridPlayer (before codec filtering)
+  if (r?.streamingData) {
+    const isEnabled = configRead('enableAVPlay');
+    if (isEnabled) {
+      console.log('[AdBlock] Exporting streamingData for AVPlay');
+      window.__avplayStreamData = JSON.parse(JSON.stringify(r.streamingData));
+    }
+  }
+
   if (r?.streamingData?.adaptiveFormats && configRead('videoPreferredCodec') !== 'any') {
     const preferredCodec = configRead('videoPreferredCodec');
     const hasPreferredCodec = r.streamingData.adaptiveFormats.find(format => format.mimeType.includes(preferredCodec));
@@ -44,16 +53,6 @@ JSON.parse = function () {
         if (format.mimeType.startsWith('audio/')) return true;
         return format.mimeType.includes(preferredCodec);
       });
-    }
-  }
-
-  // AVPlay: Export streamingData for HybridPlayer
-  if (r?.streamingData) {
-    const isEnabled = configRead('enableAVPlay');
-    console.log('[AdBlock] streamingData found. enableAVPlay:', isEnabled);
-    if (isEnabled) {
-      console.log('[AdBlock] Exporting streamingData for AVPlay');
-      window.__avplayStreamData = r.streamingData;
     }
   }
 
