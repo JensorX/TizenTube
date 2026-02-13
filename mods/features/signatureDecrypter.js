@@ -11,16 +11,16 @@ export const signatureDecrypter = {
      */
     decrypt(format) {
         if (format.url) return format;
-        if (!format.signatureCipher) return format;
+        const cipher = format.signatureCipher || format.cipher;
+        if (!cipher) return format;
 
-        const cipher = format.signatureCipher;
         const params = new URLSearchParams(cipher);
         const url = params.get('url');
         const signature = params.get('s');
         const sp = params.get('sp') || 'sig';
 
         if (!url || !signature) {
-            console.warn('[SignatureDecrypter] Invalid cipher data', format);
+            console.warn('[SignatureDecrypter] Invalid cipher data', { hasUrl: !!url, hasSig: !!signature });
             return format;
         }
 

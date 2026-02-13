@@ -310,6 +310,15 @@ class HybridPlayer {
     }
 
     selectBestVideoStream(formats) {
+        console.log(`[HybridPlayer] Selecting video from ${formats?.length} formats`);
+        if (formats && formats.length > 0) {
+            console.log('[HybridPlayer] Sample format:', JSON.stringify({
+                mimeType: formats[0].mimeType,
+                hasUrl: !!formats[0].url,
+                hasCipher: !!(formats[0].signatureCipher || formats[0].cipher)
+            }));
+        }
+
         const preferredQuality = configRead('preferredVideoQuality');
         const h = (preferredQuality === 'auto' || isNaN(parseInt(preferredQuality))) ? 1080 : parseInt(preferredQuality);
 
