@@ -193,9 +193,8 @@ class HybridPlayer {
 
                 // Start AVPlay with remote manifest
                 try {
-                    await this.avPlayController.open(streamData.serverAbrStreamingUrl);
-                    await this.avPlayController.prepareAsync();
-                    this.avPlayController.play();
+                    await this.avplay.open(streamData.serverAbrStreamingUrl);
+                    this.avplay.play();
                 } catch (e) {
                     console.error('[HybridPlayer] AVPlay Server Manifest failed:', e);
                     showToast('TizenTube', `AVPlay Error: ${e.message}`);
@@ -252,9 +251,8 @@ class HybridPlayer {
             showToast('TizenTube', 'AVPlay: Opening Native Player...');
 
             try {
-                await this.avPlayController.open(manifestUrl);
-                await this.avPlayController.prepareAsync(); // Using wrapper's simplified prepare
-                this.avPlayController.play();
+                await this.avplay.open(manifestUrl);
+                this.avplay.play();
             } catch (e) {
                 console.error('[HybridPlayer] AVPlay Launch Failed:', e);
                 showToast('TizenTube', `AVPlay Launch Error: ${e.message}`);
