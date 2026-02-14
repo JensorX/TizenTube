@@ -15,11 +15,15 @@ function execute_once_dom_loaded_speed() {
         const isMusicVideo = window.__isMusicVideo;
         const force1x = configRead('force1xForMusic');
 
+        console.info('[SpeedUI] canplay event:', { isMusicVideo, force1x, currentRate: videoElement.playbackRate });
+
         if (isMusicVideo && force1x) {
             console.info('[SpeedUI] Music video detected, forcing 1x speed');
             videoElement.playbackRate = 1;
         } else {
-            videoElement.playbackRate = configRead('videoSpeed');
+            const targetSpeed = configRead('videoSpeed');
+            console.info('[SpeedUI] Standard video, setting speed to:', targetSpeed);
+            videoElement.playbackRate = targetSpeed;
         }
     });
 
