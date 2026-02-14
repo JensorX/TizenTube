@@ -103,7 +103,7 @@ class HybridPlayer {
         const videoId = this.getVideoId();
         if (videoId && videoId !== this.currentVideoId) {
             console.log(`[HybridPlayer] Video changed: ${this.currentVideoId} -> ${videoId}`);
-            showToast('TizenTube', `Video Detected: ${videoId}`);
+            //  showToast('TizenTube', `Video Detected: ${videoId}`);
             this.currentVideoId = videoId;
             // Stop previous playback
             this.stopAVPlay();
@@ -368,34 +368,46 @@ class HybridPlayer {
         // Supported codecs (VP9/AV1) preferred on Tizen. 
         // We filter out avc1 for high res as it's usually capped at 1080p and higher CPU usage.
 
-        // Decrypt first
         const decryptedFormats = formats.map(f => signatureDecrypter.decrypt(f));
 
-        const videoStreams = decryptedFormats
-            .filter(f => f.mimeType.startsWith('video/') && f.url && !f.mimeType.includes('avc1'));
+        const disableAV1 = configRead('disableAV1');
+        const disableVP9 = configRead('disableVP9');
+        const disableAVC = configRead('disableAVC');
+        const disableVP8 = configRead('disableVP8');
+        const disableHEVC = configRead('disableHEVC');
+        const disable60fps = configRead('disable60fps');
+
+        const videoStreams = decryptedFormats.filter(f => {
+            if (!f.mimeType.startsWith('video/') || !f.url) return false;
+
+            const lowerType = f.mimeType.toLowerCase();
+
+            // Codec filtering
+            if (disableAV1 && (lowerType.includes('av1') || lowerType.includes('av01'))) return false;
+            if (disableVP9 && (lowerType.includes('vp9') || lowerType.includes('vp09'))) return false;
+            if (disableAVC && (lowerType.includes('avc') || lowerType.includes('avc1'))) return false;
+            if (disableVP8 && (lowerType.includes('vp8') || lowerType.includes('vp08'))) return false;
+            if (disableHEVC && (lowerType.includes('hev') || lowerType.includes('hvc'))) return false;
+
+            // 60fps filtering
+            if (disable60fps && f.fps > 30) return false;
+
+            return true;
+        });
 
         if (videoStreams.length === 0) {
-            console.warn('[HybridPlayer] Strict video filter returned 0. Trying fallback...');
-
-            // Fallback 1: Allow avc1
-            const fallbackAvc = decryptedFormats
-                .filter(f => f.mimeType.startsWith('video/') && f.url);
-
-            if (fallbackAvc.length > 0) {
-                console.log('[HybridPlayer] Found streams in fallback (allowing avc1).');
-                fallbackAvc.sort((a, b) => b.height - a.height);
-                return fallbackAvc.find(s => s.height <= h) || fallbackAvc[0];
-            }
-
-            console.error('[HybridPlayer] No video streams with URL found even after fallback.');
+            console.error('[HybridPlayer] No video streams with URL found even after filtering.');
             return null;
         }
 
-        // Sort: Height DESC
-        videoStreams.sort((a, b) => b.height - a.height);
+        // Sort: Height DESC, then FPS DESC
+        videoStreams.sort((a, b) => {
+            if (b.height !== a.height) return b.height - a.height;
+            return (b.fps || 0) - (a.fps || 0);
+        });
 
         // Find best quality <= preferred, or closest available
-        return videoStreams.find(s => s.height <= h) || videoStreams[videoStreams.length - 1];
+        return videoStreams.find(s => s.height <= h) || videoStreams[0];
     }
 
     selectBestAudioStream(formats) {

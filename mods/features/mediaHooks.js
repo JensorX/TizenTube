@@ -20,22 +20,29 @@ function hookMediaSource() {
     const originalIsTypeSupported = window.MediaSource.isTypeSupported;
 
     window.MediaSource.isTypeSupported = function (type) {
+        const lowerType = type.toLowerCase();
         const performanceMode = configRead('enablePerformanceMode');
 
-        // Normalize type string
-        const lowerType = type.toLowerCase();
+        // Individual blocks
+        const disableAV1 = configRead('disableAV1') || performanceMode;
+        const disableVP9 = configRead('disableVP9') || (performanceMode && !lowerType.includes('avc1')); // Performance mode blocks VP9/AV1
+        const disableAVC = configRead('disableAVC');
+        const disableVP8 = configRead('disableVP8') || performanceMode;
+        const disableHEVC = configRead('disableHEVC') || performanceMode;
+        const disable60fps = configRead('disable60fps') || performanceMode;
 
-        if (performanceMode) {
-            // In performance mode, we want to AVOID software-decoded or high-CPU codecs.
-            // Prioritize avc1 (H.264 / AVC).
-            if (lowerType.includes('vp9') || lowerType.includes('av01') || lowerType.includes('av1')) {
-                // console.debug('[MediaHooks] Blocking codec support for:', type);
-                return false;
-            }
+        // Codec filtering
+        if (disableAV1 && (lowerType.includes('av1') || lowerType.includes('av01'))) return false;
+        if (disableVP9 && (lowerType.includes('vp9') || lowerType.includes('vp09'))) return false;
+        if (disableAVC && (lowerType.includes('avc') || lowerType.includes('avc1'))) return false;
+        if (disableVP8 && (lowerType.includes('vp8') || lowerType.includes('vp08'))) return false;
+        if (disableHEVC && (lowerType.includes('hev') || lowerType.includes('hvc'))) return false;
 
-            if (lowerType.includes('avc1')) {
-                return originalIsTypeSupported.call(window.MediaSource, type);
-            }
+        // Frame rate filtering (match YourCodecs)
+        const fpsMatch = /framerate=(\d+)/.exec(lowerType) || /fps=(\d+)/.exec(lowerType);
+        if (disable60fps && fpsMatch && parseInt(fpsMatch[1]) > 30) {
+            // console.debug('[MediaHooks] Blocking high frame rate:', type);
+            return false;
         }
 
         return originalIsTypeSupported.call(window.MediaSource, type);
@@ -44,14 +51,25 @@ function hookMediaSource() {
     // Also hook canPlayType on video prototype as a fallback
     const originalCanPlayType = HTMLMediaElement.prototype.canPlayType;
     HTMLMediaElement.prototype.canPlayType = function (type) {
-        const performanceMode = configRead('enablePerformanceMode');
         const lowerType = type.toLowerCase();
+        const performanceMode = configRead('enablePerformanceMode');
 
-        if (performanceMode) {
-            if (lowerType.includes('vp9') || lowerType.includes('av01') || lowerType.includes('av1')) {
-                return '';
-            }
-        }
+        // Individual blocks (same as above)
+        const disableAV1 = configRead('disableAV1') || performanceMode;
+        const disableVP9 = configRead('disableVP9') || (performanceMode && !lowerType.includes('avc1'));
+        const disableAVC = configRead('disableAVC');
+        const disableVP8 = configRead('disableVP8') || performanceMode;
+        const disableHEVC = configRead('disableHEVC') || performanceMode;
+        const disable60fps = configRead('disable60fps') || performanceMode;
+
+        if (disableAV1 && (lowerType.includes('av1') || lowerType.includes('av01'))) return '';
+        if (disableVP9 && (lowerType.includes('vp9') || lowerType.includes('vp09'))) return '';
+        if (disableAVC && (lowerType.includes('avc') || lowerType.includes('avc1'))) return '';
+        if (disableVP8 && (lowerType.includes('vp8') || lowerType.includes('vp08'))) return '';
+        if (disableHEVC && (lowerType.includes('hev') || lowerType.includes('hvc'))) return '';
+
+        const fpsMatch = /framerate=(\d+)/.exec(lowerType) || /fps=(\d+)/.exec(lowerType);
+        if (disable60fps && fpsMatch && parseInt(fpsMatch[1]) > 30) return '';
 
         return originalCanPlayType.call(this, type);
     };
