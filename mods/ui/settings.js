@@ -328,22 +328,10 @@ export default function modernUI(update, parameters) {
                     subtitle: 'Prioritize stability: H.264 only, no previews, less animations'
                 },
                 {
-                    name: 'Native Player (AVPlay)',
-                    icon: 'TV',
-                    value: null,
-                    menuId: 'tt-avplay-settings',
-                    menuHeader: {
-                        title: 'Native Player (AVPlay)',
-                        subtitle: 'Use Samsung native player for better performance and audio support'
-                    },
-                    options: [
-                        {
-                            name: 'Enable Native Player',
-                            icon: 'TV',
-                            value: 'enableAVPlay',
-                            subtitle: 'Experimental: Fixes Q Symphony & dropped frames'
-                        }
-                    ]
+                    name: 'Audio Video Sync (Resync)',
+                    icon: 'SYNC',
+                    value: 'enableCpuStressOptimization',
+                    subtitle: 'Optional: Fixes A/V drift at high speeds (may cause buffering on AVC)'
                 },
                 {
                     name: 'Preferred Video Quality',

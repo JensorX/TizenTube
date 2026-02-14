@@ -253,6 +253,11 @@ class SubtlePlaybackSync {
     const drift = expectedTime - actualTime;
     const absDrift = Math.abs(drift);
 
+    // AVC1 Optimization: Higher thresholds if using AVC1 to avoid 1-2s buffering
+    const isAVC = this.player?.getStatsForNerds?.()?.video_codec?.includes('avc1');
+    const dynamicHardJumpThreshold = isAVC ? 3.0 : this.hardJumpThreshold;
+    const dynamicAggressiveThreshold = isAVC ? 1.0 : this.aggressiveDriftThreshold;
+
     // A: Kritischer Drift (> 3.5s) -> Letzter Ausweg: Kurzer Reset
     if (absDrift > this.resetThreshold) {
       // console.warn removed
@@ -260,15 +265,15 @@ class SubtlePlaybackSync {
       return;
     }
 
-    // B: Großer Drift (> 1.5s) -> Harter Sprung
-    if (absDrift > this.hardJumpThreshold) {
+    // B: Großer Drift (> 1.5s, 3.0s for AVC) -> Harter Sprung
+    if (absDrift > dynamicHardJumpThreshold) {
       // console.warn removed
       this._applyCorrection(expectedTime, absDrift, 'HARD');
       return;
     }
 
     // C: Mittlerer Drift oder hoher Stress -> Aggressive Korrektur
-    if (absDrift > this.aggressiveDriftThreshold || (absDrift > this.warningDriftThreshold && hasStress)) {
+    if (absDrift > dynamicAggressiveThreshold || (absDrift > this.warningDriftThreshold && hasStress)) {
       this._applyCorrection(actualTime + (drift * 0.4), absDrift, 'AGGRESSIVE');
       return;
     }

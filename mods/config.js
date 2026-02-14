@@ -57,7 +57,6 @@ const defaultConfig = {
   enableCpuStressOptimization: true,
   enableDecoderMonitor: true,
   autoFrameRate: false,
-  enableAVPlay: false,
   enablePerformanceMode: false
 };
 

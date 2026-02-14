@@ -36,14 +36,6 @@ JSON.parse = function () {
     r.paidContentOverlay = null;
   }
 
-  // AVPlay: Export original streamingData for HybridPlayer (before codec filtering)
-  if (r?.streamingData) {
-    const isEnabled = configRead('enableAVPlay');
-    if (isEnabled) {
-      console.log('[AdBlock] Exporting streamingData for AVPlay');
-      window.__avplayStreamData = JSON.parse(JSON.stringify(r.streamingData));
-    }
-  }
 
   if (r?.streamingData?.adaptiveFormats) {
     const performanceMode = configRead('enablePerformanceMode');
