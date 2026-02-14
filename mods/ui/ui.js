@@ -8,6 +8,10 @@ import modernUI from './settings.js';
 import resolveCommand, { patchResolveCommand } from '../resolveCommand.js';
 import { pipToFullscreen } from '../features/pictureInPicture.js';
 import getCommandExecutor from './customCommandExecution.js';
+import { initMediaHooks } from '../features/mediaHooks.js';
+
+// Initialize low-level media hooks as early as possible
+initMediaHooks();
 
 // It just works, okay?
 const interval = setInterval(() => {
@@ -192,7 +196,7 @@ function execute_once_dom_loaded() {
   document.addEventListener('keyup', eventHandler, true);
   if (configRead('showWelcomeToast')) {
     setTimeout(() => {
-      showToast('Welcome to TizenTubeAV 2.1.22', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
+      showToast('Welcome to TizenTubeAV 2.1.23', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
     }, 2000);
   }
 
