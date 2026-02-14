@@ -25,7 +25,7 @@ function hookMediaSource() {
 
         // Individual blocks
         const disableAV1 = configRead('disableAV1') || performanceMode;
-        const disableVP9 = configRead('disableVP9') || (performanceMode && !lowerType.includes('avc1')); // Performance mode blocks VP9/AV1
+        const disableVP9 = configRead('disableVP9');
         const disableAVC = configRead('disableAVC');
         const disableVP8 = configRead('disableVP8') || performanceMode;
         const disableHEVC = configRead('disableHEVC') || performanceMode;
@@ -56,7 +56,7 @@ function hookMediaSource() {
 
         // Individual blocks (same as above)
         const disableAV1 = configRead('disableAV1') || performanceMode;
-        const disableVP9 = configRead('disableVP9') || (performanceMode && !lowerType.includes('avc1'));
+        const disableVP9 = configRead('disableVP9');
         const disableAVC = configRead('disableAVC');
         const disableVP8 = configRead('disableVP8') || performanceMode;
         const disableHEVC = configRead('disableHEVC') || performanceMode;

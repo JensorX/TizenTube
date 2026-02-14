@@ -370,12 +370,13 @@ class HybridPlayer {
 
         const decryptedFormats = formats.map(f => signatureDecrypter.decrypt(f));
 
-        const disableAV1 = configRead('disableAV1');
+        const performanceMode = configRead('enablePerformanceMode');
+        const disableAV1 = configRead('disableAV1') || performanceMode;
         const disableVP9 = configRead('disableVP9');
         const disableAVC = configRead('disableAVC');
-        const disableVP8 = configRead('disableVP8');
-        const disableHEVC = configRead('disableHEVC');
-        const disable60fps = configRead('disable60fps');
+        const disableVP8 = configRead('disableVP8') || performanceMode;
+        const disableHEVC = configRead('disableHEVC') || performanceMode;
+        const disable60fps = configRead('disable60fps') || performanceMode;
 
         const videoStreams = decryptedFormats.filter(f => {
             if (!f.mimeType.startsWith('video/') || !f.url) return false;

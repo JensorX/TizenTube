@@ -46,30 +46,34 @@ JSON.parse = function () {
   }
 
   if (r?.streamingData?.adaptiveFormats) {
-    const preferredCodec = configRead('videoPreferredCodec');
     const performanceMode = configRead('enablePerformanceMode');
+    const disableAV1 = configRead('disableAV1') || performanceMode;
+    const disableVP9 = configRead('disableVP9'); // Performance mode shouldn't necessarily block VP9 if we want >360p
+    const disableAVC = configRead('disableAVC');
+    const disableVP8 = configRead('disableVP8') || performanceMode;
+    const disableHEVC = configRead('disableHEVC') || performanceMode;
+    const disable60fps = configRead('disable60fps') || performanceMode;
 
-    // In performance mode, we HEAVILY prioritize avc1 (hardware accelerated)
-    // and cap resolution to 1080p for HTML5 stability.
-    const effectiveCodec = (performanceMode && preferredCodec === 'any') ? 'avc1' : preferredCodec;
+    r.streamingData.adaptiveFormats = r.streamingData.adaptiveFormats.filter(format => {
+      if (format.mimeType.startsWith('audio/')) return true;
 
-    if (effectiveCodec !== 'any') {
-      const hasEffectiveCodec = r.streamingData.adaptiveFormats.find(format => format.mimeType.includes(effectiveCodec));
-      if (hasEffectiveCodec) {
-        r.streamingData.adaptiveFormats = r.streamingData.adaptiveFormats.filter(format => {
-          if (format.mimeType.startsWith('audio/')) return true;
+      const lowerType = format.mimeType.toLowerCase();
 
-          let match = format.mimeType.includes(effectiveCodec);
+      // Codec filtering
+      if (disableAV1 && (lowerType.includes('av1') || lowerType.includes('av01'))) return false;
+      if (disableVP9 && (lowerType.includes('vp9') || lowerType.includes('vp09'))) return false;
+      if (disableAVC && (lowerType.includes('avc') || lowerType.includes('avc1'))) return false;
+      if (disableVP8 && (lowerType.includes('vp8') || lowerType.includes('vp08'))) return false;
+      if (disableHEVC && (lowerType.includes('hev') || lowerType.includes('hvc'))) return false;
 
-          // If in performance mode, we also cap at 1080p (1920x1080) for avc1
-          if (performanceMode && match && format.height > 1080) {
-            match = false;
-          }
+      // 60fps filtering
+      if (disable60fps && format.fps > 30) return false;
 
-          return match;
-        });
-      }
-    }
+      // Performance mode cap
+      if (performanceMode && format.height > 1080) return false;
+
+      return true;
+    });
   }
 
   // Drop "masthead" ad from home screen
