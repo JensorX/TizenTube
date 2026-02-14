@@ -57,7 +57,8 @@ const defaultConfig = {
   enableCpuStressOptimization: true,
   enableDecoderMonitor: true,
   autoFrameRate: false,
-  enablePerformanceMode: false
+  enablePerformanceMode: false,
+  force1xForMusic: true
 };
 
 let localConfig;

@@ -209,7 +209,8 @@ class SubtlePlaybackSync {
     const actualTime = this.videoEl.currentTime;
 
     // Nur bei hohem Speed (> 1.2x) aktiv werden
-    if (rate <= 1.2) return;
+    // Musik-Videos haben oft weniger Bedarf an aggressivem Sync bei 1x
+    if (rate <= 1.2 || window.__isMusicVideo) return;
 
     // 0. Absolute Minimum Cooldown Check (e.g. 1s)
     // Don't even calculate stats if we are definitely too fast

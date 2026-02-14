@@ -11,7 +11,16 @@ const interval = setInterval(() => {
 
 function execute_once_dom_loaded_speed() {
     document.querySelector('video').addEventListener('canplay', () => {
-        document.getElementsByTagName('video')[0].playbackRate = configRead('videoSpeed');;
+        const videoElement = document.getElementsByTagName('video')[0];
+        const isMusicVideo = window.__isMusicVideo;
+        const force1x = configRead('force1xForMusic');
+
+        if (isMusicVideo && force1x) {
+            console.info('[SpeedUI] Music video detected, forcing 1x speed');
+            videoElement.playbackRate = 1;
+        } else {
+            videoElement.playbackRate = configRead('videoSpeed');
+        }
     });
 
     const eventHandler = (evt) => {
@@ -40,11 +49,11 @@ function speedSettings() {
     const maxSpeed = 5;
     const increment = configRead('speedSettingsIncrement') || 0.25;
     const buttons = [];
-    
+
     for (let speed = increment; speed <= maxSpeed; speed += increment) {
         const fixedSpeed = Math.round(speed * 100) / 100;
         const subtitle = fixedSpeed >= 1.25 ? '⚠️ May cause sync issues on 50/60fps videos' : '';
-        
+
         buttons.push(
             buttonItem(
                 { title: `${fixedSpeed}x`, subtitle },

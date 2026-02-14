@@ -68,6 +68,17 @@ JSON.parse = function () {
     });
   }
 
+  // Music Video Detection
+  if (r?.videoDetails?.musicVideoType) {
+    window.__isMusicVideo = r.videoDetails.musicVideoType.startsWith('MUSIC_VIDEO_TYPE_');
+    console.info('[AdBlock] Music Video detected:', window.__isMusicVideo, r.videoDetails.musicVideoType);
+  } else if (r?.streamingData || r?.contents?.singleColumnWatchNextResults) {
+    // If it's a video response but no music type (rare for music), or a watch next result, 
+    // we keep the state unless it's clearly a new video context.
+    // However, JSON.parse is called for many things. 
+    // videoDetails usually comes with the initial player response.
+  }
+
   // Drop "masthead" ad from home screen
   if (
     r?.contents?.tvBrowseRenderer?.content?.tvSurfaceContentRenderer?.content
