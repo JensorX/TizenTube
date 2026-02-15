@@ -334,10 +334,10 @@ export default function modernUI(update, parameters) {
                     subtitle: 'Optional: Fixes A/V drift at high speeds (may cause buffering on AVC)'
                 },
                 {
-                    name: 'Force 1x Speed for Music Videos',
+                    name: 'Default Speed for Music Videos',
                     icon: 'MUSIC_NOTE',
                     value: 'force1xForMusic',
-                    subtitle: 'Temporarily switch to 1x speed for music content'
+                    subtitle: 'Force 1x speed for music videos'
                 },
                 {
                     name: 'Preferred Video Quality',
