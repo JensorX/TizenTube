@@ -20,21 +20,21 @@ function initVoiceInteraction() {
         try {
             window.webapis.voiceinteraction.setCallback({
                 onupdatestate: function () {
-                    console.log("[VoiceSearch] VIF requesting app state");
+                    showToast("VoiceSearch", "[VoiceSearch] VIF requesting app state");
                     return "List";
                 },
                 onsearch: function (vt) {
-                    console.log("[VoiceSearch] VIF onsearch triggered:", vt);
+                    showToast("VoiceSearch", "[VoiceSearch] VIF onsearch triggered:", vt);
                     const utterance = window.webapis.voiceinteraction.getDataFromSearchTerm(vt, "SEARCH_TERM_UTTERANCE");
                     if (utterance) {
-                        console.log("[VoiceSearch] Recognized utterance:", utterance);
+                        showToast("VoiceSearch", "[VoiceSearch] Recognized utterance:", utterance);
                         performSearch(utterance);
                     }
                     return true;
                 }
             });
             window.webapis.voiceinteraction.listen();
-            console.log("[VoiceSearch] VIF listen() called");
+            showToast("VoiceSearch", "[VoiceSearch] VIF listen() called");
         } catch (e) {
             console.error("[VoiceSearch] VIF initialization failed:", e);
         }
@@ -156,7 +156,7 @@ const observerVoiceInject = new MutationObserver(() => {
 
     searchBar.appendChild(voiceButton);
     voiceButtonInjected = true;
-    console.log("[VoiceSearch] Injected microphone button mirroring PiP structure");
+    showToast("VoiceSearch", "[VoiceSearch] Injected microphone button mirroring PiP structure");
 });
 
 function start() {
