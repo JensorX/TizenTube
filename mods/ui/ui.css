@@ -107,8 +107,10 @@ div[idomkey="shadow"] {
 }
 
 .ytLrSearchBarSearchVoice {
-  display: inline-block;
-  vertical-align: middle !important;
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
   pointer-events: auto;
 }
 

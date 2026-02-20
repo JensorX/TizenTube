@@ -115,26 +115,22 @@ function removeVoiceButton() {
     }
 }
 
-function injectVoiceButton() {
+const observerVoiceInject = new MutationObserver(() => {
+    if (!configRead('enableVoiceSearch')) return;
     if (voiceButtonInjected && document.querySelector('#tt-voice-search-button')) return;
 
     const searchBar = document.querySelector('ytlr-search-bar');
     if (!searchBar) return;
 
+    // The native YouTube voice button — we need it to copy its dynamic classes
+    // and use it as a nav anchor (same approach as PiP button)
     const existingVoiceButton = searchBar.querySelector('ytlr-search-voice');
 
-    const voiceButton = document.createElement('ytlr-search-voice');
-    voiceButton.id = 'tt-voice-search-button';
-    voiceButton.setAttribute('idomkey', 'ytLrSearchBarSearchVoice');
-    voiceButton.setAttribute('tabindex', '0');
-    voiceButton.style.display = 'inline-block';
-    voiceButton.style.verticalAlign = 'top';
-    voiceButton.style.width = '1em';
-    voiceButton.style.height = '1em';
-    voiceButton.style.fontSize = '3rem';
-    voiceButton.style.marginLeft = '11rem';
-
     if (existingVoiceButton) {
+        // Copy classes from the native button (exact PiP pattern)
+        const voiceButton = document.createElement('ytlr-search-voice');
+        voiceButton.id = 'tt-voice-search-button';
+
         for (let i = 0; i < existingVoiceButton.classList.length; i++) {
             if (originalClasses.ytlrSearchVoice.length === 0) {
                 originalClasses.ytlrSearchVoice.length = existingVoiceButton.classList.length;
@@ -149,6 +145,10 @@ function injectVoiceButton() {
                 originalClasses.ytlrSearchVoice.classes.push(existingVoiceButton.classList[i]);
             voiceButton.classList.add(existingVoiceButton.classList[i]);
         }
+
+        // Position it relative to the existing voice button (which sits at left: ~11.5em on the search bar)
+        // The native button is at left: ~11.5em, we put ours slightly to the right of PiP (8.5em)
+        voiceButton.style.left = '8.5em';
 
         const voiceMicButton = document.createElement('ytlr-search-voice-mic-button');
         for (let i = 0; i < existingVoiceButton.children[0].classList.length; i++) {
@@ -170,11 +170,30 @@ function injectVoiceButton() {
         for (let i = 0; i < existingVoiceButton.children[0].children[0].classList.length; i++) {
             micIcon.classList.add(existingVoiceButton.children[0].children[0].classList[i]);
         }
-        micIcon.classList.add('ytContribIconHost');
 
         voiceMicButton.appendChild(micIcon);
         voiceButton.appendChild(voiceMicButton);
+
+        voiceButton.addEventListener('click', toggleVoice);
+        voiceButton.addEventListener('keydown', (e) => {
+            if (e.keyCode === 13 || e.keyCode === 32) {
+                toggleVoice();
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        searchBar.appendChild(voiceButton);
+        voiceButtonInjected = true;
+        console.log("[VoiceSearch] Injected microphone button (class-copy mode)");
+
     } else {
+        // Fallback: no native voice button found, use hardcoded classes & pos (mirrors PiP fallback exactly)
+        const voiceButton = document.createElement('ytlr-search-voice');
+        voiceButton.style.left = '8.5em';
+        voiceButton.id = 'tt-voice-search-button';
+        voiceButton.setAttribute('idomkey', 'ytLrSearchBarSearchVoice');
+        voiceButton.setAttribute('tabindex', '0');
         voiceButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice');
 
         const voiceMicButton = document.createElement('ytlr-search-voice-mic-button');
@@ -185,9 +204,6 @@ function injectVoiceButton() {
         const micIcon = document.createElement('yt-icon');
         micIcon.setAttribute('tabindex', '-1');
         micIcon.classList.add('ytContribIconHost', 'ytLrSearchVoiceMicButtonIcon');
-        micIcon.style.width = '1em';
-        micIcon.style.height = '1em';
-        micIcon.style.display = 'inline-block';
         micIcon.innerHTML = `
             <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
                 <g><path d="M12,14c1.66,0,3-1.34,3-3V5c0-1.66-1.34-3-3-3S9,3.34,9,5v6C9,12.66,10.34,14,12,14z M11,5c0-0.55,0.45-1,1-1s1,0.45,1,1v6 c0,0.55-0.45,1-1,1s-1-0.45-1-1V5z M17,11c0,2.76-2.24,5-5,5s-5-2.24-5-5H6c0,3.05,2.19,5.58,5,5.91V21h2v-4.09\tc2.81-0.34,5-2.87,5-5.91H17z" fill="currentColor"></path></g>
@@ -196,32 +212,27 @@ function injectVoiceButton() {
 
         voiceMicButton.appendChild(micIcon);
         voiceButton.appendChild(voiceMicButton);
+
+        voiceButton.addEventListener('click', toggleVoice);
+        voiceButton.addEventListener('keydown', (e) => {
+            if (e.keyCode === 13 || e.keyCode === 32) {
+                toggleVoice();
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        searchBar.appendChild(voiceButton);
+        voiceButtonInjected = true;
+        console.log("[VoiceSearch] Injected microphone button (fallback mode)");
     }
-
-    voiceButton.addEventListener('click', toggleVoice);
-    voiceButton.addEventListener('keydown', (e) => {
-        if (e.keyCode === 13 || e.keyCode === 32) {
-            toggleVoice();
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
-
-    searchBar.prepend(voiceButton);
-    voiceButtonInjected = true;
-    console.log("[VoiceSearch] Injected microphone button");
-}
+});
 
 function start() {
     if (!configRead('enableVoiceSearch')) return;
 
     initVoiceInteraction();
-
-    const observer = new MutationObserver(() => {
-        injectVoiceButton();
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
+    observerVoiceInject.observe(document.body, { childList: true, subtree: true });
 }
 
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
