@@ -58,6 +58,7 @@ const defaultConfig = {
   enableDecoderMonitor: true,
   autoFrameRate: false,
   enablePerformanceMode: false,
+  enableVoiceSearch: true,
   force1xForMusic: true
 };
 
