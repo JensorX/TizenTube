@@ -115,9 +115,10 @@ function removeVoiceButton() {
 }
 
 function injectVoiceButton() {
-    // Only show when search menu is open (vxawEf element exists)
-    const searchMenuOpen = document.querySelector('.vxawEf');
-    if (!searchMenuOpen) {
+    // Only show when search menu is open (URL hash starts with #/search)
+    const hash = location.hash.substring(1);
+    const isSearchOpen = hash.startsWith('/search');
+    if (!isSearchOpen) {
         removeVoiceButton();
         return;
     }
