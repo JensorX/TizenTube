@@ -122,9 +122,7 @@ const observerVoiceInject = new MutationObserver(() => {
     voiceButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice', 'zylon-ve');
 
     // Position it to the LEFT of the search text box
-    voiceButton.style.position = 'absolute';
-    voiceButton.style.left = '-4rem';
-    voiceButton.style.top = '0';
+    voiceButton.style.position = 'relative';
     voiceButton.style.width = '4rem';
     voiceButton.style.height = '4rem';
     voiceButton.style.fontSize = '3rem';
@@ -155,7 +153,7 @@ const observerVoiceInject = new MutationObserver(() => {
         }
     });
 
-    searchBar.prepend(voiceButton);
+    searchBar.appendChild(voiceButton);
     voiceButtonInjected = true;
     console.log("[VoiceSearch] Injected microphone button with spatial nav fixes");
 });
