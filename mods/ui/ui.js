@@ -176,9 +176,15 @@ function execute_once_dom_loaded() {
         modernUI();
       }
     } else if (evt.keyCode == 39) {
-      // Right key, for PiP
+      // Right key, for PiP and Voice Search
       if (evt.type === 'keydown') {
-        if (document.querySelector('ytlr-search-text-box > .zylon-focus') && window.isPipPlaying) {
+        const isSearchFocused = !!document.querySelector('ytlr-search-text-box > .zylon-focus');
+        const voiceButton = document.querySelector('#tt-voice-search-button');
+        if (isSearchFocused && voiceButton) {
+          voiceButton.focus();
+          evt.preventDefault();
+          evt.stopPropagation();
+        } else if ((isSearchFocused || (voiceButton && document.activeElement === voiceButton)) && window.isPipPlaying) {
           const ytlrPlayer = document.querySelector('ytlr-player');
           ytlrPlayer.style.setProperty('background-color', 'rgb(0, 0, 0)');
           pipToFullscreen();
@@ -196,7 +202,7 @@ function execute_once_dom_loaded() {
   document.addEventListener('keyup', eventHandler, true);
   if (configRead('showWelcomeToast')) {
     setTimeout(() => {
-      showToast('Welcome to TizenTubeAV 2.1.36', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
+      showToast('Welcome to TizenTubeAV 2.1.37', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
     }, 2000);
   }
 

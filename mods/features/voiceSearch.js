@@ -109,16 +109,19 @@ function toggleVoice() {
 
 const observerVoiceInject = new MutationObserver(() => {
     if (!configRead('enableVoiceSearch')) return;
-    if (voiceButtonInjected && document.querySelector('#tt-voice-search-button')) return;
-
     const searchBar = document.querySelector('ytlr-search-bar');
-    if (!searchBar) return;
+    if (!searchBar) {
+        voiceButtonInjected = false;
+        return;
+    }
+
+    if (voiceButtonInjected && document.querySelector('#tt-voice-search-button')) return;
 
     // Mirrors pictureInPicture.js exactly
     const voiceButton = document.createElement('ytlr-search-voice');
     voiceButton.style.left = '10.25em'; // 10.25em is PiP, let's try 6.5em to be left of it
     voiceButton.id = 'tt-voice-search-button';
-    voiceButton.setAttribute('idomkey', 'ytLrSearchBarSearchVoice');
+    voiceButton.setAttribute('idomkey', 'ytLrSearchBarVoiceSearch'); // Unique key to avoid conflict with PiP
     voiceButton.setAttribute('tabindex', '0');
     voiceButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice');
 
@@ -130,8 +133,8 @@ const observerVoiceInject = new MutationObserver(() => {
     const micIcon = document.createElement('yt-icon');
     micIcon.setAttribute('tabindex', '-1');
     micIcon.classList.add('ytContribIconHost', 'ytLrSearchVoiceMicButtonIcon');
-    micIcon.style.width = '1em';
-    micIcon.style.height = '1em';
+    micIcon.style.width = '0.7em';
+    micIcon.style.height = '0.7em';
     micIcon.style.display = 'inline-block';
     micIcon.innerHTML = `
         <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
@@ -153,7 +156,7 @@ const observerVoiceInject = new MutationObserver(() => {
 
     searchBar.appendChild(voiceButton);
     voiceButtonInjected = true;
-    console.log("[VoiceSearch] Injected microphone button mirroring PiP pattern");
+    console.log("[VoiceSearch] Injected microphone button mirroring PiP structure");
 });
 
 function start() {
