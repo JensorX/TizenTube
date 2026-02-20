@@ -114,18 +114,13 @@ const observerVoiceInject = new MutationObserver(() => {
     const searchBar = document.querySelector('ytlr-search-bar');
     if (!searchBar) return;
 
+    // Mirrors pictureInPicture.js exactly
     const voiceButton = document.createElement('ytlr-search-voice');
+    voiceButton.style.left = '10.25em'; // 10.25em is PiP, let's try 6.5em to be left of it
     voiceButton.id = 'tt-voice-search-button';
     voiceButton.setAttribute('idomkey', 'ytLrSearchBarSearchVoice');
-    voiceButton.setAttribute('tabindex', '-1');
-    voiceButton.setAttribute('hybridnavfocusable', 'true');
-    voiceButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice', 'zylon-ve');
-
-    // Position it to the LEFT of the search text box
-    voiceButton.style.position = 'relative';
-    voiceButton.style.width = '4rem';
-    voiceButton.style.height = '4rem';
-    voiceButton.style.fontSize = '3rem';
+    voiceButton.setAttribute('tabindex', '0');
+    voiceButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice');
 
     const voiceMicButton = document.createElement('ytlr-search-voice-mic-button');
     voiceMicButton.setAttribute('hybridnavfocusable', 'true');
@@ -135,11 +130,14 @@ const observerVoiceInject = new MutationObserver(() => {
     const micIcon = document.createElement('yt-icon');
     micIcon.setAttribute('tabindex', '-1');
     micIcon.classList.add('ytContribIconHost', 'ytLrSearchVoiceMicButtonIcon');
+    micIcon.style.width = '1em';
+    micIcon.style.height = '1em';
+    micIcon.style.display = 'inline-block';
     micIcon.innerHTML = `
-            <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
-                <g><path d="M12,14c1.66,0,3-1.34,3-3V5c0-1.66-1.34-3-3-3S9,3.34,9,5v6C9,12.66,10.34,14,12,14z M11,5c0-0.55,0.45-1,1-1s1,0.45,1,1v6 c0,0.55-0.45,1-1,1s-1-0.45-1-1V5z M17,11c0,2.76-2.24,5-5,5s-5-2.24-5-5H6c0,3.05,2.19,5.58,5,5.91V21h2v-4.09\tc2.81-0.34,5-2.87,5-5.91H17z" fill="currentColor"></path></g>
-            </svg>
-        `;
+        <svg viewBox="0 0 24 24" preserveAspectRatio="xMidYMid meet" focusable="false" style="pointer-events: none; display: block; width: 100%; height: 100%;">
+            <g><path d="M12,14c1.66,0,3-1.34,3-3V5c0-1.66-1.34-3-3-3S9,3.34,9,5v6C9,12.66,10.34,14,12,14z M11,5c0-0.55,0.45-1,1-1s1,0.45,1,1v6 c0,0.55-0.45,1-1,1s-1-0.45-1-1V5z M17,11c0,2.76-2.24,5-5,5s-5-2.24-5-5H6c0,3.05,2.19,5.58,5,5.91V21h2v-4.09\tc2.81-0.34,5-2.87,5-5.91H17z" fill="currentColor"></path></g>
+        </svg>
+    `;
 
     voiceMicButton.appendChild(micIcon);
     voiceButton.appendChild(voiceMicButton);
@@ -155,7 +153,7 @@ const observerVoiceInject = new MutationObserver(() => {
 
     searchBar.appendChild(voiceButton);
     voiceButtonInjected = true;
-    console.log("[VoiceSearch] Injected microphone button with spatial nav fixes");
+    console.log("[VoiceSearch] Injected microphone button mirroring PiP pattern");
 });
 
 function start() {
