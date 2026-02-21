@@ -203,9 +203,19 @@ function execute_once_dom_loaded() {
   document.addEventListener('keyup', eventHandler, true);
   if (configRead('showWelcomeToast')) {
     setTimeout(() => {
-      showToast('Welcome to TizenTubeAV 2.1.39', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
+      showToast('Welcome to TizenTubeAV 2.1.40', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
     }, 2000);
   }
+
+  // Debug API availability
+  setTimeout(() => {
+    showToast("Debug API", "Webapis: " + !!window.webapis + " | Voice: " + (window.webapis ? !!window.webapis.voiceinteraction : "N/A") + " | AVPlay: " + (window.webapis ? !!window.webapis.avplay : "N/A"));
+    console.log("Webapis vorhanden?", !!window.webapis);
+    if (window.webapis) {
+      console.log("Voice vorhanden?", !!window.webapis.voiceinteraction);
+      console.log("AVPlay vorhanden?", !!window.webapis.avplay);
+    }
+  }, 5000);
 
   if (configRead('launchToOnStartup')) {
     resolveCommand(JSON.parse(configRead('launchToOnStartup')));
