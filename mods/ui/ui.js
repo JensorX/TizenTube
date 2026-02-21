@@ -209,8 +209,10 @@ function execute_once_dom_loaded() {
 
   // Debug API availability
   setTimeout(() => {
+    const apiKeys = window.webapis ? Object.keys(window.webapis).slice(0, 10).join(", ") : "none";
     showToast("Debug API", "Webapis: " + !!window.webapis + " | Voice: " + (window.webapis ? !!window.webapis.voiceinteraction : "N/A") + " | AVPlay: " + (window.webapis ? !!window.webapis.avplay : "N/A"));
-    console.log("Webapis vorhanden?", !!window.webapis);
+    showToast("WebAPI Keys", "Keys: " + apiKeys);
+    console.log("Webapis vorhanden?", !!window.webapis, "Keys:", apiKeys);
     if (window.webapis) {
       console.log("Voice vorhanden?", !!window.webapis.voiceinteraction);
       console.log("AVPlay vorhanden?", !!window.webapis.avplay);
