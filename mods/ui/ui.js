@@ -203,20 +203,17 @@ function execute_once_dom_loaded() {
   document.addEventListener('keyup', eventHandler, true);
   if (configRead('showWelcomeToast')) {
     setTimeout(() => {
-      showToast('Welcome to TizenTubeAV 2.1.43', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
+      showToast('Welcome to TizenTubeAV 2.1.44', 'Go to settings and click on TizenTube Settings for settings, press [RED] to open TizenTube Theme Settings.');
     }, 2000);
   }
 
   // Debug API availability
   setTimeout(() => {
     const apiKeys = window.webapis ? Object.keys(window.webapis).slice(0, 10).join(", ") : "none";
-    showToast("Debug API", "Webapis: " + !!window.webapis + " | Voice: " + (window.webapis ? !!window.webapis.voiceinteraction : "N/A") + " | AVPlay: " + (window.webapis ? !!window.webapis.avplay : "N/A"));
-    showToast("WebAPI Keys", "Keys: " + apiKeys);
-    console.log("Webapis vorhanden?", !!window.webapis, "Keys:", apiKeys);
-    if (window.webapis) {
-      console.log("Voice vorhanden?", !!window.webapis.voiceinteraction);
-      console.log("AVPlay vorhanden?", !!window.webapis.avplay);
-    }
+    const tizenKeys = window.tizen ? Object.keys(window.tizen).slice(0, 5).join(", ") : "none";
+    showToast("Debug API", "Webapis: " + !!window.webapis + " | Tizen: " + !!window.tizen + " | Voice: " + (window.webapis ? !!window.webapis.voiceinteraction : "N/A"));
+    showToast("API Keys", "WebAPI: " + apiKeys + " | Tizen: " + tizenKeys);
+    console.log("Webapis:", !!window.webapis, "Tizen:", !!window.tizen);
   }, 5000);
 
   if (configRead('launchToOnStartup')) {
