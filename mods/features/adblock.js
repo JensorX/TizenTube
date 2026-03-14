@@ -3,6 +3,7 @@ import Chapters from '../ui/chapters.js';
 import resolveCommand from '../resolveCommand.js';
 import { timelyAction, longPressData, MenuServiceItemRenderer, ShelfRenderer, TileRenderer, ButtonRenderer } from '../ui/ytUI.js';
 import { PatchSettings } from '../ui/customYTSettings.js';
+import { t } from 'i18next';
 
 /**
  * This is a minimal reimplementation of the following uBlock Origin rule:
@@ -221,7 +222,7 @@ JSON.parse = function () {
       for (const segment of window.sponsorblock.segments) {
         if (manualSkippedSegments.includes(segment.category)) {
           const timelyActionData = timelyAction(
-            `Skip ${segment.category}`,
+            t('sponsorblock.toast.skip', { segment: segment.category }),
             'SKIP_NEXT',
             {
               clickTrackingParams: null,
@@ -255,7 +256,7 @@ JSON.parse = function () {
           button: {
             buttonRenderer: ButtonRenderer(
               false,
-              'Skip to highlight',
+              t('sponsorblock.toasts.skipToHighlight'),
               'SKIP_NEXT',
               {
                 clickTrackingParams: null,
