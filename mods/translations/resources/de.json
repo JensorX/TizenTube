@@ -52,8 +52,7 @@
                     },
                     "fixUI": "UI korrigieren",
                     "hqThumbnails": "Hochqualitative Thumbnails aktivieren",
-                    "longPress": "Gedrückthalten-Aktionen aktivieren",
-                    "shorts": "Shorts aktivieren",
+                    "longPress": "Gedrückthalten-Aktionen aktivieren""shorts": "Shorts aktivieren",
                     "videoPreviews": "Videovorschauen aktivieren",
                     "ttWelcomeMsg": "TT-Begrüßungsnachricht anzeigen",
                     "guestSignInReminder": "Gast-Anmeldeerinnerung anzeigen",
@@ -135,17 +134,16 @@
                     "launchToOnStartup": {
                         "title": "Startseite beim Start",
                         "subtitle": "Wähle die Standardseite, die TizenTube beim Start öffnet"
-                    },
-                    "sortSubscriptionsByAlphabet": "Sort Subscriptions Alphabetically"
-                }
-            },
-            "updater": {
-                "title": "TizenTube Cobalt Updater",
-                "menuSubtitle": "TizenTube Cobalt Updates verwalten",
-                "versionSubtitle": "Aktuelle Version: {{version}}",
-                "options": {
-                    "checkForUpdates": "Nach Updates suchen",
-                    "checkForUpdatesOnStartup": "Beim Start nach Updates suchen"
+                    }
+                },
+                "updater": {
+                    "title": "TizenTube Cobalt Updater",
+                    "menuSubtitle": "TizenTube Cobalt Updates verwalten",
+                    "versionSubtitle": "Aktuelle Version: {{version}}",
+                    "options": {
+                        "checkForUpdates": "Nach Updates suchen",
+                        "checkForUpdatesOnStartup": "Beim Start nach Updates suchen"
+                    }
                 }
             }
         },
