@@ -77,7 +77,7 @@
                             "enableVPUIPatching": "Enable Video Player UI Patching",
                             "previousNextBtns": "Enable Previous and Next Buttons",
                             "showSuperThxBtn": "Show Super Thanks Button",
-                            "showSpeedCtrlBtn": "Show Speed Controls Button"
+                            "showSpeedCtrlBtn": "Show Speed ControlS Button"
                         }
                     },
                     "preferredVideoQuality": {
@@ -135,17 +135,16 @@
                     "launchToOnStartup": {
                         "title": "Launch To on Startup",
                         "subtitle": "Choose the default page TizenTube opens to on startup"
-                    },
-                    "sortSubscriptionsByAlphabet": "Sort Subscriptions Alphabetically"
-                }
-            },
-            "updater": {
-                "title": "TizenTube Cobalt Updater",
-                "menuSubtitle": "Manage TizenTube Cobalt updates",
-                "versionSubtitle": "Current version: {{version}}",
-                "options": {
-                    "checkForUpdates": "Check for updates",
-                    "checkForUpdatesOnStartup": "Check for updates on startup"
+                    }
+                },
+                "updater": {
+                    "title": "TizenTube Cobalt Updater",
+                    "menuSubtitle": "Manage TizenTube Cobalt updates",
+                    "versionSubtitle": "Current version: {{version}}",
+                    "options": {
+                        "checkForUpdates": "Check for updates",
+                        "checkForUpdatesOnStartup": "Check for updates on startup"
+                    }
                 }
             }
         },
