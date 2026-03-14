@@ -135,17 +135,16 @@
                     "launchToOnStartup": {
                         "title": "Sākumlapa palaišanas brīdī",
                         "subtitle": "Izvēlieties noklusējuma lapu, kuru TizenTube atvērs palaišanas brīdī"
-                    },
-                    "sortSubscriptionsByAlphabet": "Sort Subscriptions Alphabetically"
-                }
-            },
-            "updater": {
-                "title": "TizenTube Cobalt atjauninātājs",
-                "menuSubtitle": "Pārvaldīt TizenTube Cobalt atjauninājumus",
-                "versionSubtitle": "Pašreizējā versija: {{version}}",
-                "options": {
-                    "checkForUpdates": "Pārbaudīt atjauninājumus",
-                    "checkForUpdatesOnStartup": "Pārbaudīt atjauninājumus palaišanas brīdī"
+                    }
+                },
+                "updater": {
+                    "title": "TizenTube Cobalt atjauninātājs",
+                    "menuSubtitle": "Pārvaldīt TizenTube Cobalt atjauninājumus",
+                    "versionSubtitle": "Pašreizējā versija: {{version}}",
+                    "options": {
+                        "checkForUpdates": "Pārbaudīt atjauninājumus",
+                        "checkForUpdatesOnStartup": "Pārbaudīt atjauninājumus palaišanas brīdī"
+                    }
                 }
             }
         },
