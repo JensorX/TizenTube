@@ -1,8 +1,7 @@
 {
     "__contributors": [
         "reisxd",
-        "palincat",
-        "Vuzzy"
+        "palincat"
     ],
     "settings": {
         "options": {
@@ -137,23 +136,22 @@
                     "launchToOnStartup": {
                         "title": "Deschidere la pornire",
                         "subtitle": "Alege pagina implicită pe care TizenTube o deschide la pornire"
-                    },
-                    "sortSubscriptionsByAlphabet": "Sortează abonamentele în ordine alfabetică"
-                }
-            },
-            "updater": {
-                "title": "Actualizator TizenTube Cobalt",
-                "menuSubtitle": "Gestionează actualizările TizenTube Cobalt",
-                "versionSubtitle": "Versiunea actuală: {{version}}",
-                "options": {
-                    "checkForUpdates": "Verifică dacă există actualizări noi",
-                    "checkForUpdatesOnStartup": "Verifică dacă există actualizări noi la pornire"
+                    }
+                },
+                "updater": {
+                    "title": "Actualizatorul TizenTube Cobalt",
+                    "menuSubtitle": "Gestionează actualizările TizenTube Cobalt",
+                    "versionSubtitle": "Versiunea actuală: {{version}}",
+                    "options": {
+                        "checkForUpdates": "Verifică dacă există actualizări noi",
+                        "checkForUpdatesOnStartup": "Verifică dacă există actualizări noi la pornire"
+                    }
                 }
             }
         },
         "ttSettings": {
             "title": "Setări TizenTube",
-            "madeByText": "Creat de Reis Can (reisxd), traducători: Alin (palincat), Vuzzy cu ❤️",
+            "madeByText": "Creat de Reis Can (reisxd), tradus de Alin (palincat) cu ❤️",
             "summary": "Deschide setările TizenTube"
         },
         "supportTT": {
