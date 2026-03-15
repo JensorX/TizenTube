@@ -781,6 +781,11 @@ export default function modernUI(update, parameters) {
                             })
                         }
                     ]
+                },
+                {
+                    name: t('settings.options.uiSettings.options.sortSubscriptionsByAlphabet'),
+                    icon: 'SUBSCRIPTIONS',
+                    value: 'sortSubscriptionsByAlphabet'
                 }
             ]
         },
