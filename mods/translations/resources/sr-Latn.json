@@ -135,17 +135,16 @@
                     "launchToOnStartup": {
                         "title": "Početna stranica pri pokretanju",
                         "subtitle": "Izaberite podrazumevanu stranicu koja se otvara pri pokretanju TizenTube-a"
-                    },
-                    "sortSubscriptionsByAlphabet": "Sort Subscriptions Alphabetically"
-                }
-            },
-            "updater": {
-                "title": "TizenTube Cobalt ažuriranje",
-                "menuSubtitle": "Upravljajte TizenTube Cobalt ažuriranjima",
-                "versionSubtitle": "Trenutna verzija: {{version}}",
-                "options": {
-                    "checkForUpdates": "Proveri ažuriranja",
-                    "checkForUpdatesOnStartup": "Proveri ažuriranja pri pokretanju"
+                    }
+                },
+                "updater": {
+                    "title": "TizenTube Cobalt ažuriranje",
+                    "menuSubtitle": "Upravljajte TizenTube Cobalt ažuriranjima",
+                    "versionSubtitle": "Trenutna verzija: {{version}}",
+                    "options": {
+                        "checkForUpdates": "Proveri ažuriranja",
+                        "checkForUpdatesOnStartup": "Proveri ažuriranja pri pokretanju"
+                    }
                 }
             }
         },
