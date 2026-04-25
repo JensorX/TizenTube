@@ -57,6 +57,8 @@ const defaultConfig = {
   enableSigninReminder: false,
   force1xForMusic: false,
   sortSubscriptionsByAlphabet: false,
+  enableReturnYoutubeDislike: true,
+  enableLowMemoryMode: false,
 };
 
 let localConfig;
