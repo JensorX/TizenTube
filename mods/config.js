@@ -61,8 +61,10 @@ const defaultConfig = {
   autoFrameRate: false,
   autoFrameRatePauseVideoFor: 0,
   enableSigninReminder: false,
-  sortSubscriptionsByAlphabet: false,
   force1xForMusic: false,
+  sortSubscriptionsByAlphabet: false,
+  enableReturnYoutubeDislike: true,
+  enableLowMemoryMode: false,
 };
 
 let localConfig;

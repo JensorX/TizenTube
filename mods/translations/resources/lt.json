@@ -1,7 +1,5 @@
 {
-    "__contributors": [
-        "Benetis"
-    ],
+    "__contributors": ["Benetis"],
     "settings": {
         "options": {
             "socialMedia": {
@@ -137,15 +135,15 @@
                         "subtitle": "Pasirinkite numatytąjį puslapį, kurį „TizenTube“ atidarys paleidimo metu"
                     },
                     "sortSubscriptionsByAlphabet": "Rūšiuoti prenumeratas abėcėlės tvarka"
-                }
-            },
-            "updater": {
-                "title": "„TizenTube Cobalt“ naujinimo įrankis",
-                "menuSubtitle": "Valdykite „TizenTube Cobalt“ naujinimus",
-                "versionSubtitle": "Dabartinė versija: {{version}}",
-                "options": {
-                    "checkForUpdates": "Tikrinti ar yra naujinimų",
-                    "checkForUpdatesOnStartup": "Tikrinti naujinimus paleidžiant"
+                },
+                "updater": {
+                    "title": "„TizenTube Cobalt“ naujinimo įrankis",
+                    "menuSubtitle": "Valdykite „TizenTube Cobalt“ naujinimus",
+                    "versionSubtitle": "Dabartinė versija: {{version}}",
+                    "options": {
+                        "checkForUpdates": "Tikrinti ar yra naujinimų",
+                        "checkForUpdatesOnStartup": "Tikrinti naujinimus paleidžiant"
+                    }
                 }
             }
         },
