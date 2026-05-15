@@ -226,6 +226,11 @@ export default function modernUI(update, parameters) {
             ]
         },
         {
+            name: t('settings.options.returnYoutubeDislike'),
+            icon: 'DISLIKE',
+            value: 'enableReturnYoutubeDislike'
+        },
+        {
             name: t('settings.options.misc.title'),
             icon: 'SETTINGS',
             value: null,
@@ -305,6 +310,11 @@ export default function modernUI(update, parameters) {
                 {
                     name: t('settings.options.misc.options.reloadHomeOnStartup'),
                     value: 'reloadHomeOnStartup'
+                },
+                {
+                    name: t('settings.options.misc.options.lowMemoryMode'),
+                    icon: 'SETTINGS',
+                    value: 'enableLowMemoryMode'
                 }
             ]
         },

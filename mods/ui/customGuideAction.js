@@ -8,6 +8,7 @@ JSON.parse = function () {
     const disabledSidebarContents = configRead('disabledSidebarContents');
     const disableChannelsOnSidebar = configRead('disableChannelsOnSidebar');
     if (r.items && Array.isArray(r.items) && r.items[0].guideSectionRenderer) {
+        if (!disabledSidebarContents.length) return r;
         for (let i = 0; i < r.items.length; i++) {
             const section = r.items[i].guideSectionRenderer;
             for (let j = 0; j < section.items.length; j++) {

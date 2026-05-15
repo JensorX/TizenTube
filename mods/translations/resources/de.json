@@ -2,6 +2,9 @@
     "__contributors": [
         "CrazyWolf13"
     ],
+    "general": {
+        "dislikes": "Dislikes"
+    },
     "settings": {
         "options": {
             "socialMedia": {
@@ -9,6 +12,7 @@
                 "qrCodeScanMessage": "Du kannst die {{name}}-Seite besuchen, indem du den untenstehenden QR-Code scannst."
             },
             "adBlock": "Werbeblocker",
+            "returnYoutubeDislike": "Return YouTube Dislike",
             "sponsorblock": {
                 "title": "SponsorBlock-Einstellungen",
                 "options": {
@@ -57,7 +61,8 @@
                     "videoPreviews": "Videovorschauen aktivieren",
                     "ttWelcomeMsg": "TT-Begrüßungsnachricht anzeigen",
                     "guestSignInReminder": "Gast-Anmeldeerinnerung anzeigen",
-                    "reloadHomeOnStartup": "Startseite beim Start neu laden"
+                    "reloadHomeOnStartup": "Startseite beim Start neu laden",
+                    "lowMemoryMode": "Wenig-Arbeitsspeicher-Modus"
                 }
             },
             "subtitles": {
