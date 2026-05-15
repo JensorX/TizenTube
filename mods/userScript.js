@@ -1,4 +1,5 @@
 import "./features/userAgentSpoofing.js";
+import "./features/highTierConfigSpoof.js";
 import "whatwg-fetch";
 import 'core-js/proposals/object-getownpropertydescriptors';
 

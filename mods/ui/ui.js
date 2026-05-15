@@ -35,17 +35,7 @@ function execute_once_dom_loaded() {
     document.head.appendChild(style);
   }
 
-  // Fix UI issues.
-  const ui = configRead('enableFixedUI');
-  if (ui) {
-    try {
-      window.tectonicConfig.featureSwitches.isLimitedMemory = false;
-      window.tectonicConfig.clientData.legacyApplicationQuality = 'full-animation';
-      window.tectonicConfig.featureSwitches.enableAnimations = true;
-      window.tectonicConfig.featureSwitches.enableOnScrollLinearAnimation = true;
-      window.tectonicConfig.featureSwitches.enableListAnimations = true;
-    } catch (e) { }
-  }
+  // UI issues are now handled early by highTierConfigSpoof.js to ensure animations are enabled natively.
 
   // We handle key events ourselves.
   window.__spatialNavigation__.keyMode = 'NONE';
