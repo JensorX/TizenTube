@@ -47,3 +47,9 @@ jobs:
             git commit -m "Auto-build: Update dist files [skip ci]"
             git push
           fi
+
+      - name: Purge jsDelivr cache
+        run: |
+          curl -s https://purge.jsdelivr.net/gh/JensorX/TizenTube@main/dist/userScript.js
+          curl -s https://purge.jsdelivr.net/gh/JensorX/TizenTube@main/dist/service.js
+          curl -s https://purge.jsdelivr.net/gh/JensorX/TizenTube@main/package.json
