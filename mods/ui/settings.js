@@ -330,12 +330,6 @@ export default function modernUI(update, parameters) {
                 {
                     name: t('settings.options.subtitles.options.showHiddenSubtitles'),
                     value: 'enableShowOtherLanguages'
-                },
-                {
-                    name: 'Default Speed for Music Videos',
-                    icon: 'MUSIC_NOTE',
-                    value: 'force1xForMusic',
-                    subtitle: 'Force 1x speed for music videos'
                 }
             ]
         },
@@ -373,6 +367,16 @@ export default function modernUI(update, parameters) {
                             name: t('settings.options.videoPlayer.options.patching.options.showSpeedCtrlBtn'),
                             icon: 'SLOW_MOTION_VIDEO',
                             value: 'enableSpeedControlsButton'
+                        },
+                        {
+                            name: t('settings.options.videoPlayer.options.patching.options.addMPBtn'),
+                            icon: 'CLEAR_COOKIES',
+                            value: 'enableMPButton'
+                        },
+                        {
+                            name: t('settings.options.videoPlayer.options.patching.options.swapMPWithPIP'),
+                            icon: 'CLEAR_COOKIES',
+                            value: 'enableSwapMPWithPIP'
                         }
                     ]
                 },
@@ -464,6 +468,12 @@ export default function modernUI(update, parameters) {
                             value: 'disableHEVC'
                         }
                     ]
+                },
+              {
+                    name: 'Default Speed for Music Videos',
+                    icon: 'MUSIC_NOTE',
+                    value: 'force1xForMusic',
+                    subtitle: 'Force 1x speed for music videos'
                 },
                 window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate ? {
                     name: t('settings.options.videoPlayer.options.afr'),
@@ -796,6 +806,10 @@ export default function modernUI(update, parameters) {
                     name: t('settings.options.uiSettings.options.sortSubscriptionsByAlphabet'),
                     icon: 'SUBSCRIPTIONS',
                     value: 'sortSubscriptionsByAlphabet'
+                },
+                {
+                    name: t('settings.options.uiSettings.options.disableChannelsOnSidebar'),
+                    value: 'disableChannelsOnSidebar'
                 }
             ]
         },

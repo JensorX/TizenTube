@@ -153,6 +153,7 @@ JSON.parse = function () {
   if (r?.contents?.tvBrowseRenderer?.content?.tvSecondaryNavRenderer?.sections) {
     for (let i = 0; i < r.contents.tvBrowseRenderer.content.tvSecondaryNavRenderer.sections.length; i++) {
       const section = r.contents.tvBrowseRenderer.content.tvSecondaryNavRenderer.sections[i].tvSecondaryNavSectionRenderer;
+      if (!section || !section.tabs) continue;
 
       if (configRead('sortSubscriptionsByAlphabet')) {
         section.tabs.sort((a, b) => {
@@ -229,7 +230,7 @@ JSON.parse = function () {
       for (const segment of window.sponsorblock.segments) {
         if (manualSkippedSegments.includes(segment.category)) {
           const timelyActionData = timelyAction(
-            t('sponsorblock.toast.skip', { segment: segment.category }),
+            t('sponsorblock.toasts.skip', { segment: t(`sponsorblock.categories.${segment.category}`) }),
             'SKIP_NEXT',
             {
               clickTrackingParams: null,
@@ -309,6 +310,8 @@ function processShelves(shelves, shouldAddPreviews = true) {
           continue;
         }
         shelve.shelfRenderer.content.horizontalListRenderer.items = shelve.shelfRenderer.content.horizontalListRenderer.items.filter(item => item.tileRenderer?.tvhtml5ShelfRendererType !== 'TVHTML5_TILE_RENDERER_TYPE_SHORTS');
+
+        shelve.shelfRenderer.content.horizontalListRenderer.items = shelve.shelfRenderer.content.horizontalListRenderer.items.filter(item => !item.tileRenderer?.onSelectCommand?.reelWatchEndpoint);
       }
     }
   }
