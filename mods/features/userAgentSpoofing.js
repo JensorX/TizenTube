@@ -58,16 +58,18 @@ function generateUserAgent(profile) {
     return `Mozilla/5.0 (${profile.architecture}; ${profile.os}) Cobalt/${cobaltVersion} (unlike Gecko) ${v8Version} ${profile.rasterizer} Starboard/${starboardVersion}, ${profile.manufacturer}_${profile.deviceType}_${profile.chipsetModel}_${profile.modelYear}/${profile.firmwareVersion} (${profile.brand}, ${profile.model}) ${auxField}`;
 }
 
-if (document.querySelector('.content-container') && window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetUserAgent) {
-    const ua = localStorage.getItem('userAgent');
-    if (ua) {
-        window.h5vcc.tizentube.SetUserAgent(ua);
-        location.reload();
+if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetUserAgent) {
+    const currentUA = navigator.userAgent;
+    let storedUA = localStorage.getItem('userAgent');
+    
+    if (!storedUA) {
+        const randomProfile = deviceProfiles[Math.floor(Math.random() * deviceProfiles.length)];
+        storedUA = generateUserAgent(randomProfile);
+        localStorage.setItem('userAgent', storedUA);
     }
 
-    const randomProfile = deviceProfiles[Math.floor(Math.random() * deviceProfiles.length)];
-    const spoofedUserAgent = generateUserAgent(randomProfile);
-    localStorage.setItem('userAgent', spoofedUserAgent);
-    window.h5vcc.tizentube.SetUserAgent(spoofedUserAgent);
-    location.reload();
+    if (currentUA !== storedUA) {
+        window.h5vcc.tizentube.SetUserAgent(storedUA);
+        location.reload();
+    }
 }

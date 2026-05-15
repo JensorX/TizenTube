@@ -66,4 +66,40 @@
     } catch (e) {
         console.error("Failed to redefine tectonicConfig", e);
     }
+
+    // Fallback: YouTube often mirrors these settings in ytcfg.
+    // We aggressively patch ytcfg as well to ensure React components picking up config late also get the high-tier flags.
+    let ytcfgInterval = setInterval(() => {
+        if (!window.ytcfg || !window.ytcfg.set) return;
+
+        let data = window.ytcfg.data_ || (window.ytcfg.get ? window.ytcfg.get() : null);
+        if (data) {
+            let changed = false;
+            if (data.clientData && data.clientData.legacyApplicationQuality !== 'full-animation') {
+                data.clientData.legacyApplicationQuality = 'full-animation';
+                data.clientData.webpSupport = true;
+                changed = true;
+            }
+            if (data.featureSwitches && data.featureSwitches.isLimitedMemory !== false) {
+                applySpoof(data);
+                changed = true;
+            }
+            
+            if (changed) {
+                window.ytcfg.set(data);
+            }
+        }
+    }, 100);
+
+    // Stop checking aggressively after 10 seconds (boot is done)
+    setTimeout(() => clearInterval(ytcfgInterval), 10000);
+
+    // Add a visible indicator to verify the script is running (bypassing caches)
+    setTimeout(() => {
+        if (window._yttv) {
+            import('../ui/ytUI.js').then(module => {
+                module.showToast('TizenTube', 'HighTier Spoof Active! (Cache cleared)');
+            }).catch(() => {});
+        }
+    }, 5000);
 })();
