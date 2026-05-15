@@ -64,6 +64,7 @@ const defaultConfig = {
   autoFrameRate: false,
   autoFrameRatePauseVideoFor: 0,
   enableSigninReminder: false,
+  force1xForMusic: false,
   sortSubscriptionsByAlphabet: false,
 };
 
@@ -108,7 +109,7 @@ export const configChangeEmitter = {
     this.listeners[type].forEach(cb => {
       try {
         cb.call(this, event)
-      } catch (_) {};
+      } catch (_) { };
     });
   }
 };
