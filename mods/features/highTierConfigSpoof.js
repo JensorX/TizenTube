@@ -42,6 +42,9 @@
                 value.featureSwitches.supportsVoiceSearch = true;
                 value.featureSwitches.enableVoiceSearchOnWatch = true;
                 value.featureSwitches.useWebSpeechApi = true;
+                value.featureSwitches.voiceSearchUseSystemInput = true;
+                value.featureSwitches.enableVoiceSearchAutoSubmit = true;
+                value.featureSwitches.voiceSearchAutoSubmitDelayMs = 0;
             }
 
             if (value.clientData) {
@@ -77,8 +80,8 @@
     setTimeout(() => {
         if (window._yttv) {
             import('../ui/ytUI.js').then(module => {
-                module.showToast('TizenTube', 'UA: ' + navigator.userAgent);
-            }).catch(() => {});
+                module.showToast('TizenTube', 'Actual UA: ' + navigator.userAgent);
+            }).catch(() => { });
         }
     }, 5000);
 })();

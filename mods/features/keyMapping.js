@@ -1,10 +1,4 @@
-/**
- * Key Mapping Feature
- * 
- * When spoofing a PlayStation 4 User Agent, YouTube TV expects PS4-specific key codes.
- * This script intercepts Tizen remote control events and re-dispatches them as the 
- * key codes that YouTube's PS4 client understands.
- */
+import resolveCommand from '../resolveCommand.js';
 
 (function() {
     const TIZEN_KEYS = {
@@ -17,21 +11,17 @@
         REWIND: 412
     };
 
-    const PS4_KEYS = {
-        BACK: 27,        // Escape (mapped to Circle on PS4)
-        PLAY_PAUSE: 32,  // Space (often used for Play/Pause)
-    };
-
-    function dispatchKey(keyCode) {
-        console.log(`TizenTube: Remapping key to ${keyCode}`);
-        const event = new KeyboardEvent('keydown', {
-            keyCode: keyCode,
-            which: keyCode,
-            bubbles: true,
-            cancelable: true,
-            view: window
-        });
-        document.dispatchEvent(event);
+    function sendSignal(signal) {
+        console.log(`TizenTube: Sending signal ${signal}`);
+        try {
+            resolveCommand({
+                signalAction: {
+                    signal: signal
+                }
+            });
+        } catch (e) {
+            console.error("TizenTube: Failed to send signal", e);
+        }
     }
 
     window.addEventListener('keydown', (e) => {
@@ -40,17 +30,21 @@
 
         switch (e.keyCode) {
             case TIZEN_KEYS.BACK:
+                console.log("TizenTube: Back pressed, resolving command...");
                 e.preventDefault();
                 e.stopImmediatePropagation();
-                dispatchKey(PS4_KEYS.BACK);
+                // We send both BACK and POPUP_BACK to cover all cases
+                sendSignal('BACK');
+                sendSignal('POPUP_BACK');
                 break;
             case TIZEN_KEYS.PLAY_PAUSE:
             case TIZEN_KEYS.PLAY:
             case TIZEN_KEYS.PAUSE:
+                console.log("TizenTube: Play/Pause pressed, resolving command...");
                 e.preventDefault();
                 e.stopImmediatePropagation();
-                dispatchKey(PS4_KEYS.PLAY_PAUSE);
+                sendSignal('TOGGLE_PLAYBACK');
                 break;
         }
-    }, true); // Use capture phase to intercept before YouTube's own listeners
+    }, true);
 })();
