@@ -36,6 +36,13 @@
                 value.featureSwitches.enableNavAsOverlay = true; // Navigation menu as overlay
                 value.featureSwitches.enableCaptionsPersistence = true; // Remember caption settings
                 value.featureSwitches.enableDirectEntryToShortsClient = true; // Faster shorts entry
+
+                // Modern 2024/2025 Watch UI (White Transparent Buttons)
+                value.featureSwitches.useModernOverlayListItemStyle = true;
+                value.featureSwitches.useUpdatedImmersiveMastheadScrim = true;
+                value.featureSwitches.watch2025LeftRightProgressBarFocus = true;
+                value.featureSwitches.watch2025OpaquePivot = true;
+                value.featureSwitches.enableNewAudioSettingsMenu = true;
             }
 
             if (value.clientData) {
