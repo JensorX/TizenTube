@@ -226,6 +226,11 @@ export default function modernUI(update, parameters) {
             ]
         },
         {
+            name: t('settings.options.returnYoutubeDislike'),
+            icon: 'DISLIKE',
+            value: 'enableReturnYoutubeDislike'
+        },
+        {
             name: t('settings.options.misc.title'),
             icon: 'SETTINGS',
             value: null,
@@ -305,6 +310,11 @@ export default function modernUI(update, parameters) {
                 {
                     name: t('settings.options.misc.options.reloadHomeOnStartup'),
                     value: 'reloadHomeOnStartup'
+                },
+                {
+                    name: t('settings.options.misc.options.lowMemoryMode'),
+                    icon: 'SETTINGS',
+                    value: 'enableLowMemoryMode'
                 }
             ]
         },
@@ -422,6 +432,48 @@ export default function modernUI(update, parameters) {
                             value: codec
                         }
                     })
+                },
+                {
+                    name: 'Advanced Codec Settings',
+                    icon: 'SETTINGS',
+                    value: null,
+                    menuId: 'tt-advanced-codec-settings',
+                    menuHeader: {
+                        title: 'Advanced Codec Settings',
+                        subtitle: 'Individually deactivate specific codecs and high frame rates',
+                    },
+                    options: [
+                        {
+                            name: 'Disable 60fps (High Frame Rate)',
+                            value: 'disable60fps'
+                        },
+                        {
+                            name: 'Disable AV1',
+                            value: 'disableAV1'
+                        },
+                        {
+                            name: 'Disable VP9',
+                            value: 'disableVP9'
+                        },
+                        {
+                            name: 'Disable AVC (H.264)',
+                            value: 'disableAVC'
+                        },
+                        {
+                            name: 'Disable VP8',
+                            value: 'disableVP8'
+                        },
+                        {
+                            name: 'Disable HEVC',
+                            value: 'disableHEVC'
+                        }
+                    ]
+                },
+              {
+                    name: 'Default Speed for Music Videos',
+                    icon: 'MUSIC_NOTE',
+                    value: 'force1xForMusic',
+                    subtitle: 'Force 1x speed for music videos'
                 },
                 window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate ? {
                     name: t('settings.options.videoPlayer.options.afr'),

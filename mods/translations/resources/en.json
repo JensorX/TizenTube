@@ -2,6 +2,9 @@
     "__contributors": [
         "reisxd"
     ],
+    "general": {
+        "dislikes": "Dislikes"
+    },
     "settings": {
         "options": {
             "socialMedia": {
@@ -9,6 +12,7 @@
                 "qrCodeScanMessage": "You can visit the {{name}} page by scanning the QR code below."
             },
             "adBlock": "Ad Block",
+            "returnYoutubeDislike": "Return YouTube Dislike",
             "sponsorblock": {
                 "title": "SponsorBlock Settings",
                 "options": {
@@ -57,7 +61,8 @@
                     "videoPreviews": "Enable Video Previews",
                     "ttWelcomeMsg": "Show TT Welcome Message",
                     "guestSignInReminder": "Show Guest Sign In Reminder",
-                    "reloadHomeOnStartup": "Reload Home on Startup"
+                    "reloadHomeOnStartup": "Reload Home on Startup",
+                    "lowMemoryMode": "Low Memory Mode"
                 }
             },
             "subtitles": {

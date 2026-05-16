@@ -53,12 +53,21 @@ const defaultConfig = {
   launchToOnStartup: null,
   reloadHomeOnStartup: true,
   disabledSidebarContents: [],
+  disable60fps: false,
+  disableAV1: false,
+  disableVP9: false,
+  disableAVC: false,
+  disableVP8: false,
+  disableHEVC: false,
   disableChannelsOnSidebar: false,
   enableUpdater: true,
   autoFrameRate: false,
   autoFrameRatePauseVideoFor: 0,
   enableSigninReminder: false,
+  force1xForMusic: false,
   sortSubscriptionsByAlphabet: false,
+  enableReturnYoutubeDislike: true,
+  enableLowMemoryMode: false,
 };
 
 let localConfig;
@@ -102,7 +111,7 @@ export const configChangeEmitter = {
     this.listeners[type].forEach(cb => {
       try {
         cb.call(this, event)
-      } catch (_) {};
+      } catch (_) { };
     });
   }
 };

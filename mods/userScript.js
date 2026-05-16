@@ -22,3 +22,5 @@ import "./ui/customUI.js";
 import "./ui/customGuideAction.js";
 import "./features/keyMapping.js";
 import "./features/autoFrameRate.js";
+import "./features/returnYoutubeDislike.js";
+import "./features/lowMemoryMode.js";
