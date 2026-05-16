@@ -36,6 +36,12 @@
                 value.featureSwitches.enableNavAsOverlay = true; // Navigation menu as overlay
                 value.featureSwitches.enableCaptionsPersistence = true; // Remember caption settings
                 value.featureSwitches.enableDirectEntryToShortsClient = true; // Faster shorts entry
+
+                // Voice Search Support
+                value.featureSwitches.enableVoiceSearch = true;
+                value.featureSwitches.supportsVoiceSearch = true;
+                value.featureSwitches.enableVoiceSearchOnWatch = true;
+                value.featureSwitches.useWebSpeechApi = true;
             }
 
             if (value.clientData) {
