@@ -4,20 +4,27 @@
 // This matches the successful approach used in VacuumTube.
 
 function generateUserAgent() {
-    return 'Mozilla/5.0 (PS4; Leanback Shell) Cobalt/25.lts.30.1034958-gold; compatible; TizenTube';
+    return 'Mozilla/5.0 (PS4; Leanback Shell) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
 }
 
 if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetUserAgent) {
     const currentUA = navigator.userAgent;
-    let storedUA = localStorage.getItem('userAgent');
     
-    if (!storedUA || storedUA !== generateUserAgent()) {
-        storedUA = generateUserAgent();
-        localStorage.setItem('userAgent', storedUA);
-    }
+    // If the User Agent already contains PS4 or Cobalt (set by TizenBrew), 
+    // we don't need to do anything!
+    if (currentUA.includes('PS4') || currentUA.includes('Cobalt/25')) {
+        console.log("TizenTube: High-End UA already active, skipping spoof.");
+    } else {
+        let storedUA = localStorage.getItem('tizentube_userAgent');
+        
+        if (!storedUA || storedUA !== generateUserAgent()) {
+            storedUA = generateUserAgent();
+            localStorage.setItem('tizentube_userAgent', storedUA);
+        }
 
-    if (currentUA !== storedUA) {
-        window.h5vcc.tizentube.SetUserAgent(storedUA);
-        location.reload();
+        if (currentUA !== storedUA) {
+            window.h5vcc.tizentube.SetUserAgent(storedUA);
+            location.reload();
+        }
     }
 }
