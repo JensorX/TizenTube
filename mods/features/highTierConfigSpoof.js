@@ -80,7 +80,7 @@
     setTimeout(() => {
         if (window._yttv) {
             import('../ui/ytUI.js').then(module => {
-                module.showToast('TizenTube', 'Actual UA: ' + navigator.userAgent);
+                module.showToast('TizenTube', 'UA Now: ' + navigator.userAgent);
             }).catch(() => { });
         }
     }, 5000);
