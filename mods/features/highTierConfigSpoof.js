@@ -71,7 +71,7 @@
     setTimeout(() => {
         if (window._yttv) {
             import('../ui/ytUI.js').then(module => {
-                module.showToast('TizenTube', 'HighTier Spoof Active! (Cache cleared)');
+                module.showToast('TizenTube', 'UA: ' + navigator.userAgent);
             }).catch(() => {});
         }
     }, 5000);
