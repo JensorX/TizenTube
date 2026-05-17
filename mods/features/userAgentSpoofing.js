@@ -1,18 +1,18 @@
-// We use a PlayStation 4 User Agent here.
-// Why PS4? YouTube's server-side logic rolls out the most modern UI (including the transparent glassmorphism watch buttons)
-// to PS4 devices natively. Using an Android TV user agent often results in mid-tier UIs with gray buttons.
-// This matches the successful approach used in VacuumTube.
+// We use an Xbox One User Agent here.
+// Why Xbox One? YouTube's server-side logic rolls out the most modern UI (including the transparent glassmorphism watch buttons)
+// to Xbox One devices natively. Additionally, Xbox has far fewer keybinding restrictions compared to PlayStation 4,
+// allowing standard remote control navigation keys to work flawlessly.
 
 function generateUserAgent() {
-    return 'Mozilla/5.0 (PS4; Leanback Shell) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
+    return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; Xbox; Xbox One) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Cobalt/24.lts.0-gold (unlike Gecko) Starboard/14';
 }
 
 if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetUserAgent) {
     const currentUA = navigator.userAgent;
     
-    // If the User Agent already contains PS4 or Cobalt (set by TizenBrew), 
+    // If the User Agent already contains Xbox or Cobalt (set by TizenBrew), 
     // we don't need to do anything!
-    if (currentUA.includes('PS4') || currentUA.includes('Cobalt/25')) {
+    if (currentUA.includes('Xbox') || currentUA.includes('Cobalt')) {
         console.log("TizenTube: High-End UA already active, skipping spoof.");
     } else {
         let storedUA = localStorage.getItem('tizentube_userAgent');
