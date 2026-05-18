@@ -21,6 +21,7 @@
                 value.featureSwitches.enableSkipButtonSlideInAnimation = true;
                 value.featureSwitches.enableCobaltTransitionFix = true;
                 value.featureSwitches.disableShortsTransitionAnimation = false;
+                value.featureSwitches.enableShortsTransitionFix = true;
                 value.featureSwitches.enableStartupSound = true;
 
                 // Modern Native App Features
@@ -33,9 +34,20 @@
                 value.featureSwitches.isSqueezebackCapable = true; // Required for player shrink animations
                 value.featureSwitches.enableSearchBarOnWatch = true; // Search while watching
                 value.featureSwitches.enableOneClickPause = true; // Pause with one click
-                value.featureSwitches.enableNavAsOverlay = true; // Navigation menu as overlay
+                value.featureSwitches.enableNavAsOverlay = true; // Required for nav overlay transitions and scrim behavior
+                value.featureSwitches.disableNavAsOverlayScrim = false; // Keep the overlay scrim active for proper fade/transparency under nav
+                value.featureSwitches.useModernOverlayListItemStyle = true; // New overlay item styles with better transition support
+                value.featureSwitches.enableLeftNavModernization = true; // Modernized left nav pairs better with overlay animation paths
+                value.featureSwitches.enableDeferPivotRendering = true; // Reduces abrupt pivot/sidesheet content swaps
+                value.featureSwitches.deferInlineFadeOut = true; // Use fade-out path instead of hard hide for inline elements
+                value.featureSwitches.useUpdatedImmersiveMastheadScrim = true; // Updated scrim handling improves top-layer transparency blending
+                value.featureSwitches.disableStandardImmersiveMastheadGradient = false; // Keep immersive gradient path enabled
                 value.featureSwitches.enableCaptionsPersistence = true; // Remember caption settings
                 value.featureSwitches.enableDirectEntryToShortsClient = true; // Faster shorts entry
+
+                // Match production animation timing defaults used by richer UI buckets.
+                value.featureSwitches.horizontalListDurationMs = 200;
+                value.featureSwitches.verticalListDurationMs = 300;
 
                 // Voice Search Support
                 value.featureSwitches.enableVoiceSearch = true;
@@ -80,7 +92,7 @@
     setTimeout(() => {
         if (window._yttv) {
             import('../ui/ytUI.js').then(module => {
-                module.showToast('TizenTube', 'UA Now: ' + navigator.userAgent);
+                module.showToast('TizenTube', 'UA: ' + navigator.userAgent);
             }).catch(() => { });
         }
     }, 5000);
