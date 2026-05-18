@@ -1,5 +1,6 @@
 import "./features/userAgentSpoofing.js";
 import "./features/highTierConfigSpoof.js";
+import "./features/bixbyMicFix.js";
 import "whatwg-fetch";
 import 'core-js/proposals/object-getownpropertydescriptors';
 
@@ -20,7 +21,6 @@ import "./features/videoQueuing.js";
 import "./features/enableFeatures.js";
 import "./ui/customUI.js";
 import "./ui/customGuideAction.js";
-import "./features/keyMapping.js";
 import "./features/autoFrameRate.js";
 import "./features/returnYoutubeDislike.js";
 import "./features/lowMemoryMode.js";
