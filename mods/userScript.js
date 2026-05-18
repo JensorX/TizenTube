@@ -1,6 +1,8 @@
 import "./features/userAgentSpoofing.js";
 import "./features/highTierConfigSpoof.js";
 import "./features/bixbyMicFix.js";
+import "./features/remoteKeyBridge.js";
+import "./features/voiceSearchInputGuard.js";
 import "whatwg-fetch";
 import 'core-js/proposals/object-getownpropertydescriptors';
 

@@ -10,37 +10,62 @@
 // at the time the event is suppressed.
 
 (function () {
-    const MIC_KEY_NAME = 'MICROPHONE';
-    // Fallback keyCode used by Samsung Tizen remotes for the microphone/Bixby button.
-    const MIC_KEY_CODE = 65376;
+    const micKeyCodes = new Set([65376]);
+    const micKeyPattern = /(mic|microphone|voice|bixby)/i;
+    const voiceState = window.__ttVoiceSearchState || (window.__ttVoiceSearchState = {
+        lastMicKeyAt: 0,
+        lastMicKeyCode: null
+    });
 
-    function suppressBixby(e) {
-        if (e.keyCode === MIC_KEY_CODE) {
-            e.stopImmediatePropagation();
-            // Do NOT preventDefault() – that would also cancel YouTube's own voice handler.
-            // Stopping propagation is enough to prevent Bixby's system listener from firing.
+    function hasSearchContext() {
+        const activeElement = document.activeElement;
+        if (activeElement && (
+            activeElement.isContentEditable ||
+            activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'TEXTAREA'
+        )) {
+            return true;
         }
+
+        return Boolean(document.querySelector(
+            'ytlr-search-box, ytlr-search-text-box, input[type="search"], input[role="searchbox"], [role="search"]'
+        ));
     }
 
-    function registerMicKey() {
+    function suppressBixby(event) {
+        if (!micKeyCodes.has(event.keyCode) || !hasSearchContext()) return;
+
+        voiceState.lastMicKeyAt = Date.now();
+        voiceState.lastMicKeyCode = event.keyCode;
+
+        if (event.type === 'keyup') {
+            event.preventDefault();
+        }
+
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+    }
+
+    function registerMicKeys() {
+        if (!window.tizen || !tizen.tvinputdevice) {
+            return;
+        }
+
         try {
-            if (window.tizen && tizen.tvinputdevice) {
-                const supported = tizen.tvinputdevice.getSupportedKeys();
-                const hasMic = supported.some(k => k.name === MIC_KEY_NAME);
-                if (hasMic) {
-                    tizen.tvinputdevice.registerKey(MIC_KEY_NAME);
-                }
+            const supportedKeys = tizen.tvinputdevice.getSupportedKeys();
+            for (const key of supportedKeys) {
+                if (!micKeyPattern.test(key.name)) continue;
+
+                micKeyCodes.add(key.code);
+
+                try {
+                    tizen.tvinputdevice.registerKey(key.name);
+                } catch (_) {}
             }
-        } catch (err) {
-            // Not a Tizen environment or key not available – silently ignore.
-        }
-        // Capture phase so we get the event before any other listener.
-        window.addEventListener('keydown', suppressBixby, true);
+        } catch (_) {}
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', registerMicKey);
-    } else {
-        registerMicKey();
-    }
+    registerMicKeys();
+    window.addEventListener('keydown', suppressBixby, true);
+    window.addEventListener('keyup', suppressBixby, true);
 })();
