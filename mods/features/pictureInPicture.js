@@ -59,6 +59,7 @@ function enablePip() {
                         videoElement.style.left = '68vw';
 
                         window.isPipPlaying = true;
+                        startPipObserver();
                         videoElement.removeEventListener('play', onPipEnter);
                     }
 
@@ -94,6 +95,7 @@ function pipToFullscreen() {
     };
     resolveCommand(command);
     window.isPipPlaying = false;
+    stopPipObserver();
 };
 
 const originalClasses = {
@@ -107,9 +109,41 @@ const originalClasses = {
     }
 }
 
+let pipObserverTarget = null;
+let isPipObserverActive = false;
+
+function stopPipObserver() {
+    if (!isPipObserverActive) return;
+    observerPipEnter.disconnect();
+    pipObserverTarget = null;
+    isPipObserverActive = false;
+}
+
+function startPipObserver() {
+    if (!window.isPipPlaying) return;
+
+    const searchBar = document.querySelector('ytlr-search-bar');
+    const target = searchBar || document.body;
+    const useSubtree = target === document.body;
+
+    if (isPipObserverActive && pipObserverTarget === target) {
+        return;
+    }
+
+    observerPipEnter.disconnect();
+    observerPipEnter.observe(target, { childList: true, subtree: useSubtree });
+    pipObserverTarget = target;
+    isPipObserverActive = true;
+}
+
 const observerPipEnter = new MutationObserver(() => {
     if (!window.isPipPlaying) return;
     const searchBar = document.querySelector('ytlr-search-bar');
+    if (searchBar && pipObserverTarget !== searchBar) {
+        // Once the search bar exists we can stop observing the full document.
+        startPipObserver();
+    }
+
     if (searchBar) {
         const pipButtonExists = document.querySelector('#tt-pip-button');
         if (!pipButtonExists) {
@@ -190,7 +224,13 @@ const observerPipEnter = new MutationObserver(() => {
     }
 });
 
-observerPipEnter.observe(document.body, { childList: true, subtree: true });
+window.addEventListener('hashchange', () => {
+    if (!window.isPipPlaying) {
+        stopPipObserver();
+        return;
+    }
+    startPipObserver();
+});
 
 export {
     enablePip,

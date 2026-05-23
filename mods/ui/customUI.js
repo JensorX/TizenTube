@@ -5,15 +5,14 @@ import { configRead } from "../config.js";
 import { ButtonRenderer } from "./ytUI.js";
 
 function applyPatches() {
-    if (!window._yttv) return setTimeout(applyPatches, 250);
-    if (!document.querySelector('video')) return setTimeout(applyPatches, 250);
+    if (!window._yttv) return false;
+    if (!document.querySelector('video')) return false;
     const methods = Object.keys(window._yttv).filter(key => {
         return typeof window._yttv[key] === 'function' && window._yttv[key].toString().includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION');
     });
 
     if (methods.length === 0) {
-        setTimeout(applyPatches, 250);
-        return;
+        return false;
     }
 
     const origMethod = window._yttv[methods[0]];
@@ -169,11 +168,37 @@ function applyPatches() {
         YtlrPlayerActionsContainer.prototype = origMethod.prototype;
         window._yttv[methods[0]] = YtlrPlayerActionsContainer;
     }
+
+    return true;
 }
 
 
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    applyPatches();
-} else {
-    window.addEventListener('DOMContentLoaded', applyPatches);
+const tryApplyPatches = () => {
+    try {
+        return applyPatches();
+    } catch (_) {
+        return false;
+    }
+};
+
+if (!tryApplyPatches()) {
+    const patchObserver = new MutationObserver(() => {
+        if (tryApplyPatches()) {
+            patchObserver.disconnect();
+            window.removeEventListener('load', onLoadTryApplyPatches);
+            document.removeEventListener('DOMContentLoaded', tryApplyPatches);
+        }
+    });
+
+    const onLoadTryApplyPatches = () => {
+        if (tryApplyPatches()) {
+            patchObserver.disconnect();
+            window.removeEventListener('load', onLoadTryApplyPatches);
+            document.removeEventListener('DOMContentLoaded', tryApplyPatches);
+        }
+    };
+
+    patchObserver.observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener('DOMContentLoaded', tryApplyPatches);
+    window.addEventListener('load', onLoadTryApplyPatches);
 }

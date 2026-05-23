@@ -10,15 +10,34 @@ import { pipToFullscreen } from '../features/pictureInPicture.js';
 import getCommandExecutor from './customCommandExecution.js';
 import { t } from 'i18next';
 
-// It just works, okay?
-const interval = setInterval(() => {
-  const videoElement = document.querySelector('video');
-  if (videoElement) {
-    execute_once_dom_loaded();
-    patchResolveCommand();
-    clearInterval(interval);
+const DEBUG_KEY_EVENTS = false;
+const keyLog = (...args) => {
+  if (DEBUG_KEY_EVENTS) {
+    console.info(...args);
   }
-}, 250);
+};
+
+let didInit = false;
+
+const tryInit = () => {
+  if (didInit || !document.querySelector('video')) {
+    return false;
+  }
+
+  didInit = true;
+  execute_once_dom_loaded();
+  patchResolveCommand();
+  return true;
+};
+
+if (!tryInit()) {
+  const initObserver = new MutationObserver(() => {
+    if (tryInit()) {
+      initObserver.disconnect();
+    }
+  });
+  initObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 let keyTimeout = null;
 
@@ -48,47 +67,47 @@ function execute_once_dom_loaded() {
   uiContainer.setAttribute('tabindex', 0);
   uiContainer.addEventListener(
     'focus',
-    () => console.info('uiContainer focused!'),
+    () => keyLog('uiContainer focused!'),
     true
   );
   uiContainer.addEventListener(
     'blur',
-    () => console.info('uiContainer blured!'),
+    () => keyLog('uiContainer blured!'),
     true
   );
 
   uiContainer.addEventListener(
     'keydown',
     (evt) => {
-      console.info('uiContainer key event:', evt.type, evt.keyCode, evt);
+      keyLog('uiContainer key event:', evt.type, evt.keyCode, evt);
+      const focusedElement = document.querySelector(':focus');
+
       if (evt.keyCode !== 404 && evt.keyCode !== 172) {
         if (evt.keyCode in ARROW_KEY_CODE) {
           navigate(ARROW_KEY_CODE[evt.keyCode]);
         } else if (evt.keyCode === 13 || evt.keyCode === 32) {
           // "OK" button
-          console.log('OK button pressed');
-          const focusedElement = document.querySelector(':focus');
-          if (focusedElement.type === 'checkbox') {
+          keyLog('OK button pressed');
+          if (focusedElement && focusedElement.type === 'checkbox') {
             focusedElement.checked = !focusedElement.checked;
             focusedElement.dispatchEvent(new Event('change'));
           }
           evt.preventDefault();
           evt.stopPropagation();
           return;
-        } else if (evt.keyCode === 27 && document.querySelector(':focus').type !== 'text') {
+        } else if (evt.keyCode === 27 && (!focusedElement || focusedElement.type !== 'text')) {
           // Back button
           uiContainer.style.display = 'none';
           uiContainer.blur();
-        } else if (document.querySelector(':focus').type === 'text' && evt.keyCode === 27) {
-          const focusedElement = document.querySelector(':focus');
+        } else if (focusedElement && focusedElement.type === 'text' && evt.keyCode === 27) {
           focusedElement.value = focusedElement.value.slice(0, -1);
         }
 
 
         if (evt.key === 'Enter' || evt.Uc?.key === 'Enter') {
           // If the focused element is a text input, emit a change event.
-          if (document.querySelector(':focus').type === 'text') {
-            document.querySelector(':focus').dispatchEvent(new Event('change'));
+          if (focusedElement && focusedElement.type === 'text') {
+            focusedElement.dispatchEvent(new Event('change'));
           }
         }
       }
@@ -120,13 +139,8 @@ function execute_once_dom_loaded() {
 
   var eventHandler = (evt) => {
     // We handle key events ourselves.
-    console.info(
-      'Key event:',
-      evt.type,
-      evt.keyCode,
-      evt.keyCode,
-      evt.defaultPrevented
-    );
+    keyLog('Key event:', evt.type, evt.keyCode, evt.keyCode, evt.defaultPrevented);
+
     if (configRead('enableScreenDimming')) {
       if (keyTimeout) {
         clearTimeout(keyTimeout);
@@ -140,17 +154,17 @@ function execute_once_dom_loaded() {
       }, configRead('dimmingTimeout') * 1000);
     }
     if (evt.keyCode == 403) {
-      console.info('Taking over!');
+      keyLog('Taking over!');
       evt.preventDefault();
       evt.stopPropagation();
       if (evt.type === 'keydown') {
         try {
           if (uiContainer.style.display === 'none') {
-            console.info('Showing and focusing!');
+            keyLog('Showing and focusing!');
             uiContainer.style.display = 'block';
             uiContainer.focus();
           } else {
-            console.info('Hiding!');
+            keyLog('Hiding!');
             uiContainer.style.display = 'none';
             uiContainer.blur();
           }

@@ -8,13 +8,26 @@ function isMusicVideoType(musicType) {
         musicType !== 'MUSIC_VIDEO_TYPE_OMV_NONE';
 }
 
-const interval = setInterval(() => {
-    const videoElement = document.querySelector('video');
-    if (videoElement) {
-        execute_once_dom_loaded_speed();
-        clearInterval(interval);
+let didInitSpeedUI = false;
+
+const tryInitSpeedUI = () => {
+    if (didInitSpeedUI || !document.querySelector('video')) {
+        return false;
     }
-}, 1000);
+
+    didInitSpeedUI = true;
+    execute_once_dom_loaded_speed();
+    return true;
+};
+
+if (!tryInitSpeedUI()) {
+    const speedInitObserver = new MutationObserver(() => {
+        if (tryInitSpeedUI()) {
+            speedInitObserver.disconnect();
+        }
+    });
+    speedInitObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 function execute_once_dom_loaded_speed() {
     document.querySelector('video').addEventListener('canplay', () => {
