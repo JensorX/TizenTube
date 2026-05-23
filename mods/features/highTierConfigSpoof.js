@@ -32,9 +32,9 @@
                 value.featureSwitches.enableBackgroundFadeOnPreview = true; // Smooth preview transitions
                 value.featureSwitches.enableAudioLottieBg = true; // Lottie animations for audio content
                 value.featureSwitches.isSqueezebackCapable = true; // Required for player shrink animations
-                // value.featureSwitches.enableSearchBarOnWatch = true; // Search while watching
+                value.featureSwitches.enableSearchBarOnWatch = true; // Search while watching
                 // value.featureSwitches.enableOneClickPause = true; // Pause with one click
-                // value.featureSwitches.enableNavAsOverlay = true; // Required for nav overlay transitions and scrim behavior
+                value.featureSwitches.enableNavAsOverlay = true; // Required for nav overlay transitions and scrim behavior
                 value.featureSwitches.disableNavAsOverlayScrim = false; // Keep the overlay scrim active for proper fade/transparency under nav
                 value.featureSwitches.useModernOverlayListItemStyle = true; // New overlay item styles with better transition support
                 value.featureSwitches.enableLeftNavModernization = true; // Modernized left nav pairs better with overlay animation paths
@@ -44,10 +44,6 @@
                 value.featureSwitches.disableStandardImmersiveMastheadGradient = false; // Keep immersive gradient path enabled
                 value.featureSwitches.enableCaptionsPersistence = true; // Remember caption settings
                 value.featureSwitches.enableDirectEntryToShortsClient = true; // Faster shorts entry
-
-                // Match production animation timing defaults used by richer UI buckets.
-                // value.featureSwitches.horizontalListDurationMs = 200;
-                // value.featureSwitches.verticalListDurationMs = 300;
 
                 // Voice Search Support
                 value.featureSwitches.enableVoiceSearch = true;

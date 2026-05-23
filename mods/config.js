@@ -1,4 +1,6 @@
 const CONFIG_KEY = 'ytaf-configuration';
+const isShieldUserAgentActive = () => navigator.userAgent.includes('Shield Android TV');
+
 const defaultConfig = {
   enableAdBlock: true,
   enableSponsorBlock: true,
@@ -79,7 +81,22 @@ try {
   localConfig = defaultConfig;
 }
 
+// Shield profile already gets the modern UI, so the fixed UI patch must stay disabled.
+if (isShieldUserAgentActive()) {
+  defaultConfig.enableFixedUI = false;
+  localConfig.enableFixedUI = false;
+  window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
+}
+
 export function configRead(key) {
+  if (key === 'enableFixedUI' && isShieldUserAgentActive()) {
+    if (localConfig.enableFixedUI !== false) {
+      localConfig.enableFixedUI = false;
+      window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
+    }
+    return false;
+  }
+
   if (localConfig[key] === undefined) {
     console.warn('Populating key', key, 'with default value', defaultConfig[key]);
     localConfig[key] = defaultConfig[key];
@@ -89,6 +106,10 @@ export function configRead(key) {
 }
 
 export function configWrite(key, value) {
+  if (key === 'enableFixedUI' && isShieldUserAgentActive()) {
+    value = false;
+  }
+
   console.info('Setting key', key, 'to', value);
   localConfig[key] = value;
   window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
