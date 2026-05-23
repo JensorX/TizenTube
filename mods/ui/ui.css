@@ -155,3 +155,56 @@ div[idomkey="shadow"] {
 .ytContribIconHost::before {
     font-family: "YouTube Icons Outlined";
 }
+
+/*
+ * Restore missing watch/overlay animations using stable idomkey anchors
+ * instead of brittle obfuscated class names.
+ */
+
+/* Main watch squeezeback zoom transition (browser parity: 0.35s) */
+body.app-quality-root ytlr-squeezeback-player-overlay[idomkey="squeezeback-player-overlay"] {
+  transition: transform .35s cubic-bezier(.2, 0, 0, 1), opacity .2s ease !important;
+  will-change: transform, opacity;
+}
+
+/* Player transform transition when watch layout shifts */
+body.app-quality-root ytlr-player[id="player-container"] {
+  transition: transform .35s cubic-bezier(.2, 0, 0, 1) !important;
+  will-change: transform;
+}
+
+/* Watch shadow/scrim fade for smooth background blend */
+body.app-quality-root div[idomkey="shadow"] {
+  transition: opacity .2s ease, background-image .2s ease !important;
+}
+
+/* Controls and metadata panel enter/exit */
+body.app-quality-root yt-focus-container[idomkey="controls"],
+body.app-quality-root div[idomkey="controlStateContainer"] {
+  transition: transform .2s ease, opacity .2s ease !important;
+  will-change: transform, opacity;
+}
+
+/* Watch pivot/next-content rail movement */
+body.app-quality-root ytlr-pivot[idomkey="pivot"],
+body.app-quality-root ytlr-section-list-renderer[idomkey="pivot"] {
+  transition: transform .2s ease, opacity .2s ease !important;
+  will-change: transform, opacity;
+}
+
+/* Overlay stage and right-side panel shell (browser parity: 0.35s / 0.75s) */
+body.app-quality-root yt-unified-overlay-stage[idomkey="overlay-stage"] ytlr-animated-overlay,
+body.app-quality-root yt-unified-overlay-stage[idomkey="overlay-stage"] .AmQJbe {
+  transition: transform .35s cubic-bezier(.2, 0, 0, 1), opacity .35s cubic-bezier(.2, 0, 0, 1) !important;
+  will-change: transform, opacity;
+}
+
+body.app-quality-root yt-unified-overlay-stage[idomkey="overlay-stage"] .N4eUpb .AmQJbe {
+  transition: transform .75s cubic-bezier(.2, 0, 0, 1), opacity .75s cubic-bezier(.2, 0, 0, 1) !important;
+}
+
+/* Guide visibility transitions (idomkey exists on guide response root) */
+body.app-quality-root ytlr-guide-response[idomkey="guide"] {
+  transition: transform .2s ease, opacity .2s ease !important;
+  will-change: transform, opacity;
+}
