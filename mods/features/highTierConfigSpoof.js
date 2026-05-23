@@ -34,7 +34,7 @@
                 value.featureSwitches.isSqueezebackCapable = true; // Required for player shrink animations
                 value.featureSwitches.enableSearchBarOnWatch = true; // Search while watching
                 // value.featureSwitches.enableOneClickPause = true; // Pause with one click
-                value.featureSwitches.enableNavAsOverlay = true; // Required for nav overlay transitions and scrim behavior
+                // value.featureSwitches.enableNavAsOverlay = true; // Required for nav overlay transitions and scrim behavior
                 value.featureSwitches.disableNavAsOverlayScrim = false; // Keep the overlay scrim active for proper fade/transparency under nav
                 value.featureSwitches.useModernOverlayListItemStyle = true; // New overlay item styles with better transition support
                 value.featureSwitches.enableLeftNavModernization = true; // Modernized left nav pairs better with overlay animation paths

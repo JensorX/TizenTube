@@ -358,20 +358,16 @@ function patchSubtitleMenu() {
     isPatched = true;
 }
 
-// Wait for the YouTube TV app to be ready
-const interval = setInterval(() => {
-    if (window._yttv && Object.keys(window._yttv).length > 0) {
-        patchSubtitleMenu();
-        clearInterval(interval);
-    }
-}, 1000);
-
 // Also try to patch when DOM is loaded
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", patchSubtitleMenu);
 } else {
     patchSubtitleMenu();
 }
+
+// Re-attempt on load and route changes without a permanent polling loop.
+window.addEventListener('load', patchSubtitleMenu);
+window.addEventListener('hashchange', patchSubtitleMenu);
 
 console.log(
     "TizenTube Subtitle Localization: Module loaded, waiting for YouTube TV..."
