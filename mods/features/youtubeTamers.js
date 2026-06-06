@@ -26,6 +26,7 @@ const tamerState = {
 };
 
 let startupToastShown = false;
+let startupApplyScheduled = false;
 
 function showTamerStatusToast() {
     if (startupToastShown) return;
@@ -124,6 +125,23 @@ function applyConfiguredTamers() {
     scheduleStartupToast();
 }
 
+function scheduleApplyConfiguredTamers() {
+    if (startupApplyScheduled) return;
+    startupApplyScheduled = true;
+
+    const run = () => {
+        // Delay injection so TizenTube core patches initialize first.
+        setTimeout(applyConfiguredTamers, 3000);
+    };
+
+    if (document.readyState === 'complete') {
+        run();
+        return;
+    }
+
+    window.addEventListener('load', run, { once: true });
+}
+
 configChangeEmitter.addEventListener('configChange', (event) => {
     const key = event?.detail?.key;
     if (key !== CONFIG_KEYS.CPU_TAMER && key !== CONFIG_KEYS.JS_ENGINE_TAMER) return;
@@ -138,9 +156,4 @@ configChangeEmitter.addEventListener('configChange', (event) => {
     }
 });
 
-if (document.readyState === 'loading') {
-    applyConfiguredTamers();
-    window.addEventListener('DOMContentLoaded', applyConfiguredTamers, { once: true });
-} else {
-    applyConfiguredTamers();
-}
+scheduleApplyConfiguredTamers();
