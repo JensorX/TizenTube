@@ -1,6 +1,5 @@
 import "./features/userAgentSpoofing.js";
 import "./features/highTierConfigSpoof.js";
-import "./features/youtubeTamers.js";
 import "./features/bixbyMicFix.js";
 import "./features/remoteKeyBridge.js";
 import "./features/voiceSearchInputGuard.js";
@@ -27,3 +26,4 @@ import "./ui/customGuideAction.js";
 import "./features/autoFrameRate.js";
 import "./features/returnYoutubeDislike.js";
 import "./features/lowMemoryMode.js";
+import "./features/youtubeTamers.js";
