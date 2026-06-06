@@ -1,5 +1,6 @@
 import "./features/userAgentSpoofing.js";
 import "./features/highTierConfigSpoof.js";
+import "./features/youtubeTamers.js";
 import "./features/bixbyMicFix.js";
 import "./features/remoteKeyBridge.js";
 import "./features/voiceSearchInputGuard.js";

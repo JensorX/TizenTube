@@ -62,6 +62,8 @@ const defaultConfig = {
   disableVP8: false,
   disableHEVC: false,
   disableChannelsOnSidebar: false,
+  enableYoutubeCpuTamer: false,
+  enableYoutubeJsEngineTamer: false,
   enableUpdater: true,
   autoFrameRate: false,
   autoFrameRatePauseVideoFor: 0,
