@@ -466,6 +466,16 @@ export default function modernUI(update, parameters) {
                         {
                             name: 'Disable HEVC',
                             value: 'disableHEVC'
+                        },
+                        {
+                            name: 'Experimental: YouTube CPU Tamer',
+                            subtitle: 'Loads external userscript; requires app reload for best effect',
+                            value: 'enableYoutubeCpuTamer'
+                        },
+                        {
+                            name: 'Experimental: YouTube JS Engine Tamer',
+                            subtitle: 'Loads external userscript; can break with YouTube updates',
+                            value: 'enableYoutubeJsEngineTamer'
                         }
                     ]
                 },

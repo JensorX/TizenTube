@@ -85,11 +85,11 @@
     }
 
     // Add a visible indicator to verify the script is running (bypassing caches)
-    setTimeout(() => {
-        if (window._yttv) {
-            import('../ui/ytUI.js').then(module => {
-                module.showToast('TizenTube', 'UA: ' + navigator.userAgent);
-            }).catch(() => { });
-        }
-    }, 5000);
+    // setTimeout(() => {
+    //     if (window._yttv) {
+    //         import('../ui/ytUI.js').then(module => {
+    //             module.showToast('TizenTube', 'UA: ' + navigator.userAgent);
+    //         }).catch(() => { });
+    //     }
+    // }, 5000);
 })();
