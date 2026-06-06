@@ -27,9 +27,43 @@ const tamerState = {
 
 let startupToastShown = false;
 let startupApplyScheduled = false;
+let toastRetryTimer = null;
+let playbackToastHooked = false;
+
+window.__ttYoutubeTamers = {
+    loadedAt: Date.now(),
+    lastToastAttemptAt: 0,
+    states: tamerState,
+};
+
+function isResolveCommandReady() {
+    if (!window._yttv || typeof window._yttv !== 'object') return false;
+
+    for (const key in window._yttv) {
+        if (
+            window._yttv[key] &&
+            window._yttv[key].instance &&
+            typeof window._yttv[key].instance.resolveCommand === 'function'
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function queueToastRetry(delayMs = 1500) {
+    if (toastRetryTimer) return;
+    toastRetryTimer = setTimeout(() => {
+        toastRetryTimer = null;
+        showTamerStatusToast();
+    }, delayMs);
+}
 
 function showTamerStatusToast() {
     if (startupToastShown) return;
+
+    window.__ttYoutubeTamers.lastToastAttemptAt = Date.now();
 
     const enabledKeys = Object.keys(CONFIG_KEYS)
         .map((key) => CONFIG_KEYS[key])
@@ -56,11 +90,24 @@ function showTamerStatusToast() {
 
     if (!parts.length) return;
 
-    startupToastShown = true;
+    if (!isResolveCommandReady()) {
+        queueToastRetry(1200);
+        return;
+    }
 
     import('../ui/ytUI.js')
-        .then((module) => module.showToast('TizenTube', `Tamers ${parts.join(' | ')}`))
-        .catch(() => { });
+        .then((module) => {
+            module.showToast('TizenTube', `Tamers ${parts.join(' | ')}`);
+            startupToastShown = true;
+            if (toastRetryTimer) {
+                clearTimeout(toastRetryTimer);
+                toastRetryTimer = null;
+            }
+        })
+        .catch(() => {
+            if (startupToastShown) return;
+            queueToastRetry(1500);
+        });
 }
 
 function scheduleStartupToast() {
@@ -74,6 +121,20 @@ function scheduleStartupToast() {
     }
 
     window.addEventListener('load', trigger, { once: true });
+}
+
+function setupPlaybackToastFallback() {
+    if (playbackToastHooked) return;
+    playbackToastHooked = true;
+
+    const onFirstPlay = () => {
+        if (!startupToastShown) {
+            showTamerStatusToast();
+        }
+        document.removeEventListener('play', onFirstPlay, true);
+    };
+
+    document.addEventListener('play', onFirstPlay, true);
 }
 
 function injectScript(configKey) {
@@ -123,6 +184,7 @@ function applyConfiguredTamers() {
     }
 
     scheduleStartupToast();
+    setupPlaybackToastFallback();
 }
 
 function scheduleApplyConfiguredTamers() {
@@ -150,6 +212,7 @@ configChangeEmitter.addEventListener('configChange', (event) => {
         injectScript(key);
         startupToastShown = false;
         scheduleStartupToast();
+        setupPlaybackToastFallback();
     } else {
         tamerState[key] = 'disabled';
         console.warn(`[TizenTube] ${key} disabled. Reload required to fully remove already applied runtime patches.`);
