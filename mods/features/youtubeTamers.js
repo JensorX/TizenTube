@@ -1,23 +1,24 @@
+/**
+ * YouTube Tamers — TizenTube integration module
+ *
+ * Manages activation of CPU Tamer and TV Engine Tamer based on user config.
+ * Scripts are bundled directly into the rollup build (no external loading).
+ */
+
 import { configRead, configChangeEmitter } from '../config.js';
+import { activate as activateCpuTamer } from './cpuTamerTV.js';
+import { activate as activateTvEngineTamer } from './tvEngineTamer.js';
+
+const TAG = '[TizenTube/Tamers]';
 
 const CONFIG_KEYS = {
     CPU_TAMER: 'enableYoutubeCpuTamer',
     JS_ENGINE_TAMER: 'enableYoutubeJsEngineTamer'
 };
 
-const SCRIPT_URLS = {
-    [CONFIG_KEYS.CPU_TAMER]: 'https://update.greasyfork.org/scripts/431573/YouTube%20CPU%20Tamer%20by%20AnimationFrame.user.js',
-    [CONFIG_KEYS.JS_ENGINE_TAMER]: 'https://update.greasyfork.org/scripts/473972/YouTube%20JS%20Engine%20Tamer.user.js'
-};
-
-const SCRIPT_IDS = {
-    [CONFIG_KEYS.CPU_TAMER]: 'tt-youtube-cpu-tamer',
-    [CONFIG_KEYS.JS_ENGINE_TAMER]: 'tt-youtube-js-engine-tamer'
-};
-
 const SCRIPT_LABELS = {
     [CONFIG_KEYS.CPU_TAMER]: 'CPU Tamer',
-    [CONFIG_KEYS.JS_ENGINE_TAMER]: 'JS Engine Tamer'
+    [CONFIG_KEYS.JS_ENGINE_TAMER]: 'TV Engine Tamer'
 };
 
 const tamerState = {
@@ -26,19 +27,63 @@ const tamerState = {
 };
 
 let startupToastShown = false;
-let startupApplyScheduled = false;
-let toastRetryTimer = null;
-let playbackToastHooked = false;
 
+// Expose state for debugging via showToast
 window.__ttYoutubeTamers = {
     loadedAt: Date.now(),
-    lastToastAttemptAt: 0,
     states: tamerState,
 };
 
+// --- Activation logic ---
+
+function activateTamers() {
+    const cpuEnabled = configRead(CONFIG_KEYS.CPU_TAMER);
+    const engineEnabled = configRead(CONFIG_KEYS.JS_ENGINE_TAMER);
+
+    if (!cpuEnabled && !engineEnabled) return;
+
+    const results = [];
+
+    if (cpuEnabled) {
+        tamerState[CONFIG_KEYS.CPU_TAMER] = 'pending';
+        try {
+            // CPU Tamer is async (obtains clean timers via iframe)
+            activateCpuTamer().then((success) => {
+                tamerState[CONFIG_KEYS.CPU_TAMER] = success ? 'loaded' : 'failed';
+                console.info(TAG, `CPU Tamer: ${tamerState[CONFIG_KEYS.CPU_TAMER]}`);
+                tryShowToast();
+            }).catch((err) => {
+                tamerState[CONFIG_KEYS.CPU_TAMER] = 'failed';
+                console.warn(TAG, 'CPU Tamer failed:', err);
+                tryShowToast();
+            });
+            results.push('CPU Tamer: activating');
+        } catch (err) {
+            tamerState[CONFIG_KEYS.CPU_TAMER] = 'failed';
+            console.warn(TAG, 'CPU Tamer failed:', err);
+        }
+    }
+
+    if (engineEnabled) {
+        tamerState[CONFIG_KEYS.JS_ENGINE_TAMER] = 'pending';
+        try {
+            const success = activateTvEngineTamer();
+            tamerState[CONFIG_KEYS.JS_ENGINE_TAMER] = success ? 'loaded' : 'failed';
+            console.info(TAG, `TV Engine Tamer: ${tamerState[CONFIG_KEYS.JS_ENGINE_TAMER]}`);
+        } catch (err) {
+            tamerState[CONFIG_KEYS.JS_ENGINE_TAMER] = 'failed';
+            console.warn(TAG, 'TV Engine Tamer failed:', err);
+        }
+    }
+
+    // Show a toast after a delay to allow _yttv.resolveCommand to become available
+    scheduleToast();
+}
+
+// --- Toast display ---
+
 function isResolveCommandReady() {
     if (!window._yttv || typeof window._yttv !== 'object') return false;
-
     for (const key in window._yttv) {
         if (
             window._yttv[key] &&
@@ -48,175 +93,120 @@ function isResolveCommandReady() {
             return true;
         }
     }
-
     return false;
 }
 
-function queueToastRetry(delayMs = 1500) {
-    if (toastRetryTimer) return;
-    toastRetryTimer = setTimeout(() => {
-        toastRetryTimer = null;
-        showTamerStatusToast();
-    }, delayMs);
-}
-
-function showTamerStatusToast() {
+function tryShowToast() {
     if (startupToastShown) return;
 
-    window.__ttYoutubeTamers.lastToastAttemptAt = Date.now();
-
-    const enabledKeys = Object.keys(CONFIG_KEYS)
-        .map((key) => CONFIG_KEYS[key])
-        .filter((key) => configRead(key));
-
+    const enabledKeys = Object.values(CONFIG_KEYS).filter((key) => configRead(key));
     if (!enabledKeys.length) return;
 
     const loaded = enabledKeys
         .filter((key) => tamerState[key] === 'loaded')
         .map((key) => SCRIPT_LABELS[key]);
-
     const failed = enabledKeys
         .filter((key) => tamerState[key] === 'failed')
         .map((key) => SCRIPT_LABELS[key]);
-
     const pending = enabledKeys
         .filter((key) => tamerState[key] === 'pending')
         .map((key) => SCRIPT_LABELS[key]);
 
+    // Don't show toast if everything is still pending
+    if (pending.length === enabledKeys.length) return;
+
+    if (!isResolveCommandReady()) return;
+
     const parts = [];
-    if (loaded.length) parts.push(`loaded: ${loaded.join(', ')}`);
-    if (failed.length) parts.push(`failed: ${failed.join(', ')}`);
-    if (pending.length) parts.push(`pending: ${pending.join(', ')}`);
+    if (loaded.length) parts.push(`✓ ${loaded.join(', ')}`);
+    if (failed.length) parts.push(`✗ ${failed.join(', ')}`);
+    if (pending.length) parts.push(`… ${pending.join(', ')}`);
 
     if (!parts.length) return;
 
-    if (!isResolveCommandReady()) {
-        queueToastRetry(1200);
-        return;
-    }
-
     import('../ui/ytUI.js')
         .then((module) => {
-            module.showToast('TizenTube', `Tamers ${parts.join(' | ')}`);
+            module.showToast('TizenTube Tamers', parts.join(' | '));
             startupToastShown = true;
-            if (toastRetryTimer) {
-                clearTimeout(toastRetryTimer);
-                toastRetryTimer = null;
-            }
         })
         .catch(() => {
-            if (startupToastShown) return;
-            queueToastRetry(1500);
+            // ytUI not ready yet, will retry via scheduleToast
         });
 }
 
-function scheduleStartupToast() {
-    const trigger = () => {
-        setTimeout(showTamerStatusToast, 1800);
+function scheduleToast() {
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    const tryToast = () => {
+        if (startupToastShown) return;
+        attempts++;
+
+        if (isResolveCommandReady()) {
+            tryShowToast();
+            if (startupToastShown) return;
+        }
+
+        if (attempts < maxAttempts) {
+            setTimeout(tryToast, 1000);
+        }
     };
 
-    if (document.readyState === 'complete') {
-        trigger();
-        return;
-    }
+    // First attempt after a reasonable delay
+    setTimeout(tryToast, 3000);
 
-    window.addEventListener('load', trigger, { once: true });
-}
-
-function setupPlaybackToastFallback() {
-    if (playbackToastHooked) return;
-    playbackToastHooked = true;
-
+    // Also try on first video play
     const onFirstPlay = () => {
-        if (!startupToastShown) {
-            showTamerStatusToast();
-        }
+        if (!startupToastShown) tryShowToast();
         document.removeEventListener('play', onFirstPlay, true);
     };
-
     document.addEventListener('play', onFirstPlay, true);
 }
 
-function injectScript(configKey) {
-    const scriptId = SCRIPT_IDS[configKey];
-    const scriptUrl = SCRIPT_URLS[configKey];
+// --- Startup ---
 
-    if (!scriptId || !scriptUrl) return;
-    if (document.getElementById(scriptId)) {
-        if (tamerState[configKey] === 'disabled') {
-            tamerState[configKey] = 'loaded';
-        }
-        return;
-    }
-
-    tamerState[configKey] = 'pending';
-
-    const script = document.createElement('script');
-    script.id = scriptId;
-    script.src = scriptUrl;
-    script.async = false;
-    script.crossOrigin = 'anonymous';
-    script.referrerPolicy = 'no-referrer';
-
-    script.onload = () => {
-        tamerState[configKey] = 'loaded';
-        console.info(`[TizenTube] Loaded external tamer script: ${scriptId}`);
-    };
-
-    script.onerror = (error) => {
-        tamerState[configKey] = 'failed';
-        console.warn(`[TizenTube] Failed to load external tamer script: ${scriptId}`, error);
-    };
-
-    (document.documentElement || document.head || document.body).appendChild(script);
-}
-
-function applyConfiguredTamers() {
-    tamerState[CONFIG_KEYS.CPU_TAMER] = configRead(CONFIG_KEYS.CPU_TAMER) ? 'pending' : 'disabled';
-    tamerState[CONFIG_KEYS.JS_ENGINE_TAMER] = configRead(CONFIG_KEYS.JS_ENGINE_TAMER) ? 'pending' : 'disabled';
-
-    if (configRead(CONFIG_KEYS.CPU_TAMER)) {
-        injectScript(CONFIG_KEYS.CPU_TAMER);
-    }
-
-    if (configRead(CONFIG_KEYS.JS_ENGINE_TAMER)) {
-        injectScript(CONFIG_KEYS.JS_ENGINE_TAMER);
-    }
-
-    scheduleStartupToast();
-    setupPlaybackToastFallback();
-}
-
-function scheduleApplyConfiguredTamers() {
-    if (startupApplyScheduled) return;
-    startupApplyScheduled = true;
-
+function scheduleStartup() {
     const run = () => {
-        // Delay injection so TizenTube core patches initialize first.
-        setTimeout(applyConfiguredTamers, 3000);
+        // Delay injection so TizenTube core patches initialize first
+        setTimeout(activateTamers, 3000);
     };
 
     if (document.readyState === 'complete') {
         run();
-        return;
+    } else {
+        window.addEventListener('load', run, { once: true });
     }
-
-    window.addEventListener('load', run, { once: true });
 }
+
+// --- Config change listener ---
 
 configChangeEmitter.addEventListener('configChange', (event) => {
     const key = event?.detail?.key;
     if (key !== CONFIG_KEYS.CPU_TAMER && key !== CONFIG_KEYS.JS_ENGINE_TAMER) return;
 
     if (configRead(key)) {
-        injectScript(key);
-        startupToastShown = false;
-        scheduleStartupToast();
-        setupPlaybackToastFallback();
+        // Activate the requested tamer
+        if (key === CONFIG_KEYS.CPU_TAMER && tamerState[key] !== 'loaded') {
+            tamerState[key] = 'pending';
+            activateCpuTamer().then((success) => {
+                tamerState[key] = success ? 'loaded' : 'failed';
+                startupToastShown = false;
+                tryShowToast();
+                scheduleToast();
+            });
+        } else if (key === CONFIG_KEYS.JS_ENGINE_TAMER && tamerState[key] !== 'loaded') {
+            tamerState[key] = 'pending';
+            const success = activateTvEngineTamer();
+            tamerState[key] = success ? 'loaded' : 'failed';
+            startupToastShown = false;
+            tryShowToast();
+            scheduleToast();
+        }
     } else {
         tamerState[key] = 'disabled';
-        console.warn(`[TizenTube] ${key} disabled. Reload required to fully remove already applied runtime patches.`);
+        console.warn(TAG, `${SCRIPT_LABELS[key]} disabled. Reload required to fully remove runtime patches.`);
     }
 });
 
-scheduleApplyConfiguredTamers();
+// Start
+scheduleStartup();
