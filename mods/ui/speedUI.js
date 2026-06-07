@@ -30,8 +30,14 @@ if (!tryInitSpeedUI()) {
 }
 
 function execute_once_dom_loaded_speed() {
-    document.querySelector('video').addEventListener('canplay', () => {
-        const video = document.getElementsByTagName('video')[0];
+    const video = document.querySelector('video');
+    let lastAppliedSessionKey = null;
+
+    const applyConfiguredSpeedOncePerVideo = () => {
+        const sessionKey = `${window.location.href}::${video.currentSrc || ''}`;
+        if (sessionKey === lastAppliedSessionKey) return;
+        lastAppliedSessionKey = sessionKey;
+
         const defaultSpeed = configRead('videoSpeed');
         video.playbackRate = defaultSpeed;
 
@@ -42,7 +48,13 @@ function execute_once_dom_loaded_speed() {
                 video.playbackRate = 1;
             }
         }, 25);
-    });
+    };
+
+    // loadedmetadata fires for new media loads, but not for every rebuffer.
+    video.addEventListener('loadedmetadata', applyConfiguredSpeedOncePerVideo);
+
+    // Fallback for some player transitions that skip loadedmetadata.
+    video.addEventListener('playing', applyConfiguredSpeedOncePerVideo);
 
     const eventHandler = (evt) => {
         if (evt.keyCode == 406 || evt.keyCode == 191) {
