@@ -1,18 +1,60 @@
 import { configRead } from '../config.js';
 import { showModal, buttonItem, overlayPanelItemListRenderer } from './ytUI.js';
 
-const interval = setInterval(() => {
-    const videoElement = document.querySelector('video');
-    if (videoElement) {
-        execute_once_dom_loaded_speed();
-        clearInterval(interval);
+function isMusicVideoType(musicType) {
+    return typeof musicType === 'string' &&
+        musicType.startsWith('MUSIC_VIDEO_TYPE_') &&
+        musicType !== 'MUSIC_VIDEO_TYPE_NONE' &&
+        musicType !== 'MUSIC_VIDEO_TYPE_OMV_NONE';
+}
+
+let didInitSpeedUI = false;
+
+const tryInitSpeedUI = () => {
+    if (didInitSpeedUI || !document.querySelector('video')) {
+        return false;
     }
-}, 1000);
+
+    didInitSpeedUI = true;
+    execute_once_dom_loaded_speed();
+    return true;
+};
+
+if (!tryInitSpeedUI()) {
+    const speedInitObserver = new MutationObserver(() => {
+        if (tryInitSpeedUI()) {
+            speedInitObserver.disconnect();
+        }
+    });
+    speedInitObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 function execute_once_dom_loaded_speed() {
-    document.querySelector('video').addEventListener('canplay', () => {
-        document.getElementsByTagName('video')[0].playbackRate = configRead('videoSpeed');;
-    });
+    const video = document.querySelector('video');
+    let lastAppliedSessionKey = null;
+
+    const applyConfiguredSpeedOncePerVideo = () => {
+        const sessionKey = `${window.location.href}::${video.currentSrc || ''}`;
+        if (sessionKey === lastAppliedSessionKey) return;
+        lastAppliedSessionKey = sessionKey;
+
+        const defaultSpeed = configRead('videoSpeed');
+        video.playbackRate = defaultSpeed;
+
+        if (!configRead('force1xForMusic')) return;
+
+        setTimeout(() => {
+            if (isMusicVideoType(window.musicVideoType)) {
+                video.playbackRate = 1;
+            }
+        }, 25);
+    };
+
+    // loadedmetadata fires for new media loads, but not for every rebuffer.
+    video.addEventListener('loadedmetadata', applyConfiguredSpeedOncePerVideo);
+
+    // Fallback for some player transitions that skip loadedmetadata.
+    video.addEventListener('playing', applyConfiguredSpeedOncePerVideo);
 
     const eventHandler = (evt) => {
         if (evt.keyCode == 406 || evt.keyCode == 191) {

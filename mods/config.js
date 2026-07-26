@@ -1,4 +1,6 @@
 const CONFIG_KEY = 'ytaf-configuration';
+const isShieldUserAgentActive = () => navigator.userAgent.includes('Shield Android TV');
+
 const defaultConfig = {
   enableAdBlock: true,
   enableSponsorBlock: true,
@@ -54,15 +56,26 @@ const defaultConfig = {
   launchToOnStartup: null,
   reloadHomeOnStartup: true,
   disabledSidebarContents: [],
+  disable60fps: false,
+  disableAV1: false,
+  disableVP9: false,
+  disableAVC: false,
+  disableVP8: false,
+  disableHEVC: false,
   disableChannelsOnSidebar: false,
+  enableYoutubeCpuTamer: false,
+  enableYoutubeJsEngineTamer: false,
   enableUpdater: true,
   autoFrameRate: false,
   autoFrameRatePauseVideoFor: 0,
   enableSigninReminder: false,
+  force1xForMusic: false,
   sortSubscriptionsByAlphabet: false,
   enableClock: false,
   isClock12HourFormat: false,
   clockShowSeconds: false,
+  enableReturnYoutubeDislike: true,
+  enableLowMemoryMode: false,
 };
 
 let localConfig;
@@ -74,7 +87,22 @@ try {
   localConfig = defaultConfig;
 }
 
+// Shield profile already gets the modern UI, so the fixed UI patch must stay disabled.
+if (isShieldUserAgentActive()) {
+  defaultConfig.enableFixedUI = false;
+  localConfig.enableFixedUI = false;
+  window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
+}
+
 export function configRead(key) {
+  if (key === 'enableFixedUI' && isShieldUserAgentActive()) {
+    if (localConfig.enableFixedUI !== false) {
+      localConfig.enableFixedUI = false;
+      window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
+    }
+    return false;
+  }
+
   if (localConfig[key] === undefined) {
     console.warn('Populating key', key, 'with default value', defaultConfig[key]);
     localConfig[key] = defaultConfig[key];
@@ -84,6 +112,10 @@ export function configRead(key) {
 }
 
 export function configWrite(key, value) {
+  if (key === 'enableFixedUI' && isShieldUserAgentActive()) {
+    value = false;
+  }
+
   console.info('Setting key', key, 'to', value);
   localConfig[key] = value;
   window.localStorage[CONFIG_KEY] = JSON.stringify(localConfig);
@@ -106,7 +138,7 @@ export const configChangeEmitter = {
     this.listeners[type].forEach(cb => {
       try {
         cb.call(this, event)
-      } catch (_) {};
+      } catch (_) { };
     });
   }
 };
