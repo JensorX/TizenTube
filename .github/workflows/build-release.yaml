@@ -2,12 +2,25 @@ name: Build TizenTube Standalone and Release
 
 
 on:
+  workflow_run:
+    workflows:
+      - Build and Push Dist
+    types:
+      - completed
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     steps:
       - name: Clone repo with full history and tags
@@ -15,6 +28,7 @@ jobs:
         with:
           fetch-depth: 0 # fetch full history for tags
           fetch-tags: true
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
       
       - name: Fetch tags (safety)
         run: |
@@ -22,7 +36,12 @@ jobs:
       - name: Determine release tag
         id: version
         run: |
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            PACKAGE_VERSION=$(node -p "require('./package.json').version")
+            TAG="v${PACKAGE_VERSION}"
+          else
+            TAG=$(git describe --tags --exact-match 2>/dev/null || true)
+          fi
           if [ -z "$TAG" ]; then
             echo "No tags found; deriving from config.xml or fallback"
             if [ -f standalone/config.xml ]; then
@@ -37,13 +56,22 @@ jobs:
               TAG=v0.0.0-${GITHUB_SHA:0:7}
             fi
           fi
+          echo "RELEASE_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           echo "RELEASE_VERSION=$TAG" >> $GITHUB_ENV
+
+      - name: Build userscript and standalone preload
+        working-directory: mods
+        run: |
+          npm install
+          npm test
+          npm run build
 
       - name: Install modules, transpile service and build service
         working-directory: standalone/service
         run: |
           npm install
           npm install -g @vercel/ncc https://github.com/reisxd/tizen.js/tarball/main
+          npm test
           npm run build
           rm -rf node_modules
 
@@ -60,13 +88,13 @@ jobs:
       - name: Upload TizenTube package artifact for Old Tizen
         uses: actions/upload-artifact@v4
         with:
-            name: app-${{ github.sha }}-old.wgt
+            name: app-${{ env.RELEASE_SHA }}-old.wgt
             path: standalone/release/TizenTube.wgt
       
       - name: Release TizenTube Build Results
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.RELEASE_VERSION }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ env.RELEASE_SHA }}
           files: |
             standalone/release/*

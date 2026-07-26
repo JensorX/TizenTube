@@ -1,5 +1,6 @@
 packets/
 node_modules/
+/standalone/service/dist/
 *.wgt
 .sign
 package-lock.json

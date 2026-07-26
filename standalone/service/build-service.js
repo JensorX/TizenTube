@@ -16,6 +16,10 @@ async function build() {
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
 
     fs.writeFileSync(path.join(outDir, 'index.js'), fixedCode);
+    fs.copyFileSync(
+        path.join(__dirname, '..', '..', 'dist', 'standalonePreload.js'),
+        path.join(outDir, 'standalonePreload.js')
+    );
 }
 
 build();

@@ -1,4 +1,4 @@
-function redirectUrl(originalUrl) {
+export function redirectUrl(originalUrl) {
     if (!originalUrl) return originalUrl;
 
     try {
@@ -24,7 +24,64 @@ function redirectUrl(originalUrl) {
     return originalUrl;
 }
 
+const requestOptionKeys = [
+    'method',
+    'mode',
+    'credentials',
+    'cache',
+    'redirect',
+    'referrer',
+    'referrerPolicy',
+    'integrity',
+    'keepalive',
+    'signal'
+];
+
+export function copyRequestOptions(input, init) {
+    const options = {
+        headers: new Headers(input.headers)
+    };
+
+    requestOptionKeys.forEach(function (key) {
+        if (input[key] !== undefined) {
+            options[key] = input[key];
+        }
+    });
+
+    if (init) {
+        Object.keys(init).forEach(function (key) {
+            options[key] = init[key];
+        });
+    }
+
+    return options;
+}
+
+export function fetchRedirectedRequest(originalFetch, input, targetUrl, init) {
+    const options = copyRequestOptions(input, init);
+    const method = (options.method || input.method || 'GET').toUpperCase();
+    const hasExplicitBody = init && Object.prototype.hasOwnProperty.call(init, 'body');
+
+    if (hasExplicitBody || method === 'GET' || method === 'HEAD') {
+        return originalFetch(targetUrl, options);
+    }
+
+    if (input.bodyUsed) {
+        return Promise.reject(new TypeError('Cannot redirect a Request whose body has already been consumed'));
+    }
+
+    return input.clone().blob().then(function (blob) {
+        options.body = blob;
+        return originalFetch(targetUrl, options);
+    });
+}
+
 export default function () {
+    if (window.__tizentubeStandalonePatchesInstalled) {
+        return;
+    }
+    window.__tizentubeStandalonePatchesInstalled = true;
+
     const originalFetch = window.fetch;
     if (originalFetch) {
         window.fetch = function (input, init) {
@@ -42,25 +99,11 @@ export default function () {
             }
 
             if (isRequestObject) {
-                if (input.method === 'POST' && targetUrl.indexOf('localhost') !== -1) {
-                    const modifiedOptions = {
-                        method: input.method,
-                        headers: new Headers(input.headers),
-                        mode: input.mode,
-                        credentials: input.credentials
-                    };
-
-                    if (input.body && !input.bodyUsed) {
-                        return input.clone().blob().then(function (blob) {
-                            modifiedOptions.body = blob;
-                            return originalFetch(targetUrl, modifiedOptions);
-                        });
-                    }
-
-                    return originalFetch(targetUrl, modifiedOptions);
+                if (targetUrl !== input.url) {
+                    return fetchRedirectedRequest(originalFetch, input, targetUrl, init);
                 }
 
-                input = new Request(targetUrl, input);
+                return originalFetch.apply(this, [input, init]);
             }
 
             return originalFetch.apply(this, [input, init]);
@@ -84,7 +127,6 @@ export default function () {
     if (navigator.sendBeacon) {
         const originalSendBeacon = navigator.sendBeacon;
         navigator.sendBeacon = function (url, data) {
-            console.log("Beacon data:", data);
             return originalSendBeacon.apply(this, [redirectUrl(url), data]);
         };
     }
