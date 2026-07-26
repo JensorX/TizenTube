@@ -364,6 +364,11 @@ export default function modernUI(update, parameters) {
                             value: 'enableSuperThanksButton'
                         },
                         {
+                            name: t('settings.options.videoPlayer.options.patching.options.showAIAskBtn'),
+                            icon: 'SPARK',
+                            value: 'enableAIAskButton'
+                        },
+                        {
                             name: t('settings.options.videoPlayer.options.patching.options.showSpeedCtrlBtn'),
                             icon: 'SLOW_MOTION_VIDEO',
                             value: 'enableSpeedControlsButton'
@@ -701,6 +706,11 @@ export default function modernUI(update, parameters) {
                             name: 'More',
                             icon: 'TAB_MORE',
                             value: 'TAB_MORE'
+                        },
+                        {
+                            name: 'Shorts',
+                            icon: 'YOUTUBE_SHORTS_FILL_24',
+                            value: 'YOUTUBE_SHORTS_FILL_24'
                         }
                     ]
                 },
@@ -820,6 +830,33 @@ export default function modernUI(update, parameters) {
                 {
                     name: t('settings.options.uiSettings.options.disableChannelsOnSidebar'),
                     value: 'disableChannelsOnSidebar'
+                },
+                {
+                    name: t('settings.options.uiSettings.options.clock.title'),
+                    value: null,
+                    icon: 'TIMER',
+                    menuId: 'tt-clock-settings',
+                    menuHeader: {
+                        title: t('settings.options.uiSettings.options.clock.title'),
+                        subtitle: t('settings.options.uiSettings.options.clock.subtitle')
+                    },
+                    options: [
+                        {
+                            name: t('settings.options.uiSettings.options.clock.options.enableClock'),
+                            icon: 'TIMER',
+                            value: 'enableClock'
+                        },
+                        {
+                            name: t('settings.options.uiSettings.options.clock.options.isClock12HourFormat'),
+                            icon: 'TIMER',
+                            value: 'isClock12HourFormat'
+                        },
+                        {
+                            name: t('settings.options.uiSettings.options.clock.options.clockShowSeconds'),
+                            icon: 'TIMER',
+                            value: 'clockShowSeconds'
+                        }
+                    ]
                 }
             ]
         },

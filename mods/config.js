@@ -35,6 +35,7 @@ const defaultConfig = {
   showWelcomeToast: true,
   enablePreviousNextButtons: true,
   enableSuperThanksButton: false,
+  enableAIAskButton: false,
   enableSpeedControlsButton: true,
   enablePatchingVideoPlayer: true,
   enableMPButton: true,
@@ -70,6 +71,9 @@ const defaultConfig = {
   enableSigninReminder: false,
   force1xForMusic: false,
   sortSubscriptionsByAlphabet: false,
+  enableClock: false,
+  isClock12HourFormat: false,
+  clockShowSeconds: false,
   enableReturnYoutubeDislike: true,
   enableLowMemoryMode: false,
 };

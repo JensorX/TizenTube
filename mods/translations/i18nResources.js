@@ -22,6 +22,12 @@ import LithuanianResource from './resources/lt.json';
 import HungarianResource from './resources/hu.json';
 import ItalianResource from './resources/it.json';
 import UkrainianResource from './resources/uk.json';
+import JapaneseResource from './resources/ja.json';
+import GreekResource from './resources/el.json';
+import TaiwaneseResource from './resources/zh-TW.json';
+import CzechResource from './resources/cs.json';
+import PolishResource from './resources/pl.json';
+import ArabicResource from './resources/ar.json';
 
 export default {
     da: {
@@ -95,5 +101,23 @@ export default {
     },
     uk: {
         translation: UkrainianResource
+    },
+    ja: {
+        translation: JapaneseResource
+    },
+    el: {
+        translation: GreekResource
+    },
+    "zh-TW": {
+        translation: TaiwaneseResource
+    },
+    cs: {
+        translation: CzechResource
+    }, 
+    pl: {
+        translation: PolishResource
+    },
+    ar: {
+        translation: ArabicResource
     }
 };

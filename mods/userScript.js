@@ -1,10 +1,14 @@
+import initPatches from "./features/standaloneUserscript.js";
+if (window.location.hostname === 'localhost') {
+    initPatches();
+}
 import "./features/userAgentSpoofing.js";
 import "./features/highTierConfigSpoof.js";
 import "./features/bixbyMicFix.js";
 import "./features/remoteKeyBridge.js";
 import "./features/voiceSearchInputGuard.js";
 import "whatwg-fetch";
-import 'core-js/proposals/object-getownpropertydescriptors';
+import "core-js/proposals/object-getownpropertydescriptors";
 
 import './translations/index.js'
 import "./domrect-polyfill";
@@ -24,6 +28,7 @@ import "./features/enableFeatures.js";
 import "./ui/customUI.js";
 import "./ui/customGuideAction.js";
 import "./features/autoFrameRate.js";
+import "./ui/clock.js";
 import "./features/returnYoutubeDislike.js";
 import "./features/lowMemoryMode.js";
 import "./features/youtubeTamers.js";
