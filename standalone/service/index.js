@@ -10,6 +10,8 @@ const http = require('http');
 const URL = require('url');
 const fs = require('fs');
 const path = require('path');
+const USERSCRIPT_URL = 'https://github.com/JensorX/TizenTube/raw/refs/heads/main/dist/userScript.js';
+const STANDALONE_USER_AGENT = 'Mozilla/5.0 (Linux; Shield Android TV) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
 
 const requestHeadersToRemove = [
     'connection',
@@ -51,6 +53,16 @@ function injectAfterOpeningHead(text, markup) {
     }
 
     return markup + text;
+}
+
+function createUserAgentOverrideScript() {
+    const userAgent = JSON.stringify(STANDALONE_USER_AGENT);
+    return `<script>(function(){var userAgent=${userAgent};Object.defineProperty(navigator,"userAgent",{configurable:true,get:function(){return userAgent;}});}());</script>`;
+}
+
+function applyStandaloneUserAgent(headers) {
+    headers['user-agent'] = STANDALONE_USER_AGENT;
+    return headers;
 }
 
 function rewriteLogicalLocation(text, isBotGuardResponse) {
@@ -120,6 +132,26 @@ app.get('/tizentube/standalonePreload.js', (req, res) => {
     res.sendFile(preloadPath);
 });
 
+app.get('/tizentube/userScript.js', (req, res) => {
+    fetch(USERSCRIPT_URL)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error(`Userscript download failed with status ${response.status}`);
+            }
+
+            return response.text();
+        })
+        .then((script) => {
+            res.setHeader('Cache-Control', 'no-store');
+            res.type('application/javascript');
+            res.send(script);
+        })
+        .catch((error) => {
+            console.error(`Userscript download failed: ${error.message}`);
+            res.status(502).type('text/plain').send('TizenTube userscript unavailable');
+        });
+});
+
 app.all('*', (req, res) => {
     const isCorsBypass = req.path.indexOf('/cors-bypass/') === 0;
 
@@ -162,6 +194,7 @@ app.all('*', (req, res) => {
     requestHeadersToRemove.forEach((header) => {
         delete headers[header];
     });
+    applyStandaloneUserAgent(headers);
 
     readRequestBody(req)
         .then((body) => {
@@ -233,9 +266,10 @@ app.all('*', (req, res) => {
 
                 return response.text().then((text) => {
                     if (req.url.indexOf('/tv') === 0) {
-                        const preload = `<script src="/tizentube/standalonePreload.js?ver=${Date.now()}"></script>`;
+                        const preload = createUserAgentOverrideScript()
+                            + `<script src="/tizentube/standalonePreload.js?ver=${Date.now()}"></script>`;
                         text = injectAfterOpeningHead(text, preload);
-                        text += `<script src="https://github.com/JensorX/TizenTube/raw/refs/heads/main/dist/userScript.js?ver=${Date.now()}"></script>`;
+                        text += `<script src="/tizentube/userScript.js?ver=${Date.now()}"></script>`;
                     }
 
                     const proxyPrefix = `http://localhost:${PORT}/cors-bypass/`;
@@ -289,6 +323,9 @@ if (process.env.TIZENTUBE_NO_LISTEN !== '1') {
 }
 
 module.exports = {
+    STANDALONE_USER_AGENT,
+    applyStandaloneUserAgent,
+    createUserAgentOverrideScript,
     injectAfterOpeningHead,
     readRequestBody,
     rewriteLogicalLocation,

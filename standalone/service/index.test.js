@@ -5,13 +5,35 @@ process.env.TIZENTUBE_NO_LISTEN = '1';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { PassThrough } = require('node:stream');
+const vm = require('node:vm');
 const {
+    STANDALONE_USER_AGENT,
+    applyStandaloneUserAgent,
+    createUserAgentOverrideScript,
     injectAfterOpeningHead,
     readRequestBody,
     rewriteLogicalLocation,
     toLogicalReferer,
     toProxyUrl
 } = require('./index.js');
+
+test('standalone proxy always uses the Nvidia Shield user agent', () => {
+    const headers = applyStandaloneUserAgent({ 'user-agent': 'Tizen TV' });
+
+    assert.equal(headers['user-agent'], STANDALONE_USER_AGENT);
+    assert.match(headers['user-agent'], /Shield Android TV/);
+});
+
+test('user agent override exposes the Nvidia Shield user agent in the page', () => {
+    const navigator = { userAgent: 'Tizen TV' };
+    const script = createUserAgentOverrideScript()
+        .replace(/^<script>/, '')
+        .replace(/<\/script>$/, '');
+
+    vm.runInNewContext(script, { navigator });
+
+    assert.equal(navigator.userAgent, STANDALONE_USER_AGENT);
+});
 
 test('readRequestBody preserves chunked binary request bytes', async () => {
     const request = new PassThrough();

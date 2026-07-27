@@ -1,34 +1,55 @@
 import { configRead } from '../config.js';
 import { t } from 'i18next';
+import { findVideoId, injectDislikes } from './returnYoutubeDislikeCore.js';
 
 const dislikeCache = new Map();
+const pendingRequests = new Map();
+let currentVideoId = null;
+
+function videoIdFromLocation() {
+    try {
+        const route = location.hash ? location.hash.substring(1) : location.href;
+        return new URL(route, location.href).searchParams.get('v');
+    } catch (error) {
+        return null;
+    }
+}
+
+function selectVideo(videoId) {
+    if (!videoId) return;
+    currentVideoId = videoId;
+    fetchDislikes(videoId);
+}
 
 // Fetch dislikes when the video changes
 window.addEventListener('hashchange', () => {
     if (!configRead('enableReturnYoutubeDislike')) return;
-
-    const newURL = new URL(location.hash.substring(1), location.href);
-    const videoId = newURL.searchParams.get('v');
-    
-    if (videoId && !dislikeCache.has(videoId)) {
-        fetchDislikes(videoId);
-    }
+    selectVideo(videoIdFromLocation());
 }, false);
 
-async function fetchDislikes(videoId) {
-    try {
-        const res = await fetch(`https://returnyoutubedislikeapi.com/Votes?videoId=${videoId}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        dislikeCache.set(videoId, data);
-    } catch (err) {
-        console.error(`[RYD] Fetching dislikes for ${videoId} failed`, err);
-    }
+function fetchDislikes(videoId) {
+    if (!videoId || dislikeCache.has(videoId) || pendingRequests.has(videoId)) return;
+
+    const request = fetch(`https://returnyoutubedislikeapi.com/Votes?videoId=${videoId}`)
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(data => {
+            dislikeCache.set(videoId, data);
+        })
+        .catch(error => {
+            console.error(`[RYD] Fetching dislikes for ${videoId} failed`, error);
+        })
+        .then(() => {
+            pendingRequests.delete(videoId);
+        });
+
+    pendingRequests.set(videoId, request);
 }
 
 // Initial check if we are already on a video page
-const initialVideoId = new URL(location.hash.substring(1), location.href).searchParams.get('v');
-if (initialVideoId) fetchDislikes(initialVideoId);
+selectVideo(videoIdFromLocation());
 
 const origParse = JSON.parse;
 JSON.parse = function () {
@@ -36,51 +57,10 @@ JSON.parse = function () {
     
     if (!configRead('enableReturnYoutubeDislike')) return r;
 
-    // Detect if this is a response containing video details (watch next)
-    const videoId = r?.currentVideoEndpoint?.watchEndpoint?.videoId || 
-                    r?.contents?.singleColumnWatchNextResults?.results?.results?.contents?.[0]?.itemSectionRenderer?.contents?.[0]?.videoMetadataRenderer?.videoId;
+    selectVideo(findVideoId(r));
 
-    if (videoId && dislikeCache.has(videoId)) {
-        const votes = dislikeCache.get(videoId);
-        const abbreviatedDislikes = Intl.NumberFormat(undefined, {
-            notation: 'compact',
-            maximumFractionDigits: 1
-        }).format(votes.dislikes);
-
-        // Inject into description panel factoids
-        const panels = r.engagementPanels || [];
-        const descriptionPanel = panels.find(p => p.engagementPanelSectionListRenderer?.panelIdentifier === 'video-description-ep-identifier');
-        
-        if (descriptionPanel) {
-            const items = descriptionPanel.engagementPanelSectionListRenderer.content?.structuredDescriptionContentRenderer?.items || [];
-            const header = items.find(i => i.videoDescriptionHeaderRenderer)?.videoDescriptionHeaderRenderer;
-            
-            if (header && header.factoid) {
-                // Avoid duplicate injection
-                if (!header.factoid.find(f => f.factoidRenderer?.label?.simpleText === t('general.dislikes'))) {
-                    header.factoid.push({
-                        factoidRenderer: {
-                            value: {
-                                simpleText: abbreviatedDislikes
-                            },
-                            label: {
-                                simpleText: t('general.dislikes') || 'Dislikes'
-                            }
-                        }
-                    });
-                }
-            }
-        }
-
-        // Inject into like/dislike buttons
-        const engagementActions = r.transportControls?.transportControlsRenderer?.engagementActions;
-        const likesEngagement = engagementActions?.find(a => a.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_LIKE_BUTTON');
-
-        if (likesEngagement?.button?.likeButtonRenderer) {
-            likesEngagement.button.likeButtonRenderer.dislikeCountText = { simpleText: abbreviatedDislikes };
-            likesEngagement.button.likeButtonRenderer.dislikeCountWithUndislikeText = { simpleText: abbreviatedDislikes };
-        }
-    }
+    const votes = currentVideoId && dislikeCache.get(currentVideoId);
+    if (votes) injectDislikes(r, votes, t('general.dislikes') || 'Dislikes');
 
     return r;
 };
