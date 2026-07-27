@@ -10,8 +10,10 @@ const http = require('http');
 const URL = require('url');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const USERSCRIPT_URL = 'https://github.com/JensorX/TizenTube/raw/refs/heads/main/dist/userScript.js';
 const STANDALONE_USER_AGENT = 'Mozilla/5.0 (Linux; Shield Android TV) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
+const LOGICAL_ORIGIN = 'https://www.youtube.com';
 
 const requestHeadersToRemove = [
     'connection',
@@ -110,7 +112,64 @@ function toProxyUrl(originalUrl) {
 
 function toLogicalReferer(referer) {
     if (!referer) return referer;
-    return referer.replace(`http://localhost:${PORT}`, 'https://www.youtube.com');
+    return referer.replace(`http://localhost:${PORT}`, LOGICAL_ORIGIN);
+}
+
+function parseCookieHeader(cookieHeader) {
+    const cookies = {};
+
+    String(cookieHeader || '').split(';').forEach((cookie) => {
+        const separator = cookie.indexOf('=');
+        if (separator === -1) return;
+
+        const name = cookie.substring(0, separator).trim();
+        if (!name || Object.prototype.hasOwnProperty.call(cookies, name)) return;
+        cookies[name] = cookie.substring(separator + 1).trim();
+    });
+
+    return cookies;
+}
+
+function createSapisidHash(cookieValue, scheme, timestamp) {
+    const input = `${timestamp} ${cookieValue} ${LOGICAL_ORIGIN}`;
+    const digest = crypto.createHash('sha1').update(input).digest('hex');
+    return `${scheme} ${timestamp}_${digest}`;
+}
+
+function createLogicalAuthorization(cookieHeader, timestamp) {
+    const cookies = parseCookieHeader(cookieHeader);
+    const primaryCookie = cookies.SAPISID || cookies['__Secure-3PAPISID'];
+    const authorization = [];
+
+    if (primaryCookie) {
+        authorization.push(createSapisidHash(primaryCookie, 'SAPISIDHASH', timestamp));
+    }
+    if (cookies['__Secure-1PAPISID']) {
+        authorization.push(createSapisidHash(cookies['__Secure-1PAPISID'], 'SAPISID1PHASH', timestamp));
+    }
+    if (cookies['__Secure-3PAPISID']) {
+        authorization.push(createSapisidHash(cookies['__Secure-3PAPISID'], 'SAPISID3PHASH', timestamp));
+    }
+
+    return authorization.join(' ');
+}
+
+function applyLogicalAuthorization(headers, timestamp) {
+    const incomingAuthorization = headers.authorization || '';
+    if (!/(?:^|\s)(?:APISIDHASH|SAPISID(?:1P|3P)?HASH)\s/.test(incomingAuthorization)) {
+        return headers;
+    }
+
+    const logicalAuthorization = createLogicalAuthorization(
+        headers.cookie,
+        timestamp === undefined ? Math.floor(Date.now() / 1000) : timestamp
+    );
+    if (logicalAuthorization) {
+        headers.authorization = logicalAuthorization;
+        headers['x-origin'] = LOGICAL_ORIGIN;
+    }
+
+    return headers;
 }
 
 app.use((req, res, next) => {
@@ -130,6 +189,10 @@ app.get('/tizentube/standalonePreload.js', (req, res) => {
 
     res.type('application/javascript');
     res.sendFile(preloadPath);
+});
+
+app.get('/tizentube/health', (req, res) => {
+    res.status(204).end();
 });
 
 app.get('/tizentube/userScript.js', (req, res) => {
@@ -184,10 +247,11 @@ app.all('*', (req, res) => {
         headers['host'] = isCorsBypass ? 'www.youtube.com' : 'www.youtube.com';
     }
 
-    headers['origin'] = 'https://www.youtube.com';
+    headers['origin'] = LOGICAL_ORIGIN;
     if (headers['referer']) {
         headers['referer'] = toLogicalReferer(headers['referer']);
     }
+    applyLogicalAuthorization(headers);
 
     headers['accept-encoding'] = 'gzip, deflate';
 
@@ -324,7 +388,10 @@ if (process.env.TIZENTUBE_NO_LISTEN !== '1') {
 
 module.exports = {
     STANDALONE_USER_AGENT,
+    app,
+    applyLogicalAuthorization,
     applyStandaloneUserAgent,
+    createLogicalAuthorization,
     createUserAgentOverrideScript,
     injectAfterOpeningHead,
     readRequestBody,

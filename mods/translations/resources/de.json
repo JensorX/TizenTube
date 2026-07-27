@@ -76,6 +76,10 @@
                 "title": "Videoplayer-Einstellungen",
                 "subtitle": "Videoplayer-Funktionen anpassen",
                 "options": {
+                    "forceDisableCaptions": {
+                        "title": "Untertitel immer deaktivieren",
+                        "subtitle": "Verhindert, dass YouTube Untertitel automatisch aktiviert"
+                    },
                     "patching": {
                         "title": "Videoplayer-UI patchen",
                         "options": {

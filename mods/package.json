@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "rollup -c rollup.config.js",
-    "test": "node --test features/standaloneUserscript.test.js features/returnYoutubeDislike.test.js"
+    "test": "node --test features/standaloneUserscript.test.js features/returnYoutubeDislike.test.js features/forceDisableCaptions.test.js"
   },
   "keywords": [],
   "author": "Reis Can, YouTube WebOs contributors",

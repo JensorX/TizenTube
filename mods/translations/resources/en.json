@@ -76,6 +76,10 @@
                 "title": "Video Player Settings",
                 "subtitle": "Customize video player features",
                 "options": {
+                    "forceDisableCaptions": {
+                        "title": "Always Disable Captions",
+                        "subtitle": "Prevent YouTube from automatically enabling captions"
+                    },
                     "patching": {
                         "title": "Patch Video Player UI",
                         "options": {

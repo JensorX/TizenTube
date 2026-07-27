@@ -1,11 +1,71 @@
 <!DOCTYPE html>
-
+<html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        html,
         body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
             background-color: #0f0f0f;
+            overflow: hidden;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .startup {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .startup img {
+            width: 18vmin;
+            min-width: 160px;
+            max-width: 280px;
+            height: auto;
+        }
+
+        .startup-progress {
+            width: 160px;
+            height: 3px;
+            margin-top: 28px;
+            overflow: hidden;
+            background: #303030;
+        }
+
+        .startup-progress::after {
+            display: block;
+            width: 45%;
+            height: 100%;
+            content: "";
+            background: #ff0033;
+            animation: startup-progress 1.1s ease-in-out infinite;
+        }
+
+        @keyframes startup-progress {
+            from {
+                transform: translateX(-110%);
+            }
+            to {
+                transform: translateX(245%);
+            }
         }
     </style>
+</head>
+
+<body>
+    <main class="startup">
+        <img src="icon.png" alt="">
+        <div class="startup-progress"></div>
+    </main>
+
     <script>
         "use strict";
         tizen.tvinputdevice.registerKey("ColorF0Red");
@@ -31,26 +91,28 @@
         const pkgId = tizen.application.getCurrentApplication().appInfo.packageId;
 
         const serviceId = pkgId + ".StandaloneService";
+        const healthUrl = "http://localhost:8099/tizentube/health";
+        const targetUrl = "http://localhost:8099/tv";
+
+        function openWhenServiceIsReady() {
+            fetch(healthUrl, { cache: "no-store" }).then(response => {
+                if (!response.ok) throw new Error("Service unavailable");
+                window.location.replace(targetUrl);
+            }).catch(() => {
+                setTimeout(openWhenServiceIsReady, 100);
+            });
+        }
 
         tizen.application.launchAppControl(
             new tizen.ApplicationControl("http://tizen.org/appcontrol/operation/service"),
             serviceId,
             function () {
-                fetch('http://localhost:8099/tv').then(a => {
-                    location.href = 'http://localhost:8099/tv';
-                }).catch(b => {
-                    window.location.reload();
-                })
+                openWhenServiceIsReady();
             },
             function (e) {
                 alert("Launch Service failed: " + e.message);
             }
         );
     </script>
-</head>
-
-<body>
-
 </body>
-
 </html>

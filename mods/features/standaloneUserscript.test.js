@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fetchRedirectedRequest, redirectUrl } from './standaloneUserscript.js';
+import {
+    fetchRedirectedRequest,
+    installCookieNameCompatibility,
+    redirectUrl,
+    toLocalCookieAssignment,
+    toLogicalCookieString
+} from './standaloneUserscript.js';
 
 test('redirectUrl maps YouTube and Google media URLs to the standalone proxy', () => {
     globalThis.window = { location: { origin: 'http://localhost:8099' } };
@@ -52,5 +58,40 @@ test('fetchRedirectedRequest rejects an already consumed body', async () => {
     await assert.rejects(
         fetchRedirectedRequest(() => Promise.resolve(), input, 'http://localhost:8099/youtubei/v1/player'),
         /already been consumed/
+    );
+});
+
+test('cookie compatibility exposes secure authentication cookie names to YouTube', () => {
+    let storedCookie = '__LocalSecure-3PAPISID=three; __LocalSecure-1PAPISID=one; SAPISID=main';
+    const prototype = {};
+    Object.defineProperty(prototype, 'cookie', {
+        configurable: true,
+        get() {
+            return storedCookie;
+        },
+        set(value) {
+            storedCookie = value;
+        }
+    });
+    const documentObject = Object.create(prototype);
+
+    assert.equal(installCookieNameCompatibility(documentObject), true);
+    assert.equal(
+        documentObject.cookie,
+        '__Secure-3PAPISID=three; __Secure-1PAPISID=one; SAPISID=main'
+    );
+
+    documentObject.cookie = '__Secure-3PAPISID=updated; Domain=.youtube.com; Path=/; Secure; SameSite=None';
+    assert.equal(storedCookie, '__LocalSecure-3PAPISID=updated; Path=/');
+});
+
+test('cookie name translation only changes cookie names and attributes', () => {
+    assert.equal(
+        toLogicalCookieString('VALUE=__LocalSecure-unchanged; __LocalHost-session=value'),
+        'VALUE=__LocalSecure-unchanged; __Host-session=value'
+    );
+    assert.equal(
+        toLocalCookieAssignment('__Host-session=value; Path=/; Secure'),
+        '__LocalHost-session=value; Path=/'
     );
 });

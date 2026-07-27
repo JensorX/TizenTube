@@ -343,6 +343,12 @@ export default function modernUI(update, parameters) {
             },
             options: [
                 {
+                    name: t('settings.options.videoPlayer.options.forceDisableCaptions.title'),
+                    subtitle: t('settings.options.videoPlayer.options.forceDisableCaptions.subtitle'),
+                    icon: 'TRANSLATE',
+                    value: 'forceDisableCaptions'
+                },
+                {
                     name: t('settings.options.videoPlayer.options.patching.title'),
                     icon: 'SETTINGS',
                     value: null,

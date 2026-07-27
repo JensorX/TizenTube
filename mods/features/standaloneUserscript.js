@@ -24,6 +24,59 @@ export function redirectUrl(originalUrl) {
     return originalUrl;
 }
 
+export function toLogicalCookieString(cookieString) {
+    return cookieString
+        .replace(/(^|;\s*)__LocalSecure-/gi, '$1__Secure-')
+        .replace(/(^|;\s*)__LocalHost-/gi, '$1__Host-');
+}
+
+export function toLocalCookieAssignment(cookieString) {
+    return cookieString
+        .replace(/^(\s*)__Secure-/i, '$1__LocalSecure-')
+        .replace(/^(\s*)__Host-/i, '$1__LocalHost-')
+        .replace(/;\s*Domain=[^;]*/gi, '')
+        .replace(/;\s*Secure\b/gi, '')
+        .replace(/;\s*SameSite=None\b/gi, '');
+}
+
+function findPropertyDescriptor(object, propertyName) {
+    let currentObject = object;
+
+    while (currentObject) {
+        const descriptor = Object.getOwnPropertyDescriptor(currentObject, propertyName);
+        if (descriptor) return descriptor;
+        currentObject = Object.getPrototypeOf(currentObject);
+    }
+
+    return null;
+}
+
+export function installCookieNameCompatibility(documentObject) {
+    if (documentObject.__tizentubeCookieNamesInstalled) return true;
+
+    const descriptor = findPropertyDescriptor(documentObject, 'cookie');
+    if (!descriptor || !descriptor.get || !descriptor.set) return false;
+
+    Object.defineProperty(documentObject, 'cookie', {
+        configurable: true,
+        enumerable: descriptor.enumerable,
+        get: function () {
+            return toLogicalCookieString(descriptor.get.call(documentObject));
+        },
+        set: function (value) {
+            descriptor.set.call(documentObject, toLocalCookieAssignment(String(value)));
+        }
+    });
+    Object.defineProperty(documentObject, '__tizentubeCookieNamesInstalled', {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: true
+    });
+
+    return true;
+}
+
 const requestOptionKeys = [
     'method',
     'mode',
@@ -81,6 +134,8 @@ export default function () {
         return;
     }
     window.__tizentubeStandalonePatchesInstalled = true;
+
+    installCookieNameCompatibility(document);
 
     const originalFetch = window.fetch;
     if (originalFetch) {
