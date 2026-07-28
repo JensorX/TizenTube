@@ -7,22 +7,27 @@ const PLAYER_EVENTS = [
     'onApiChange',
     'onCaptionsModuleAvailable',
     'onCaptionsTrackListChanged',
-    'onStateChange',
     'onVideoDataChange'
 ];
 
 let player = null;
 let attachTimeout = null;
-let delayedEnforcement = null;
+let videoEnforcementTimeout = null;
+let lastVideoId = null;
 
 function enforceCaptionPreference() {
-    clearTimeout(delayedEnforcement);
     if (!configRead(CONFIG_KEY) || !player) return;
 
     disableActiveCaptions(player);
-    delayedEnforcement = setTimeout(() => {
-        if (configRead(CONFIG_KEY)) disableActiveCaptions(player);
-    }, 250);
+}
+
+function enforceForCurrentVideo() {
+    const videoId = player?.getVideoData?.().video_id;
+    if (!videoId || videoId === lastVideoId) return;
+
+    lastVideoId = videoId;
+    clearTimeout(videoEnforcementTimeout);
+    videoEnforcementTimeout = setTimeout(enforceCaptionPreference, 250);
 }
 
 function attachToPlayer() {
@@ -36,12 +41,13 @@ function attachToPlayer() {
 
     if (player !== currentPlayer) {
         player = currentPlayer;
+        lastVideoId = null;
         PLAYER_EVENTS.forEach((eventName) => {
-            player.addEventListener(eventName, enforceCaptionPreference);
+            player.addEventListener(eventName, enforceForCurrentVideo);
         });
     }
 
-    enforceCaptionPreference();
+    enforceForCurrentVideo();
 }
 
 configChangeEmitter.addEventListener('configChange', (event) => {

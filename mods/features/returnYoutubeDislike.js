@@ -4,7 +4,9 @@ import { findVideoId, injectDislikes } from './returnYoutubeDislikeCore.js';
 
 const dislikeCache = new Map();
 const pendingRequests = new Map();
+const injectableResponses = new Map();
 let currentVideoId = null;
+const MAX_RESPONSES_PER_VIDEO = 8;
 
 function videoIdFromLocation() {
     try {
@@ -21,11 +23,28 @@ function selectVideo(videoId) {
     fetchDislikes(videoId);
 }
 
-// Fetch dislikes when the video changes
-window.addEventListener('hashchange', () => {
-    if (!configRead('enableReturnYoutubeDislike')) return;
-    selectVideo(videoIdFromLocation());
-}, false);
+function isInjectableResponse(response) {
+    return Boolean(response?.transportControls || response?.engagementPanels);
+}
+
+function rememberInjectableResponse(videoId, response) {
+    if (!videoId || !isInjectableResponse(response)) return;
+
+    const responses = injectableResponses.get(videoId) || [];
+    if (!responses.includes(response)) responses.push(response);
+    if (responses.length > MAX_RESPONSES_PER_VIDEO) responses.shift();
+    injectableResponses.set(videoId, responses);
+}
+
+function injectCachedDislikes(videoId) {
+    const votes = dislikeCache.get(videoId);
+    if (!votes) return;
+
+    const label = t('general.dislikes') || 'Dislikes';
+    (injectableResponses.get(videoId) || []).forEach(response => {
+        injectDislikes(response, votes, label);
+    });
+}
 
 function fetchDislikes(videoId) {
     if (!videoId || dislikeCache.has(videoId) || pendingRequests.has(videoId)) return;
@@ -37,6 +56,7 @@ function fetchDislikes(videoId) {
         })
         .then(data => {
             dislikeCache.set(videoId, data);
+            injectCachedDislikes(videoId);
         })
         .catch(error => {
             console.error(`[RYD] Fetching dislikes for ${videoId} failed`, error);
@@ -49,27 +69,49 @@ function fetchDislikes(videoId) {
 }
 
 // Initial check if we are already on a video page
-selectVideo(videoIdFromLocation());
+function processParsedResponse(response) {
+    if (!configRead('enableReturnYoutubeDislike')) return response;
+
+    const responseVideoId = findVideoId(response);
+    if (responseVideoId) selectVideo(responseVideoId);
+
+    const videoId = responseVideoId || currentVideoId;
+    if (!videoId) return response;
+
+    rememberInjectableResponse(videoId, response);
+    injectCachedDislikes(videoId);
+    return response;
+}
 
 const origParse = JSON.parse;
-JSON.parse = function () {
-    const r = origParse.apply(this, arguments);
-    
-    if (!configRead('enableReturnYoutubeDislike')) return r;
-
-    selectVideo(findVideoId(r));
-
-    const votes = currentVideoId && dislikeCache.get(currentVideoId);
-    if (votes) injectDislikes(r, votes, t('general.dislikes') || 'Dislikes');
-
-    return r;
+const patchedParse = function () {
+    return processParsedResponse(origParse.apply(this, arguments));
 };
 
-// Also patch _yttv if available (similar to adblock.js)
-if (window._yttv) {
-    for (const key in window._yttv) {
-        if (window._yttv[key] && window._yttv[key].JSON && window._yttv[key].JSON.parse) {
-            window._yttv[key].JSON.parse = JSON.parse;
+function installParserHooks() {
+    window.JSON.parse = patchedParse;
+
+    if (window._yttv) {
+        for (const key in window._yttv) {
+            if (window._yttv[key] && window._yttv[key].JSON && window._yttv[key].JSON.parse !== patchedParse) {
+                window._yttv[key].JSON.parse = patchedParse;
+            }
         }
     }
 }
+
+function handleNavigation() {
+    if (!configRead('enableReturnYoutubeDislike')) return;
+    selectVideo(videoIdFromLocation());
+    installParserHooks();
+}
+
+selectVideo(videoIdFromLocation());
+installParserHooks();
+
+['hashchange', 'popstate', 'yt-navigate-finish', 'yt-page-data-updated'].forEach(eventName => {
+    window.addEventListener(eventName, handleNavigation, false);
+});
+
+// YouTube TV may replace its JSON namespace during an in-player navigation.
+setInterval(installParserHooks, 1000);
