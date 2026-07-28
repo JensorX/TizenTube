@@ -1,1 +1,208 @@
-!function(){"use strict";function e(e){if(!e)return e;try{var t=new URL(e,window.location.origin),o=t.hostname;if("youtube.com"===o||"www.youtube.com"===o)return t.protocol="http:",t.host="localhost:8099",t.toString();if(o.endsWith("googlevideo.com")||o.endsWith("youtube.com")||o.endsWith("gstatic.com")||o.endsWith(".google.com")||o.endsWith(".googleapis.com")||o.endsWith("googleusercontent.com")||o.endsWith(".ggpht.com"))return"http://localhost:8099/cors-bypass/"+t.toString()}catch(e){console.error("Failed to parse URL during interception:",e)}return e}function t(e){if(e.__tizentubeCookieNamesInstalled)return!0;var t=function(e,t){for(var o=e;o;){var r=Object.getOwnPropertyDescriptor(o,t);if(r)return r;o=Object.getPrototypeOf(o)}return null}(e,"cookie");return!!(t&&t.get&&t.set)&&(Object.defineProperty(e,"cookie",{configurable:!0,enumerable:t.enumerable,get:function(){return t.get.call(e).replace(/(^|;\s*)__LocalSecure-/gi,"$1__Secure-").replace(/(^|;\s*)__LocalHost-/gi,"$1__Host-")},set:function(o){t.set.call(e,String(o).replace(/^(\s*)__Secure-/i,"$1__LocalSecure-").replace(/^(\s*)__Host-/i,"$1__LocalHost-").replace(/;\s*Domain=[^;]*/gi,"").replace(/;\s*Secure\b/gi,"").replace(/;\s*SameSite=None\b/gi,""))}}),Object.defineProperty(e,"__tizentubeCookieNamesInstalled",{configurable:!1,enumerable:!1,writable:!1,value:!0}),!0)}var o=["method","mode","credentials","cache","redirect","referrer","referrerPolicy","integrity","keepalive","signal"];function r(e,t,r,n){var i=function(e,t){var r={headers:new Headers(e.headers)};return o.forEach(function(t){void 0!==e[t]&&(r[t]=e[t])}),t&&Object.keys(t).forEach(function(e){r[e]=t[e]}),r}(t,n),c=(i.method||t.method||"GET").toUpperCase();return n&&Object.prototype.hasOwnProperty.call(n,"body")||"GET"===c||"HEAD"===c?e(r,i):t.bodyUsed?Promise.reject(new TypeError("Cannot redirect a Request whose body has already been consumed")):t.clone().blob().then(function(t){return i.body=t,e(r,i)})}if("localhost"===window.location.hostname){var n=window.location.href.replace("http://localhost:8099","https://www.youtube.com"),i=new URL(n);Object.defineProperty(window,"__tizentubeLogicalUrl",{configurable:!1,enumerable:!1,writable:!1,value:n}),Object.defineProperty(window,"__tizentubeLogicalLocation",{configurable:!1,enumerable:!1,writable:!1,value:i}),function(){if(!window.__tizentubeStandalonePatchesInstalled){window.__tizentubeStandalonePatchesInstalled=!0,t(document);var o=window.fetch;o&&(window.fetch=function(t,n){var i="",c=!1;return"string"==typeof t?i=e(t):t instanceof URL?(i=e(t.toString()),t=new URL(i)):t instanceof Request&&(c=!0,i=e(t.url)),c&&i!==t.url?r(o,t,i,n):o.apply(this,[t,n])});var n=XMLHttpRequest.prototype.open;if(XMLHttpRequest.prototype.open=function(t,o,r,i,c){var a=e(o);return a!==o&&(r=!0),void 0===r&&(r=!0),n.apply(this,[t,a,r,i,c])},navigator.sendBeacon){var i=navigator.sendBeacon;navigator.sendBeacon=function(t,o){return i.apply(this,[e(t),o])}}Object.defineProperty(HTMLImageElement.prototype,"src",{set:function(t){Object.getOwnPropertyDescriptor(Element.prototype,"setAttribute").value.call(this,"src",e(t))}}),Object.defineProperty(HTMLScriptElement.prototype,"src",{set:function(t){Object.getOwnPropertyDescriptor(Element.prototype,"setAttribute").value.call(this,"src",e(t))}})}}()}}();
+!function () {
+    "use strict";
+
+    function isHostOrSubdomain(hostname, domain) {
+        return hostname === domain || hostname.endsWith('.' + domain);
+    }
+
+    function redirectUrl(originalUrl) {
+        if (!originalUrl) return originalUrl;
+
+        try {
+            var url = new URL(originalUrl, window.location.origin);
+            var hostname = url.hostname;
+
+            if (hostname === 'youtube.com' || hostname === 'www.youtube.com') {
+                url.protocol = 'http:';
+                url.host = 'localhost:8099';
+                return url.toString();
+            }
+
+            if (isHostOrSubdomain(hostname, 'googlevideo.com')) {
+                return 'http://localhost:8099/media/' + url.toString();
+            }
+
+            if (isHostOrSubdomain(hostname, 'youtube.com') || isHostOrSubdomain(hostname, 'gstatic.com')
+                || isHostOrSubdomain(hostname, 'google.com') || isHostOrSubdomain(hostname, 'googleapis.com')
+                || isHostOrSubdomain(hostname, 'googleusercontent.com') || isHostOrSubdomain(hostname, 'ggpht.com')) {
+                return 'http://localhost:8099/cors-bypass/' + url.toString();
+            }
+        } catch (error) {
+            console.error('Failed to parse URL during interception:', error);
+        }
+
+        return originalUrl;
+    }
+
+    function toLogicalCookieString(cookieString) {
+        return cookieString
+            .replace(/(^|;\s*)__LocalSecure-/gi, '$1__Secure-')
+            .replace(/(^|;\s*)__LocalHost-/gi, '$1__Host-');
+    }
+
+    function toLocalCookieAssignment(cookieString) {
+        return cookieString
+            .replace(/^(\s*)__Secure-/i, '$1__LocalSecure-')
+            .replace(/^(\s*)__Host-/i, '$1__LocalHost-')
+            .replace(/;\s*Domain=[^;]*/gi, '')
+            .replace(/;\s*Secure\b/gi, '')
+            .replace(/;\s*SameSite=None\b/gi, '');
+    }
+
+    function findPropertyDescriptor(object, propertyName) {
+        var currentObject = object;
+
+        while (currentObject) {
+            var descriptor = Object.getOwnPropertyDescriptor(currentObject, propertyName);
+            if (descriptor) return descriptor;
+            currentObject = Object.getPrototypeOf(currentObject);
+        }
+
+        return null;
+    }
+
+    function installCookieNameCompatibility(documentObject) {
+        if (documentObject.__tizentubeCookieNamesInstalled) return true;
+
+        var descriptor = findPropertyDescriptor(documentObject, 'cookie');
+        if (!descriptor || !descriptor.get || !descriptor.set) return false;
+
+        Object.defineProperty(documentObject, 'cookie', {
+            configurable: true,
+            enumerable: descriptor.enumerable,
+            get: function () {
+                return toLogicalCookieString(descriptor.get.call(documentObject));
+            },
+            set: function (value) {
+                descriptor.set.call(documentObject, toLocalCookieAssignment(String(value)));
+            }
+        });
+        Object.defineProperty(documentObject, '__tizentubeCookieNamesInstalled', {
+            configurable: false,
+            enumerable: false,
+            writable: false,
+            value: true
+        });
+
+        return true;
+    }
+
+    var requestOptionKeys = [
+        'method', 'mode', 'credentials', 'cache', 'redirect', 'referrer',
+        'referrerPolicy', 'integrity', 'keepalive', 'signal'
+    ];
+
+    function copyRequestOptions(input, init) {
+        var options = { headers: new Headers(input.headers) };
+
+        requestOptionKeys.forEach(function (key) {
+            if (input[key] !== undefined) options[key] = input[key];
+        });
+
+        if (init) {
+            Object.keys(init).forEach(function (key) {
+                options[key] = init[key];
+            });
+        }
+
+        return options;
+    }
+
+    function fetchRedirectedRequest(originalFetch, input, targetUrl, init) {
+        var options = copyRequestOptions(input, init);
+        var method = (options.method || input.method || 'GET').toUpperCase();
+        var hasExplicitBody = init && Object.prototype.hasOwnProperty.call(init, 'body');
+
+        if (hasExplicitBody || method === 'GET' || method === 'HEAD') {
+            return originalFetch(targetUrl, options);
+        }
+        if (input.bodyUsed) {
+            return Promise.reject(new TypeError('Cannot redirect a Request whose body has already been consumed'));
+        }
+
+        return input.clone().blob().then(function (blob) {
+            options.body = blob;
+            return originalFetch(targetUrl, options);
+        });
+    }
+
+    function initPatches() {
+        if (window.__tizentubeStandalonePatchesInstalled) return;
+        window.__tizentubeStandalonePatchesInstalled = true;
+
+        installCookieNameCompatibility(document);
+
+        var originalFetch = window.fetch;
+        if (originalFetch) {
+            window.fetch = function (input, init) {
+                var targetUrl = '';
+                var isRequestObject = false;
+
+                if (typeof input === 'string') {
+                    targetUrl = redirectUrl(input);
+                } else if (input instanceof URL) {
+                    targetUrl = redirectUrl(input.toString());
+                    input = new URL(targetUrl);
+                } else if (input instanceof Request) {
+                    isRequestObject = true;
+                    targetUrl = redirectUrl(input.url);
+                }
+
+                if (isRequestObject) {
+                    if (targetUrl !== input.url) {
+                        return fetchRedirectedRequest(originalFetch, input, targetUrl, init);
+                    }
+                    return originalFetch.apply(this, [input, init]);
+                }
+
+                return originalFetch.apply(this, [input, init]);
+            };
+        }
+
+        var originalOpen = XMLHttpRequest.prototype.open;
+        XMLHttpRequest.prototype.open = function (method, url, async, user, password) {
+            var redirectedUrl = redirectUrl(url);
+            if (redirectedUrl !== url) async = true;
+            if (async === undefined) async = true;
+            return originalOpen.apply(this, [method, redirectedUrl, async, user, password]);
+        };
+
+        if (navigator.sendBeacon) {
+            var originalSendBeacon = navigator.sendBeacon;
+            navigator.sendBeacon = function (url, data) {
+                return originalSendBeacon.apply(this, [redirectUrl(url), data]);
+            };
+        }
+
+        Object.defineProperty(HTMLImageElement.prototype, 'src', {
+            set: function (value) {
+                Object.getOwnPropertyDescriptor(Element.prototype, 'setAttribute').value.call(this, 'src', redirectUrl(value));
+            }
+        });
+        Object.defineProperty(HTMLScriptElement.prototype, 'src', {
+            set: function (value) {
+                Object.getOwnPropertyDescriptor(Element.prototype, 'setAttribute').value.call(this, 'src', redirectUrl(value));
+            }
+        });
+    }
+
+    if (window.location.hostname === 'localhost') {
+        var logicalUrl = window.location.href.replace('http://localhost:8099', 'https://www.youtube.com');
+        var logicalLocation = new URL(logicalUrl);
+
+        Object.defineProperty(window, '__tizentubeLogicalUrl', {
+            configurable: false,
+            enumerable: false,
+            writable: false,
+            value: logicalUrl
+        });
+        Object.defineProperty(window, '__tizentubeLogicalLocation', {
+            configurable: false,
+            enumerable: false,
+            writable: false,
+            value: logicalLocation
+        });
+
+        initPatches();
+    }
+}();

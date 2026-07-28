@@ -8,7 +8,7 @@ import {
     toLogicalCookieString
 } from './standaloneUserscript.js';
 
-test('redirectUrl maps YouTube and Google media URLs to the standalone proxy', () => {
+test('redirectUrl maps YouTube APIs and media URLs to their dedicated proxy routes', () => {
     globalThis.window = { location: { origin: 'http://localhost:8099' } };
 
     assert.equal(
@@ -17,7 +17,11 @@ test('redirectUrl maps YouTube and Google media URLs to the standalone proxy', (
     );
     assert.equal(
         redirectUrl('https://r1---sn.example.googlevideo.com/videoplayback?id=1'),
-        'http://localhost:8099/cors-bypass/https://r1---sn.example.googlevideo.com/videoplayback?id=1'
+        'http://localhost:8099/media/https://r1---sn.example.googlevideo.com/videoplayback?id=1'
+    );
+    assert.equal(
+        redirectUrl('https://notyoutube.com/watch?v=1'),
+        'https://notyoutube.com/watch?v=1'
     );
 });
 

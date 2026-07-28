@@ -1,3 +1,7 @@
+function isHostOrSubdomain(hostname, domain) {
+    return hostname === domain || hostname.endsWith('.' + domain);
+}
+
 export function redirectUrl(originalUrl) {
     if (!originalUrl) return originalUrl;
 
@@ -11,10 +15,14 @@ export function redirectUrl(originalUrl) {
             return url.toString();
         }
 
-        if (hostname.endsWith('googlevideo.com') || hostname.endsWith('youtube.com')
-            || hostname.endsWith('gstatic.com') || hostname.endsWith('.google.com')
-            || hostname.endsWith('.googleapis.com') || hostname.endsWith('googleusercontent.com')
-            || hostname.endsWith('.ggpht.com')) {
+        if (isHostOrSubdomain(hostname, 'googlevideo.com')) {
+            return 'http://localhost:8099/media/' + url.toString();
+        }
+
+        if (isHostOrSubdomain(hostname, 'youtube.com')
+            || isHostOrSubdomain(hostname, 'gstatic.com') || isHostOrSubdomain(hostname, 'google.com')
+            || isHostOrSubdomain(hostname, 'googleapis.com') || isHostOrSubdomain(hostname, 'googleusercontent.com')
+            || isHostOrSubdomain(hostname, 'ggpht.com')) {
             return 'http://localhost:8099/cors-bypass/' + url.toString();
         }
     } catch (e) {

@@ -17,6 +17,11 @@ const {
     createLogicalAuthorization,
     createUserAgentOverrideScript,
     injectAfterOpeningHead,
+    isMediaUrl,
+    isProxyableCrossOriginHost,
+    isSessionCookieHost,
+    isYouTubeSessionApiRequest,
+    removeMediaSessionHeaders,
     readRequestBody,
     rewriteLogicalLocation,
     toLogicalReferer,
@@ -97,9 +102,37 @@ test('proxy URL helpers preserve paths, queries, and logical referers', () => {
         'http://localhost:8099/cors-bypass/https://jnn-pa.googleapis.com/$rpc/google.internal.waa.v1.Waa/Create'
     );
     assert.equal(
+        toProxyUrl('https://r1---sn.example.googlevideo.com/videoplayback?id=1'),
+        'http://localhost:8099/media/https://r1---sn.example.googlevideo.com/videoplayback?id=1'
+    );
+    assert.equal(
         toLogicalReferer('http://localhost:8099/tv/watch?v=abc'),
         'https://www.youtube.com/tv/watch?v=abc'
     );
+});
+
+test('media requests use a separate route and never receive session cookies', () => {
+    const headers = removeMediaSessionHeaders({
+        authorization: 'SAPISIDHASH local-signature',
+        cookie: 'SAPISID=secret',
+        range: 'bytes=0-',
+        'sec-fetch-site': 'same-origin',
+        'x-goog-authuser': '0',
+        'x-origin': 'https://www.youtube.com'
+    });
+
+    assert.equal(isMediaUrl('https://r1---sn.example.googlevideo.com/videoplayback?id=1'), true);
+    assert.equal(isSessionCookieHost('https://r1---sn.example.googlevideo.com/videoplayback?id=1'), false);
+    assert.equal(headers.cookie, undefined);
+    assert.equal(headers.authorization, undefined);
+    assert.equal(headers.range, 'bytes=0-');
+    assert.equal(headers['accept-encoding'], 'identity');
+});
+
+test('proxy target matching requires a real Google subdomain boundary', () => {
+    assert.equal(isProxyableCrossOriginHost('r1.googlevideo.com'), true);
+    assert.equal(isProxyableCrossOriginHost('notgooglevideo.com'), false);
+    assert.equal(isProxyableCrossOriginHost('notyoutube.com'), false);
 });
 
 test('logical authorization signs restored secure cookies for the YouTube origin', () => {
@@ -134,6 +167,22 @@ test('logical authorization only replaces Google cookie authentication', () => {
     assert.equal(googleHeaders['x-origin'], 'https://www.youtube.com');
     assert.equal(bearerHeaders.authorization, 'Bearer token');
     assert.equal(bearerHeaders['x-origin'], undefined);
+});
+
+test('YouTube session APIs receive a logical authorization even when the browser omitted it', () => {
+    const headers = {
+        cookie: 'SAPISID=main-secret'
+    };
+
+    applyLogicalAuthorization(headers, 1700000000, true);
+
+    assert.equal(isYouTubeSessionApiRequest('https://www.youtube.com/youtubei/v1/log_event'), true);
+    assert.equal(isYouTubeSessionApiRequest('https://www.youtube.com/tv'), false);
+    assert.equal(
+        headers.authorization,
+        'SAPISIDHASH 1700000000_f208f0272283c276bda5c963770d1dbab38378eb'
+    );
+    assert.equal(headers['x-origin'], 'https://www.youtube.com');
 });
 
 test('preload injection happens directly after the opening head tag', () => {

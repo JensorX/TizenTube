@@ -7,6 +7,7 @@ const app = express();
 const PORT = 8099;
 const fetch = require('node-fetch');
 const http = require('http');
+const https = require('https');
 const URL = require('url');
 const fs = require('fs');
 const path = require('path');
@@ -14,6 +15,10 @@ const crypto = require('crypto');
 const USERSCRIPT_URL = 'https://github.com/JensorX/TizenTube/raw/refs/heads/main/dist/userScript.js';
 const STANDALONE_USER_AGENT = 'Mozilla/5.0 (Linux; Shield Android TV) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
 const LOGICAL_ORIGIN = 'https://www.youtube.com';
+const mediaAgent = new https.Agent({
+    keepAlive: true,
+    maxSockets: 8
+});
 
 const requestHeadersToRemove = [
     'connection',
@@ -67,6 +72,54 @@ function applyStandaloneUserAgent(headers) {
     return headers;
 }
 
+function isHostOrSubdomain(hostname, domain) {
+    const normalizedHostname = String(hostname || '').toLowerCase();
+    return normalizedHostname === domain || normalizedHostname.endsWith(`.${domain}`);
+}
+
+function isProxyableCrossOriginHost(hostname) {
+    return [
+        'googlevideo.com',
+        'youtube.com',
+        'gstatic.com',
+        'google.com',
+        'googleapis.com',
+        'googleusercontent.com',
+        'ggpht.com'
+    ].some((domain) => isHostOrSubdomain(hostname, domain));
+}
+
+function isMediaUrl(targetUrl) {
+    try {
+        return isHostOrSubdomain(URL.parse(targetUrl).hostname, 'googlevideo.com');
+    } catch (e) {
+        return false;
+    }
+}
+
+function isSessionCookieHost(targetUrl) {
+    try {
+        const hostname = URL.parse(targetUrl).hostname;
+        return hostname === 'youtube.com' || hostname === 'www.youtube.com'
+            || hostname === 'accounts.google.com';
+    } catch (e) {
+        return false;
+    }
+}
+
+function isYouTubeSessionApiRequest(targetUrl) {
+    try {
+        const parsed = URL.parse(targetUrl);
+        if (parsed.hostname !== 'youtube.com' && parsed.hostname !== 'www.youtube.com') {
+            return false;
+        }
+
+        return /^\/(?:youtubei\/|api\/stats\/|log_event(?:\/|$))/.test(parsed.pathname || '');
+    } catch (e) {
+        return false;
+    }
+}
+
 function rewriteLogicalLocation(text, isBotGuardResponse) {
     const logicalUrl = '(window.__tizentubeLogicalUrl || document.location.toString())';
     const logicalLocation = '(window.__tizentubeLogicalLocation || document.location)';
@@ -97,10 +150,11 @@ function toProxyUrl(originalUrl) {
             return `http://localhost:${PORT}${parsed.path}`;
         }
 
-        if (hostname.endsWith('googlevideo.com') || hostname.endsWith('youtube.com')
-            || hostname.endsWith('gstatic.com') || hostname.endsWith('.google.com')
-            || hostname.endsWith('.googleapis.com') || hostname.endsWith('googleusercontent.com')
-            || hostname.endsWith('.ggpht.com')) {
+        if (isMediaUrl(originalUrl)) {
+            return `http://localhost:${PORT}/media/${originalUrl}`;
+        }
+
+        if (isProxyableCrossOriginHost(hostname)) {
             return `http://localhost:${PORT}/cors-bypass/${originalUrl}`;
         }
     } catch (e) {
@@ -154,9 +208,13 @@ function createLogicalAuthorization(cookieHeader, timestamp) {
     return authorization.join(' ');
 }
 
-function applyLogicalAuthorization(headers, timestamp) {
+function applyLogicalAuthorization(headers, timestamp, forceSessionAuthorization) {
     const incomingAuthorization = headers.authorization || '';
-    if (!/(?:^|\s)(?:APISIDHASH|SAPISID(?:1P|3P)?HASH)\s/.test(incomingAuthorization)) {
+    const hasGoogleCookieAuthorization = /(?:^|\s)(?:APISIDHASH|SAPISID(?:1P|3P)?HASH)\s/.test(incomingAuthorization);
+    if (!hasGoogleCookieAuthorization && !forceSessionAuthorization) {
+        return headers;
+    }
+    if (incomingAuthorization && !hasGoogleCookieAuthorization) {
         return headers;
     }
 
@@ -169,6 +227,23 @@ function applyLogicalAuthorization(headers, timestamp) {
         headers['x-origin'] = LOGICAL_ORIGIN;
     }
 
+    return headers;
+}
+
+function removeMediaSessionHeaders(headers) {
+    [
+        'authorization',
+        'cookie',
+        'x-origin',
+        'x-goog-authuser',
+        'x-youtube-bootstrap-logged-in',
+        'sec-fetch-dest',
+        'sec-fetch-mode',
+        'sec-fetch-site',
+        'sec-fetch-user'
+    ].forEach((header) => delete headers[header]);
+
+    headers['accept-encoding'] = 'identity';
     return headers;
 }
 
@@ -217,13 +292,30 @@ app.get('/tizentube/userScript.js', (req, res) => {
 
 app.all('*', (req, res) => {
     const isCorsBypass = req.path.indexOf('/cors-bypass/') === 0;
+    const isMediaProxy = req.path.indexOf('/media/') === 0;
+    const isCrossOriginProxy = isCorsBypass || isMediaProxy;
 
     let targetUrl;
-    if (isCorsBypass) {
-        const rawTarget = req.url.substring('/cors-bypass/'.length);
+    if (isCrossOriginProxy) {
+        const proxyPath = isMediaProxy ? '/media/' : '/cors-bypass/';
+        const rawTarget = req.url.substring(proxyPath.length);
         targetUrl = rawTarget.indexOf('http') === 0 ? rawTarget : `https://${rawTarget}`;
     } else {
         targetUrl = `https://www.youtube.com${req.url}`;
+    }
+
+    let parsedUrl;
+    try {
+        parsedUrl = URL.parse(targetUrl);
+    } catch (e) {
+        return res.status(400).send('Invalid proxy target');
+    }
+
+    if (isCrossOriginProxy && !isProxyableCrossOriginHost(parsedUrl.hostname)) {
+        return res.status(403).send('Unsupported proxy target');
+    }
+    if (isMediaProxy && !isMediaUrl(targetUrl)) {
+        return res.status(403).send('Unsupported media target');
     }
 
     const headers = {};
@@ -239,21 +331,22 @@ app.all('*', (req, res) => {
         }
     }
 
-    let parsedUrl;
-    try {
-        parsedUrl = URL.parse(targetUrl);
-        headers['host'] = parsedUrl.host;
-    } catch (e) {
-        headers['host'] = isCorsBypass ? 'www.youtube.com' : 'www.youtube.com';
-    }
+    headers['host'] = parsedUrl.host;
 
     headers['origin'] = LOGICAL_ORIGIN;
     if (headers['referer']) {
         headers['referer'] = toLogicalReferer(headers['referer']);
     }
-    applyLogicalAuthorization(headers);
 
-    headers['accept-encoding'] = 'gzip, deflate';
+    if (isMediaProxy) {
+        removeMediaSessionHeaders(headers);
+    } else {
+        if (!isSessionCookieHost(targetUrl)) {
+            delete headers.cookie;
+        }
+        applyLogicalAuthorization(headers, undefined, isYouTubeSessionApiRequest(targetUrl));
+        headers['accept-encoding'] = 'gzip, deflate';
+    }
 
     requestHeadersToRemove.forEach((header) => {
         delete headers[header];
@@ -270,7 +363,8 @@ app.all('*', (req, res) => {
                 method: req.method,
                 headers: headers,
                 body: body,
-                redirect: 'manual'
+                redirect: 'manual',
+                agent: isMediaProxy ? mediaAgent : undefined
             });
         })
         .then((response) => {
@@ -285,7 +379,7 @@ app.all('*', (req, res) => {
                 if (Object.prototype.hasOwnProperty.call(headerKeys, key)) {
                     const lowerKey = key.toLowerCase();
                     const skipHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'content-security-policy', 'alt-svc'];
-                    if (isCorsBypass) skipHeaders.push('access-control-allow-origin');
+                    if (isCrossOriginProxy) skipHeaders.push('access-control-allow-origin');
 
                     if (skipHeaders.indexOf(lowerKey) !== -1) continue;
 
@@ -297,6 +391,7 @@ app.all('*', (req, res) => {
                     }
 
                     if (lowerKey === 'set-cookie') {
+                        if (!isSessionCookieHost(targetUrl)) continue;
                         const rawCookies = headerKeys[key];
                         if (Array.isArray(rawCookies)) {
                             const modifiedCookies = rawCookies.map(cookieStr => {
@@ -339,9 +434,10 @@ app.all('*', (req, res) => {
                     const proxyPrefix = `http://localhost:${PORT}/cors-bypass/`;
 
                     // Rewrite rules for replacing URLs so CORS and presumably YT is happy.
-                    text = text.replace(/https:\/\/([a-zA-Z0-9-.]+)\.googlevideo\.com/g, `${proxyPrefix}https://$1.googlevideo.com`);
-                    text = text.replace(/https:\\\/\\\/([a-zA-Z0-9-.]+)\.googlevideo\.com/g, `http:\\\/\\\/localhost:${PORT}\\\/cors-bypass\\\/https:\\\/\\\/$1.googlevideo.com`);
-                    text = text.replace(/"\/\/([a-zA-Z0-9-.]+)\.googlevideo\.com/g, `"${proxyPrefix}https://$1.googlevideo.com`);
+                    const mediaProxyPrefix = `http://localhost:${PORT}/media/`;
+                    text = text.replace(/https:\/\/([a-zA-Z0-9-.]+)\.googlevideo\.com/g, `${mediaProxyPrefix}https://$1.googlevideo.com`);
+                    text = text.replace(/https:\\\/\\\/([a-zA-Z0-9-.]+)\.googlevideo\.com/g, `http:\\\/\\\/localhost:${PORT}\\\/media\\\/https:\\\/\\\/$1.googlevideo.com`);
+                    text = text.replace(/"\/\/([a-zA-Z0-9-.]+)\.googlevideo\.com/g, `"${mediaProxyPrefix}https://$1.googlevideo.com`);
 
                     text = text.replace(/https:\/\/www\.gstatic\.com/g, `${proxyPrefix}https://www.gstatic.com`);
                     text = text.replace(/http:\/\/www\.gstatic\.com/g, `${proxyPrefix}https://www.gstatic.com`);
@@ -357,7 +453,7 @@ app.all('*', (req, res) => {
                     text = text.replace('Set(["www.youtube.com","accounts.google.com"]);', 'Set(["www.youtube.com", "accounts.google.com", "localhost"]);');
                     text = rewriteLogicalLocation(text, isBotGuardResponse);
                     text = text.replace(/https:\/\/s\.youtube\.com/g, `${proxyPrefix}https://s.youtube.com`);
-                    text = text.replace(/redirector.googlevideo.com/g, `${proxyPrefix}https://redirector.googlevideo.com`);
+                    text = text.replace(/redirector.googlevideo.com/g, `${mediaProxyPrefix}https://redirector.googlevideo.com`);
                     text = text.replace(/this.scheme="https"/, 'this.scheme="http"');
                     text = text.replace(/https\:\/\/jnn-pa.googleapis.com/g, `${proxyPrefix}https://jnn-pa.googleapis.com`);
                     text = text.replace(/https:\/\/yt3\.googleusercontent\.com/g, `${proxyPrefix}https://yt3.googleusercontent.com`);
@@ -394,6 +490,11 @@ module.exports = {
     createLogicalAuthorization,
     createUserAgentOverrideScript,
     injectAfterOpeningHead,
+    isMediaUrl,
+    isProxyableCrossOriginHost,
+    isSessionCookieHost,
+    isYouTubeSessionApiRequest,
+    removeMediaSessionHeaders,
     readRequestBody,
     rewriteLogicalLocation,
     toLogicalReferer,
