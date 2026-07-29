@@ -4,6 +4,7 @@ const adbhost = require('adbhost');
 const CDP = require('chrome-remote-interface');
 const fetch = require('node-fetch');
 
+const STANDALONE_USER_AGENT = 'Mozilla/5.0 (Linux; Shield Android TV) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
 let isConnecting = false;
 const isTizen3 = typeof tizen !== 'undefined' &&
 	tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version').startsWith('3.0');
@@ -14,6 +15,12 @@ function connectToDebugger(host, port, args) {
 			isConnecting = false;
 			client.Runtime.enable();
 			client.Page.enable();
+			client.Network.enable();
+			client.Network.setUserAgentOverride({
+				userAgent: STANDALONE_USER_AGENT,
+				acceptLanguage: 'en-US,en;q=0.9',
+				platform: 'Linux armv7l'
+			});
 			client.on('Runtime.executionContextCreated', (message) => {
 				fetch('http://127.0.0.1:8099/tizentube/userScript.js')
 					.then((response) => response.text())
