@@ -15,14 +15,82 @@ var require$$1$5 = require('assert');
 var require$$0$6 = require('tty');
 var require$$4$2 = require('net');
 var require$$1$6 = require('stream');
-var require$$3$2 = require('zlib');
+var require$$3$3 = require('zlib');
 var require$$0$7 = require('buffer');
 var require$$8$1 = require('querystring');
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
+function getAugmentedNamespace(n) {
+  if (n.__esModule) return n;
+  var f = n.default;
+	if (typeof f == "function") {
+		var a = function a () {
+			if (this instanceof a) {
+        return Reflect.construct(f, arguments, this.constructor);
+			}
+			return f.apply(this, arguments);
+		};
+		a.prototype = f.prototype;
+  } else a = {};
+  Object.defineProperty(a, '__esModule', {value: true});
+	Object.keys(n).forEach(function (k) {
+		var d = Object.getOwnPropertyDescriptor(n, k);
+		Object.defineProperty(a, k, d.get ? d : {
+			enumerable: true,
+			get: function () {
+				return n[k];
+			}
+		});
+	});
+	return a;
+}
+
 var service = {};
 
+function _defineProperty(e, r, t) {
+  return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
+    value: t,
+    enumerable: !0,
+    configurable: !0,
+    writable: !0
+  }) : e[r] = t, e;
+}
+function ownKeys(e, r) {
+  var t = Object.keys(e);
+  if (Object.getOwnPropertySymbols) {
+    var o = Object.getOwnPropertySymbols(e);
+    r && (o = o.filter(function (r) {
+      return Object.getOwnPropertyDescriptor(e, r).enumerable;
+    })), t.push.apply(t, o);
+  }
+  return t;
+}
+function _objectSpread2(e) {
+  for (var r = 1; r < arguments.length; r++) {
+    var t = null != arguments[r] ? arguments[r] : {};
+    r % 2 ? ownKeys(Object(t), !0).forEach(function (r) {
+      _defineProperty(e, r, t[r]);
+    }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) {
+      Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
+    });
+  }
+  return e;
+}
+function _toPrimitive(t, r) {
+  if ("object" != typeof t || !t) return t;
+  var e = t[Symbol.toPrimitive];
+  if (void 0 !== e) {
+    var i = e.call(t, r || "default");
+    if ("object" != typeof i) return i;
+    throw new TypeError("@@toPrimitive must return a primitive value.");
+  }
+  return ("string" === r ? String : Number)(t);
+}
+function _toPropertyKey(t) {
+  var i = _toPrimitive(t, "string");
+  return "symbol" == typeof i ? i : i + "";
+}
 function _typeof(o) {
   "@babel/helpers - typeof";
 
@@ -38,28 +106,28 @@ var peerDial$1 = {};
 // Unique ID creation requires a high quality random # generator.  In node.js
 // this is pretty straight-forward - we use the crypto API.
 
-var crypto$1 = require$$0$3;
-var rng$2 = function nodeRNG() {
-  return crypto$1.randomBytes(16);
+var crypto$2 = require$$0$3;
+var rng$3 = function nodeRNG() {
+  return crypto$2.randomBytes(16);
 };
 
 /**
  * Convert array of 16 byte values to UUID string format of the form:
  * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
  */
-var byteToHex = [];
-for (var i = 0; i < 256; ++i) {
-  byteToHex[i] = (i + 0x100).toString(16).substr(1);
+var byteToHex$1 = [];
+for (var i$1 = 0; i$1 < 256; ++i$1) {
+  byteToHex$1[i$1] = (i$1 + 0x100).toString(16).substr(1);
 }
 function bytesToUuid$2(buf, offset) {
   var i = offset || 0;
-  var bth = byteToHex;
+  var bth = byteToHex$1;
   // join used to fix memory issue caused by concatenation: https://bugs.chromium.org/p/v8/issues/detail?id=3175#c4
   return [bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], '-', bth[buf[i++]], bth[buf[i++]], '-', bth[buf[i++]], bth[buf[i++]], '-', bth[buf[i++]], bth[buf[i++]], '-', bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], bth[buf[i++]]].join('');
 }
 var bytesToUuid_1 = bytesToUuid$2;
 
-var rng$1 = rng$2;
+var rng$2 = rng$3;
 var bytesToUuid$1 = bytesToUuid_1;
 
 // **`v1()` - Generate time-based UUID**
@@ -75,7 +143,7 @@ var _lastMSecs = 0;
 var _lastNSecs = 0;
 
 // See https://github.com/uuidjs/uuid for API details
-function v1$1(options, buf, offset) {
+function v1$2(options, buf, offset) {
   var i = buf && offset || 0;
   var b = buf || [];
   options = options || {};
@@ -86,7 +154,7 @@ function v1$1(options, buf, offset) {
   // specified.  We do this lazily to minimize issues related to insufficient
   // system entropy.  See #189
   if (node == null || clockseq == null) {
-    var seedBytes = rng$1();
+    var seedBytes = rng$2();
     if (node == null) {
       // Per 4.5, create and 48-bit node id, (47 random bits + multicast bit = 1)
       node = _nodeId = [seedBytes[0] | 0x01, seedBytes[1], seedBytes[2], seedBytes[3], seedBytes[4], seedBytes[5]];
@@ -160,18 +228,18 @@ function v1$1(options, buf, offset) {
   }
   return buf ? buf : bytesToUuid$1(b);
 }
-var v1_1 = v1$1;
+var v1_1 = v1$2;
 
-var rng = rng$2;
+var rng$1 = rng$3;
 var bytesToUuid = bytesToUuid_1;
-function v4$1(options, buf, offset) {
+function v4$2(options, buf, offset) {
   var i = buf && offset || 0;
   if (typeof options == 'string') {
     buf = options === 'binary' ? new Array(16) : null;
     options = null;
   }
   options = options || {};
-  var rnds = options.random || (options.rng || rng)();
+  var rnds = options.random || (options.rng || rng$1)();
 
   // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
   rnds[6] = rnds[6] & 0x0f | 0x40;
@@ -185,14 +253,14 @@ function v4$1(options, buf, offset) {
   }
   return buf || bytesToUuid(rnds);
 }
-var v4_1 = v4$1;
+var v4_1 = v4$2;
 
-var v1 = v1_1;
-var v4 = v4_1;
-var uuid$1 = v4;
-uuid$1.v1 = v1;
-uuid$1.v4 = v4;
-var uuid_1 = uuid$1;
+var v1$1 = v1_1;
+var v4$1 = v4_1;
+var uuid$2 = v4$1;
+uuid$2.v1 = v1$1;
+uuid$2.v4 = v4$1;
+var uuid_1 = uuid$2;
 
 var peerSsdp$1 = {};
 
@@ -829,7 +897,7 @@ var keywords = [
 	"engine",
 	"ejs"
 ];
-var version = "3.1.10";
+var version$1 = "3.1.10";
 var author = "Matthew Eernisse <mde@fleegix.org> (http://fleegix.org)";
 var license = "Apache-2.0";
 var bin = {
@@ -862,11 +930,11 @@ var engines = {
 var scripts = {
 	test: "npx jake test"
 };
-var require$$3$1 = {
+var require$$3$2 = {
 	name: name,
 	description: description,
 	keywords: keywords,
-	version: version,
+	version: version$1,
 	author: author,
 	license: license,
 	bin: bin,
@@ -931,7 +999,7 @@ var require$$3$1 = {
   var utils = utils$2;
   var scopeOptionWarned = false;
   /** @type {string} */
-  var _VERSION_STRING = require$$3$1.version;
+  var _VERSION_STRING = require$$3$2.version;
   var _DEFAULT_OPEN_DELIMITER = '<';
   var _DEFAULT_CLOSE_DELIMITER = '>';
   var _DEFAULT_DELIMITER = '%';
@@ -8129,7 +8197,7 @@ function append(header, field) {
   }
 
   // get fields array
-  var fields = !Array.isArray(field) ? parse$9(String(field)) : field;
+  var fields = !Array.isArray(field) ? parse$a(String(field)) : field;
 
   // assert on invalid field names
   for (var j = 0; j < fields.length; j++) {
@@ -8145,7 +8213,7 @@ function append(header, field) {
 
   // enumerate current values
   var val = header;
-  var vals = parse$9(header.toLowerCase());
+  var vals = parse$a(header.toLowerCase());
 
   // unspecified vary
   if (fields.indexOf('*') !== -1 || vals.indexOf('*') !== -1) {
@@ -8171,7 +8239,7 @@ function append(header, field) {
  * @private
  */
 
-function parse$9(header) {
+function parse$a(header) {
   var end = 0;
   var list = [];
   var start = 0;
@@ -8576,7 +8644,7 @@ Async.prototype.makeCallback = function makeCallback(caller, name, mapping) {
   }
 };
 
-var uuid = uuid_1;
+var uuid$1 = uuid_1;
 var ssdp = peerSsdp;
 var fs$3 = require$$1$2;
 var ejs = ejs$1;
@@ -8584,7 +8652,7 @@ var os = require$$2$2;
 var util$2 = require$$0$4;
 var events = require$$1$1;
 var http$3 = require$$7$1;
-var URL = require$$8;
+var URL$1 = require$$8;
 var xml2js = xml2js$1;
 var cors$1 = libExports;
 var gate = gate$1;
@@ -8767,7 +8835,7 @@ var DIALServer = function DIALServer(options) {
   this.prefix = options.prefix || "";
   this.port = options.port || null;
   this.host = options.host || null;
-  this.uuid = options.uuid || uuid.v4();
+  this.uuid = options.uuid || uuid$1.v4();
   this.friendlyName = options.friendlyName || os.hostname() || "unknown";
   this.manufacturer = options.manufacturer || "unknown manufacturer";
   this.modelName = options.modelName || "unknown model";
@@ -9026,7 +9094,7 @@ DialDevice.prototype.launchApp = function (appName, launchData, contentType, cal
     callback && callback(null, err);
     return;
   }
-  appUrl = URL.parse(appUrl);
+  appUrl = URL$1.parse(appUrl);
   var contentLength = launchData && Buffer.byteLength(launchData) || 0;
   var options = {
     host: appUrl.hostname,
@@ -9066,7 +9134,7 @@ DialDevice.prototype.stopApp = function (appName, pid, callback) {
     callback && callback(null, err);
     return;
   }
-  stopUrl = URL.parse(stopUrl);
+  stopUrl = URL$1.parse(stopUrl);
   var options = {
     host: stopUrl.hostname,
     port: stopUrl.port,
@@ -9780,7 +9848,7 @@ var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
  */
 
 contentType.format = format$2;
-contentType.parse = parse$8;
+contentType.parse = parse$9;
 
 /**
  * Format object to media type.
@@ -9824,7 +9892,7 @@ function format$2(obj) {
  * @public
  */
 
-function parse$8(string) {
+function parse$9(string) {
   if (!string) {
     throw new TypeError('argument string is required');
   }
@@ -11260,7 +11328,7 @@ var srcExports = src.exports;
 var EventEmitter = require$$1$1.EventEmitter;
 var ReadStream = require$$1$2.ReadStream;
 var Stream$1 = require$$1$6;
-var Zlib = require$$3$2;
+var Zlib = require$$3$3;
 
 /**
  * Module exports.
@@ -17307,7 +17375,7 @@ var require$$2$1 = [
 	]
 ];
 
-var require$$3 = [
+var require$$3$1 = [
 	[
 		"a140",
 		"",
@@ -21707,7 +21775,7 @@ function requireDbcsData() {
     'gbk': {
       type: '_dbcs',
       table: function table() {
-        return require$$2$1.concat(require$$3);
+        return require$$2$1.concat(require$$3$1);
       }
     },
     'xgbk': 'gbk',
@@ -21720,7 +21788,7 @@ function requireDbcsData() {
     'gb18030': {
       type: '_dbcs',
       table: function table() {
-        return require$$2$1.concat(require$$3);
+        return require$$2$1.concat(require$$3$1);
       },
       gb18030: function gb18030() {
         return require$$4;
@@ -22949,7 +23017,7 @@ function requireRead() {
   var iconv = requireLib$1();
   var onFinished = onFinishedExports;
   var unpipe = unpipe_1;
-  var zlib = require$$3$2;
+  var zlib = require$$3$3;
 
   /**
    * Module exports.
@@ -23194,7 +23262,7 @@ var typeRegExp = /^ *([A-Za-z0-9][A-Za-z0-9!#$&^_-]{0,126})\/([A-Za-z0-9][A-Za-z
  */
 
 mediaTyper.format = format$1;
-mediaTyper.parse = parse$7;
+mediaTyper.parse = parse$8;
 
 /**
  * Format object to media type.
@@ -23253,7 +23321,7 @@ function format$1(obj) {
  * @api public
  */
 
-function parse$7(string) {
+function parse$8(string) {
   if (!string) {
     throw new TypeError('argument string is required');
   }
@@ -36951,10 +37019,10 @@ function requireStringify() {
   return stringify_1;
 }
 
-var parse$6;
+var parse$7;
 var hasRequiredParse;
 function requireParse() {
-  if (hasRequiredParse) return parse$6;
+  if (hasRequiredParse) return parse$7;
   hasRequiredParse = 1;
   var utils = requireUtils();
   var has = Object.prototype.hasOwnProperty;
@@ -37159,7 +37227,7 @@ function requireParse() {
       strictNullHandling: typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling
     };
   };
-  parse$6 = function parse(str, opts) {
+  parse$7 = function parse(str, opts) {
     var options = normalizeParseOptions(opts);
     if (str === '' || str === null || typeof str === 'undefined') {
       return options.plainObjects ? Object.create(null) : {};
@@ -37180,7 +37248,7 @@ function requireParse() {
     }
     return utils.compact(obj);
   };
-  return parse$6;
+  return parse$7;
 }
 
 var lib;
@@ -37806,7 +37874,7 @@ var parseurl$1 = {exports: {}};
  */
 
 var url = require$$8;
-var parse$5 = url.parse;
+var parse$6 = url.parse;
 var Url = url.Url;
 
 /**
@@ -37879,7 +37947,7 @@ function originalurl(req) {
 
 function fastparse(str) {
   if (typeof str !== 'string' || str.charCodeAt(0) !== 0x2f /* / */) {
-    return parse$5(str);
+    return parse$6(str);
   }
   var pathname = str;
   var query = null;
@@ -37906,7 +37974,7 @@ function fastparse(str) {
       case 0x23: /* #  */
       case 0xa0:
       case 0xfeff:
-        return parse$5(str);
+        return parse$6(str);
     }
   }
   var url = Url !== undefined ? new Url() : {};
@@ -39768,7 +39836,7 @@ var contentDisposition$2 = {exports: {}};
  */
 
 contentDisposition$2.exports = contentDisposition$1;
-contentDisposition$2.exports.parse = parse$4;
+contentDisposition$2.exports.parse = parse$5;
 
 /**
  * Module dependencies.
@@ -40047,7 +40115,7 @@ function getlatin1(val) {
  * @public
  */
 
-function parse$4(string) {
+function parse$5(string) {
   if (!string || typeof string !== 'string') {
     throw new TypeError('argument string is required');
   }
@@ -40186,7 +40254,7 @@ var etag_1 = etag$1;
  * @private
  */
 
-var crypto = require$$0$3;
+var crypto$1 = require$$0$3;
 var Stats = require$$1$2.Stats;
 
 /**
@@ -40211,7 +40279,7 @@ function entitytag(entity) {
   }
 
   // compute hash of entity
-  var hash = crypto.createHash('sha1').update(entity, 'utf8').digest('base64').substring(0, 27);
+  var hash = crypto$1.createHash('sha1').update(entity, 'utf8').digest('base64').substring(0, 27);
 
   // compute length of entity
   var len = typeof entity === 'string' ? Buffer.byteLength(entity, 'utf8') : entity.length;
@@ -43294,7 +43362,7 @@ var ms$1 = function ms(val, options) {
   options = options || {};
   var type = _typeof(val);
   if (type === 'string' && val.length > 0) {
-    return parse$3(val);
+    return parse$4(val);
   } else if (type === 'number' && isFinite(val)) {
     return options["long"] ? fmtLong(val) : fmtShort(val);
   }
@@ -43309,7 +43377,7 @@ var ms$1 = function ms(val, options) {
  * @api private
  */
 
-function parse$3(str) {
+function parse$4(str) {
   str = String(str);
   if (str.length > 100) {
     return;
@@ -44633,7 +44701,7 @@ function forwarded$1(req) {
   }
 
   // simple header parsing
-  var proxyAddrs = parse$2(req.headers['x-forwarded-for'] || '');
+  var proxyAddrs = parse$3(req.headers['x-forwarded-for'] || '');
   var socketAddr = getSocketAddr(req);
   var addrs = [socketAddr].concat(proxyAddrs);
 
@@ -44660,7 +44728,7 @@ function getSocketAddr(req) {
  * @private
  */
 
-function parse$2(header) {
+function parse$3(header) {
   var end = header.length;
   var list = [];
   var start = header.length;
@@ -47595,7 +47663,7 @@ var typeis = typeIsExports;
 var http$1 = require$$7$1;
 var fresh = fresh_1;
 var parseRange = rangeParser_1;
-var parse$1 = parseurlExports;
+var parse$2 = parseurlExports;
 var proxyaddr = proxyAddrExports;
 
 /**
@@ -47956,7 +48024,7 @@ defineGetter(req, 'subdomains', function subdomains() {
  */
 
 defineGetter(req, 'path', function path() {
-  return parse$1(this).pathname;
+  return parse$2(this).pathname;
 });
 
 /**
@@ -48126,7 +48194,7 @@ var cookie$1 = {};
  * @public
  */
 
-cookie$1.parse = parse;
+cookie$1.parse = parse$1;
 cookie$1.serialize = serialize;
 
 /**
@@ -48158,7 +48226,7 @@ var fieldContentRegExp = /^[\u0009\u0020-\u007e\u0080-\u00ff]+$/;
  * @public
  */
 
-function parse(str, options) {
+function parse$1(str, options) {
   if (typeof str !== 'string') {
     throw new TypeError('argument str must be a string');
   }
@@ -48607,7 +48675,7 @@ res.json = function json(obj) {
   var escape = app.get('json escape');
   var replacer = app.get('json replacer');
   var spaces = app.get('json spaces');
-  var body = stringify(val, replacer, spaces, escape);
+  var body = stringify$1(val, replacer, spaces, escape);
 
   // content-type
   if (!this.get('Content-Type')) {
@@ -48649,7 +48717,7 @@ res.jsonp = function jsonp(obj) {
   var escape = app.get('json escape');
   var replacer = app.get('json replacer');
   var spaces = app.get('json spaces');
-  var body = stringify(val, replacer, spaces, escape);
+  var body = stringify$1(val, replacer, spaces, escape);
   var callback = this.req.query[app.get('jsonp callback name')];
 
   // content-type
@@ -49434,7 +49502,7 @@ function sendfile(res, file, options, callback) {
  * @private
  */
 
-function stringify(value, replacer, spaces, escape) {
+function stringify$1(value, replacer, spaces, escape) {
   // v8 checks arguments.length for optimizing simple call
   // https://bugs.chromium.org/p/v8/issues/detail?id=4730
   var json = replacer || spaces ? JSON.stringify(value, replacer, spaces) : JSON.stringify(value);
@@ -49768,9 +49836,550 @@ var expressExports = express$2.exports;
  */
 var express$1 = expressExports;
 
+var max = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+
+var nil = '00000000-0000-0000-0000-000000000000';
+
+var REGEX = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$/i;
+
+function validate(uuid) {
+  return typeof uuid === 'string' && REGEX.test(uuid);
+}
+
+function parse(uuid) {
+  if (!validate(uuid)) {
+    throw TypeError('Invalid UUID');
+  }
+  var v;
+  return Uint8Array.of((v = parseInt(uuid.slice(0, 8), 16)) >>> 24, v >>> 16 & 0xff, v >>> 8 & 0xff, v & 0xff, (v = parseInt(uuid.slice(9, 13), 16)) >>> 8, v & 0xff, (v = parseInt(uuid.slice(14, 18), 16)) >>> 8, v & 0xff, (v = parseInt(uuid.slice(19, 23), 16)) >>> 8, v & 0xff, (v = parseInt(uuid.slice(24, 36), 16)) / 0x10000000000 & 0xff, v / 0x100000000 & 0xff, v >>> 24 & 0xff, v >>> 16 & 0xff, v >>> 8 & 0xff, v & 0xff);
+}
+
+var byteToHex = [];
+for (var i = 0; i < 256; ++i) {
+  byteToHex.push((i + 0x100).toString(16).slice(1));
+}
+function unsafeStringify(arr) {
+  var offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + '-' + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + '-' + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + '-' + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + '-' + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
+}
+function stringify(arr) {
+  var offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var uuid = unsafeStringify(arr, offset);
+  if (!validate(uuid)) {
+    throw TypeError('Stringified UUID is invalid');
+  }
+  return uuid;
+}
+
+var getRandomValues;
+var rnds8 = new Uint8Array(16);
+function rng() {
+  if (!getRandomValues) {
+    if (typeof crypto === 'undefined' || !crypto.getRandomValues) {
+      throw new Error('crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported');
+    }
+    getRandomValues = crypto.getRandomValues.bind(crypto);
+  }
+  return getRandomValues(rnds8);
+}
+
+var _state$1 = {};
+function v1(options, buf, offset) {
+  var _options$_v, _options;
+  var bytes;
+  var isV6 = (_options$_v = (_options = options) === null || _options === void 0 ? void 0 : _options._v6) !== null && _options$_v !== void 0 ? _options$_v : false;
+  if (options) {
+    var optionsKeys = Object.keys(options);
+    if (optionsKeys.length === 1 && optionsKeys[0] === '_v6') {
+      options = undefined;
+    }
+  }
+  if (options) {
+    var _ref, _options$random, _options$rng, _options2;
+    bytes = v1Bytes((_ref = (_options$random = options.random) !== null && _options$random !== void 0 ? _options$random : (_options$rng = (_options2 = options).rng) === null || _options$rng === void 0 ? void 0 : _options$rng.call(_options2)) !== null && _ref !== void 0 ? _ref : rng(), options.msecs, options.nsecs, options.clockseq, options.node, buf, offset);
+  } else {
+    var now = Date.now();
+    var rnds = rng();
+    updateV1State(_state$1, now, rnds);
+    bytes = v1Bytes(rnds, _state$1.msecs, _state$1.nsecs, isV6 ? undefined : _state$1.clockseq, isV6 ? undefined : _state$1.node, buf, offset);
+  }
+  return buf !== null && buf !== void 0 ? buf : unsafeStringify(bytes);
+}
+function updateV1State(state, now, rnds) {
+  var _state$msecs, _state$nsecs;
+  (_state$msecs = state.msecs) !== null && _state$msecs !== void 0 ? _state$msecs : state.msecs = -Infinity;
+  (_state$nsecs = state.nsecs) !== null && _state$nsecs !== void 0 ? _state$nsecs : state.nsecs = 0;
+  if (now === state.msecs) {
+    state.nsecs++;
+    if (state.nsecs >= 10000) {
+      state.node = undefined;
+      state.nsecs = 0;
+    }
+  } else if (now > state.msecs) {
+    state.nsecs = 0;
+  } else if (now < state.msecs) {
+    state.node = undefined;
+  }
+  if (!state.node) {
+    state.node = rnds.slice(10, 16);
+    state.node[0] |= 0x01;
+    state.clockseq = (rnds[8] << 8 | rnds[9]) & 0x3fff;
+  }
+  state.msecs = now;
+  return state;
+}
+function v1Bytes(rnds, msecs, nsecs, clockseq, node, buf) {
+  var _msecs, _nsecs, _clockseq, _node;
+  var offset = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : 0;
+  if (rnds.length < 16) {
+    throw new Error('Random bytes length must be >= 16');
+  }
+  if (!buf) {
+    buf = new Uint8Array(16);
+    offset = 0;
+  } else {
+    if (offset < 0 || offset + 16 > buf.length) {
+      throw new RangeError("UUID byte range ".concat(offset, ":").concat(offset + 15, " is out of buffer bounds"));
+    }
+  }
+  (_msecs = msecs) !== null && _msecs !== void 0 ? _msecs : msecs = Date.now();
+  (_nsecs = nsecs) !== null && _nsecs !== void 0 ? _nsecs : nsecs = 0;
+  (_clockseq = clockseq) !== null && _clockseq !== void 0 ? _clockseq : clockseq = (rnds[8] << 8 | rnds[9]) & 0x3fff;
+  (_node = node) !== null && _node !== void 0 ? _node : node = rnds.slice(10, 16);
+  msecs += 12219292800000;
+  var tl = ((msecs & 0xfffffff) * 10000 + nsecs) % 0x100000000;
+  buf[offset++] = tl >>> 24 & 0xff;
+  buf[offset++] = tl >>> 16 & 0xff;
+  buf[offset++] = tl >>> 8 & 0xff;
+  buf[offset++] = tl & 0xff;
+  var tmh = msecs / 0x100000000 * 10000 & 0xfffffff;
+  buf[offset++] = tmh >>> 8 & 0xff;
+  buf[offset++] = tmh & 0xff;
+  buf[offset++] = tmh >>> 24 & 0xf | 0x10;
+  buf[offset++] = tmh >>> 16 & 0xff;
+  buf[offset++] = clockseq >>> 8 | 0x80;
+  buf[offset++] = clockseq & 0xff;
+  for (var n = 0; n < 6; ++n) {
+    buf[offset++] = node[n];
+  }
+  return buf;
+}
+
+function v1ToV6(uuid) {
+  var v1Bytes = typeof uuid === 'string' ? parse(uuid) : uuid;
+  var v6Bytes = _v1ToV6(v1Bytes);
+  return typeof uuid === 'string' ? unsafeStringify(v6Bytes) : v6Bytes;
+}
+function _v1ToV6(v1Bytes) {
+  return Uint8Array.of((v1Bytes[6] & 0x0f) << 4 | v1Bytes[7] >> 4 & 0x0f, (v1Bytes[7] & 0x0f) << 4 | (v1Bytes[4] & 0xf0) >> 4, (v1Bytes[4] & 0x0f) << 4 | (v1Bytes[5] & 0xf0) >> 4, (v1Bytes[5] & 0x0f) << 4 | (v1Bytes[0] & 0xf0) >> 4, (v1Bytes[0] & 0x0f) << 4 | (v1Bytes[1] & 0xf0) >> 4, (v1Bytes[1] & 0x0f) << 4 | (v1Bytes[2] & 0xf0) >> 4, 0x60 | v1Bytes[2] & 0x0f, v1Bytes[3], v1Bytes[8], v1Bytes[9], v1Bytes[10], v1Bytes[11], v1Bytes[12], v1Bytes[13], v1Bytes[14], v1Bytes[15]);
+}
+
+function md5(bytes) {
+  var words = uint8ToUint32(bytes);
+  var md5Bytes = wordsToMd5(words, bytes.length * 8);
+  return uint32ToUint8(md5Bytes);
+}
+function uint32ToUint8(input) {
+  var bytes = new Uint8Array(input.length * 4);
+  for (var i = 0; i < input.length * 4; i++) {
+    bytes[i] = input[i >> 2] >>> i % 4 * 8 & 0xff;
+  }
+  return bytes;
+}
+function getOutputLength(inputLength8) {
+  return (inputLength8 + 64 >>> 9 << 4) + 14 + 1;
+}
+function wordsToMd5(x, len) {
+  var xpad = new Uint32Array(getOutputLength(len)).fill(0);
+  xpad.set(x);
+  xpad[len >> 5] |= 0x80 << len % 32;
+  xpad[xpad.length - 1] = len;
+  x = xpad;
+  var a = 1732584193;
+  var b = -271733879;
+  var c = -1732584194;
+  var d = 271733878;
+  for (var i = 0; i < x.length; i += 16) {
+    var olda = a;
+    var oldb = b;
+    var oldc = c;
+    var oldd = d;
+    a = md5ff(a, b, c, d, x[i], 7, -680876936);
+    d = md5ff(d, a, b, c, x[i + 1], 12, -389564586);
+    c = md5ff(c, d, a, b, x[i + 2], 17, 606105819);
+    b = md5ff(b, c, d, a, x[i + 3], 22, -1044525330);
+    a = md5ff(a, b, c, d, x[i + 4], 7, -176418897);
+    d = md5ff(d, a, b, c, x[i + 5], 12, 1200080426);
+    c = md5ff(c, d, a, b, x[i + 6], 17, -1473231341);
+    b = md5ff(b, c, d, a, x[i + 7], 22, -45705983);
+    a = md5ff(a, b, c, d, x[i + 8], 7, 1770035416);
+    d = md5ff(d, a, b, c, x[i + 9], 12, -1958414417);
+    c = md5ff(c, d, a, b, x[i + 10], 17, -42063);
+    b = md5ff(b, c, d, a, x[i + 11], 22, -1990404162);
+    a = md5ff(a, b, c, d, x[i + 12], 7, 1804603682);
+    d = md5ff(d, a, b, c, x[i + 13], 12, -40341101);
+    c = md5ff(c, d, a, b, x[i + 14], 17, -1502002290);
+    b = md5ff(b, c, d, a, x[i + 15], 22, 1236535329);
+    a = md5gg(a, b, c, d, x[i + 1], 5, -165796510);
+    d = md5gg(d, a, b, c, x[i + 6], 9, -1069501632);
+    c = md5gg(c, d, a, b, x[i + 11], 14, 643717713);
+    b = md5gg(b, c, d, a, x[i], 20, -373897302);
+    a = md5gg(a, b, c, d, x[i + 5], 5, -701558691);
+    d = md5gg(d, a, b, c, x[i + 10], 9, 38016083);
+    c = md5gg(c, d, a, b, x[i + 15], 14, -660478335);
+    b = md5gg(b, c, d, a, x[i + 4], 20, -405537848);
+    a = md5gg(a, b, c, d, x[i + 9], 5, 568446438);
+    d = md5gg(d, a, b, c, x[i + 14], 9, -1019803690);
+    c = md5gg(c, d, a, b, x[i + 3], 14, -187363961);
+    b = md5gg(b, c, d, a, x[i + 8], 20, 1163531501);
+    a = md5gg(a, b, c, d, x[i + 13], 5, -1444681467);
+    d = md5gg(d, a, b, c, x[i + 2], 9, -51403784);
+    c = md5gg(c, d, a, b, x[i + 7], 14, 1735328473);
+    b = md5gg(b, c, d, a, x[i + 12], 20, -1926607734);
+    a = md5hh(a, b, c, d, x[i + 5], 4, -378558);
+    d = md5hh(d, a, b, c, x[i + 8], 11, -2022574463);
+    c = md5hh(c, d, a, b, x[i + 11], 16, 1839030562);
+    b = md5hh(b, c, d, a, x[i + 14], 23, -35309556);
+    a = md5hh(a, b, c, d, x[i + 1], 4, -1530992060);
+    d = md5hh(d, a, b, c, x[i + 4], 11, 1272893353);
+    c = md5hh(c, d, a, b, x[i + 7], 16, -155497632);
+    b = md5hh(b, c, d, a, x[i + 10], 23, -1094730640);
+    a = md5hh(a, b, c, d, x[i + 13], 4, 681279174);
+    d = md5hh(d, a, b, c, x[i], 11, -358537222);
+    c = md5hh(c, d, a, b, x[i + 3], 16, -722521979);
+    b = md5hh(b, c, d, a, x[i + 6], 23, 76029189);
+    a = md5hh(a, b, c, d, x[i + 9], 4, -640364487);
+    d = md5hh(d, a, b, c, x[i + 12], 11, -421815835);
+    c = md5hh(c, d, a, b, x[i + 15], 16, 530742520);
+    b = md5hh(b, c, d, a, x[i + 2], 23, -995338651);
+    a = md5ii(a, b, c, d, x[i], 6, -198630844);
+    d = md5ii(d, a, b, c, x[i + 7], 10, 1126891415);
+    c = md5ii(c, d, a, b, x[i + 14], 15, -1416354905);
+    b = md5ii(b, c, d, a, x[i + 5], 21, -57434055);
+    a = md5ii(a, b, c, d, x[i + 12], 6, 1700485571);
+    d = md5ii(d, a, b, c, x[i + 3], 10, -1894986606);
+    c = md5ii(c, d, a, b, x[i + 10], 15, -1051523);
+    b = md5ii(b, c, d, a, x[i + 1], 21, -2054922799);
+    a = md5ii(a, b, c, d, x[i + 8], 6, 1873313359);
+    d = md5ii(d, a, b, c, x[i + 15], 10, -30611744);
+    c = md5ii(c, d, a, b, x[i + 6], 15, -1560198380);
+    b = md5ii(b, c, d, a, x[i + 13], 21, 1309151649);
+    a = md5ii(a, b, c, d, x[i + 4], 6, -145523070);
+    d = md5ii(d, a, b, c, x[i + 11], 10, -1120210379);
+    c = md5ii(c, d, a, b, x[i + 2], 15, 718787259);
+    b = md5ii(b, c, d, a, x[i + 9], 21, -343485551);
+    a = safeAdd(a, olda);
+    b = safeAdd(b, oldb);
+    c = safeAdd(c, oldc);
+    d = safeAdd(d, oldd);
+  }
+  return Uint32Array.of(a, b, c, d);
+}
+function uint8ToUint32(input) {
+  if (input.length === 0) {
+    return new Uint32Array();
+  }
+  var output = new Uint32Array(getOutputLength(input.length * 8)).fill(0);
+  for (var i = 0; i < input.length; i++) {
+    output[i >> 2] |= (input[i] & 0xff) << i % 4 * 8;
+  }
+  return output;
+}
+function safeAdd(x, y) {
+  var lsw = (x & 0xffff) + (y & 0xffff);
+  var msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+  return msw << 16 | lsw & 0xffff;
+}
+function bitRotateLeft(num, cnt) {
+  return num << cnt | num >>> 32 - cnt;
+}
+function md5cmn(q, a, b, x, s, t) {
+  return safeAdd(bitRotateLeft(safeAdd(safeAdd(a, q), safeAdd(x, t)), s), b);
+}
+function md5ff(a, b, c, d, x, s, t) {
+  return md5cmn(b & c | ~b & d, a, b, x, s, t);
+}
+function md5gg(a, b, c, d, x, s, t) {
+  return md5cmn(b & d | c & ~d, a, b, x, s, t);
+}
+function md5hh(a, b, c, d, x, s, t) {
+  return md5cmn(b ^ c ^ d, a, b, x, s, t);
+}
+function md5ii(a, b, c, d, x, s, t) {
+  return md5cmn(c ^ (b | ~d), a, b, x, s, t);
+}
+
+function stringToBytes(str) {
+  str = unescape(encodeURIComponent(str));
+  var bytes = new Uint8Array(str.length);
+  for (var i = 0; i < str.length; ++i) {
+    bytes[i] = str.charCodeAt(i);
+  }
+  return bytes;
+}
+var DNS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+var URL = '6ba7b811-9dad-11d1-80b4-00c04fd430c8';
+function v35(version, hash, value, namespace, buf, offset) {
+  var _namespace;
+  var valueBytes = typeof value === 'string' ? stringToBytes(value) : value;
+  var namespaceBytes = typeof namespace === 'string' ? parse(namespace) : namespace;
+  if (typeof namespace === 'string') {
+    namespace = parse(namespace);
+  }
+  if (((_namespace = namespace) === null || _namespace === void 0 ? void 0 : _namespace.length) !== 16) {
+    throw TypeError('Namespace must be array-like (16 iterable integer values, 0-255)');
+  }
+  var bytes = new Uint8Array(16 + valueBytes.length);
+  bytes.set(namespaceBytes);
+  bytes.set(valueBytes, namespaceBytes.length);
+  bytes = hash(bytes);
+  bytes[6] = bytes[6] & 0x0f | version;
+  bytes[8] = bytes[8] & 0x3f | 0x80;
+  if (buf) {
+    offset = offset || 0;
+    if (offset < 0 || offset + 16 > buf.length) {
+      throw new RangeError("UUID byte range ".concat(offset, ":").concat(offset + 15, " is out of buffer bounds"));
+    }
+    for (var i = 0; i < 16; ++i) {
+      buf[offset + i] = bytes[i];
+    }
+    return buf;
+  }
+  return unsafeStringify(bytes);
+}
+
+function v3(value, namespace, buf, offset) {
+  return v35(0x30, md5, value, namespace, buf, offset);
+}
+v3.DNS = DNS;
+v3.URL = URL;
+
+var randomUUID = typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID.bind(crypto);
+var _native = {
+  randomUUID: randomUUID
+};
+
+function v4(options, buf, offset) {
+  var _ref, _options$random, _options$rng, _options;
+  if (_native.randomUUID && !buf && !options) {
+    return _native.randomUUID();
+  }
+  options = options || {};
+  var rnds = (_ref = (_options$random = options.random) !== null && _options$random !== void 0 ? _options$random : (_options$rng = (_options = options).rng) === null || _options$rng === void 0 ? void 0 : _options$rng.call(_options)) !== null && _ref !== void 0 ? _ref : rng();
+  if (rnds.length < 16) {
+    throw new Error('Random bytes length must be >= 16');
+  }
+  rnds[6] = rnds[6] & 0x0f | 0x40;
+  rnds[8] = rnds[8] & 0x3f | 0x80;
+  if (buf) {
+    offset = offset || 0;
+    if (offset < 0 || offset + 16 > buf.length) {
+      throw new RangeError("UUID byte range ".concat(offset, ":").concat(offset + 15, " is out of buffer bounds"));
+    }
+    for (var i = 0; i < 16; ++i) {
+      buf[offset + i] = rnds[i];
+    }
+    return buf;
+  }
+  return unsafeStringify(rnds);
+}
+
+function f(s, x, y, z) {
+  switch (s) {
+    case 0:
+      return x & y ^ ~x & z;
+    case 1:
+      return x ^ y ^ z;
+    case 2:
+      return x & y ^ x & z ^ y & z;
+    case 3:
+      return x ^ y ^ z;
+  }
+}
+function ROTL(x, n) {
+  return x << n | x >>> 32 - n;
+}
+function sha1(bytes) {
+  var K = [0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6];
+  var H = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
+  var newBytes = new Uint8Array(bytes.length + 1);
+  newBytes.set(bytes);
+  newBytes[bytes.length] = 0x80;
+  bytes = newBytes;
+  var l = bytes.length / 4 + 2;
+  var N = Math.ceil(l / 16);
+  var M = new Array(N);
+  for (var i = 0; i < N; ++i) {
+    var arr = new Uint32Array(16);
+    for (var j = 0; j < 16; ++j) {
+      arr[j] = bytes[i * 64 + j * 4] << 24 | bytes[i * 64 + j * 4 + 1] << 16 | bytes[i * 64 + j * 4 + 2] << 8 | bytes[i * 64 + j * 4 + 3];
+    }
+    M[i] = arr;
+  }
+  M[N - 1][14] = (bytes.length - 1) * 8 / Math.pow(2, 32);
+  M[N - 1][14] = Math.floor(M[N - 1][14]);
+  M[N - 1][15] = (bytes.length - 1) * 8 & 0xffffffff;
+  for (var _i = 0; _i < N; ++_i) {
+    var W = new Uint32Array(80);
+    for (var t = 0; t < 16; ++t) {
+      W[t] = M[_i][t];
+    }
+    for (var _t = 16; _t < 80; ++_t) {
+      W[_t] = ROTL(W[_t - 3] ^ W[_t - 8] ^ W[_t - 14] ^ W[_t - 16], 1);
+    }
+    var a = H[0];
+    var b = H[1];
+    var c = H[2];
+    var d = H[3];
+    var e = H[4];
+    for (var _t2 = 0; _t2 < 80; ++_t2) {
+      var s = Math.floor(_t2 / 20);
+      var T = ROTL(a, 5) + f(s, b, c, d) + e + K[s] + W[_t2] >>> 0;
+      e = d;
+      d = c;
+      c = ROTL(b, 30) >>> 0;
+      b = a;
+      a = T;
+    }
+    H[0] = H[0] + a >>> 0;
+    H[1] = H[1] + b >>> 0;
+    H[2] = H[2] + c >>> 0;
+    H[3] = H[3] + d >>> 0;
+    H[4] = H[4] + e >>> 0;
+  }
+  return Uint8Array.of(H[0] >> 24, H[0] >> 16, H[0] >> 8, H[0], H[1] >> 24, H[1] >> 16, H[1] >> 8, H[1], H[2] >> 24, H[2] >> 16, H[2] >> 8, H[2], H[3] >> 24, H[3] >> 16, H[3] >> 8, H[3], H[4] >> 24, H[4] >> 16, H[4] >> 8, H[4]);
+}
+
+function v5(value, namespace, buf, offset) {
+  return v35(0x50, sha1, value, namespace, buf, offset);
+}
+v5.DNS = DNS;
+v5.URL = URL;
+
+function v6(options, buf, offset) {
+  var _options, _offset;
+  (_options = options) !== null && _options !== void 0 ? _options : options = {};
+  (_offset = offset) !== null && _offset !== void 0 ? _offset : offset = 0;
+  var bytes = v1(_objectSpread2(_objectSpread2({}, options), {}, {
+    _v6: true
+  }), new Uint8Array(16));
+  bytes = v1ToV6(bytes);
+  if (buf) {
+    if (offset < 0 || offset + 16 > buf.length) {
+      throw new RangeError("UUID byte range ".concat(offset, ":").concat(offset + 15, " is out of buffer bounds"));
+    }
+    for (var i = 0; i < 16; i++) {
+      buf[offset + i] = bytes[i];
+    }
+    return buf;
+  }
+  return unsafeStringify(bytes);
+}
+
+function v6ToV1(uuid) {
+  var v6Bytes = typeof uuid === 'string' ? parse(uuid) : uuid;
+  var v1Bytes = _v6ToV1(v6Bytes);
+  return typeof uuid === 'string' ? unsafeStringify(v1Bytes) : v1Bytes;
+}
+function _v6ToV1(v6Bytes) {
+  return Uint8Array.of((v6Bytes[3] & 0x0f) << 4 | v6Bytes[4] >> 4 & 0x0f, (v6Bytes[4] & 0x0f) << 4 | (v6Bytes[5] & 0xf0) >> 4, (v6Bytes[5] & 0x0f) << 4 | v6Bytes[6] & 0x0f, v6Bytes[7], (v6Bytes[1] & 0x0f) << 4 | (v6Bytes[2] & 0xf0) >> 4, (v6Bytes[2] & 0x0f) << 4 | (v6Bytes[3] & 0xf0) >> 4, 0x10 | (v6Bytes[0] & 0xf0) >> 4, (v6Bytes[0] & 0x0f) << 4 | (v6Bytes[1] & 0xf0) >> 4, v6Bytes[8], v6Bytes[9], v6Bytes[10], v6Bytes[11], v6Bytes[12], v6Bytes[13], v6Bytes[14], v6Bytes[15]);
+}
+
+var _state = {};
+function v7(options, buf, offset) {
+  var bytes;
+  if (options) {
+    var _ref, _options$random, _options$rng;
+    bytes = v7Bytes((_ref = (_options$random = options.random) !== null && _options$random !== void 0 ? _options$random : (_options$rng = options.rng) === null || _options$rng === void 0 ? void 0 : _options$rng.call(options)) !== null && _ref !== void 0 ? _ref : rng(), options.msecs, options.seq, buf, offset);
+  } else {
+    var now = Date.now();
+    var rnds = rng();
+    updateV7State(_state, now, rnds);
+    bytes = v7Bytes(rnds, _state.msecs, _state.seq, buf, offset);
+  }
+  return buf !== null && buf !== void 0 ? buf : unsafeStringify(bytes);
+}
+function updateV7State(state, now, rnds) {
+  var _state$msecs, _state$seq;
+  (_state$msecs = state.msecs) !== null && _state$msecs !== void 0 ? _state$msecs : state.msecs = -Infinity;
+  (_state$seq = state.seq) !== null && _state$seq !== void 0 ? _state$seq : state.seq = 0;
+  if (now > state.msecs) {
+    state.seq = rnds[6] << 23 | rnds[7] << 16 | rnds[8] << 8 | rnds[9];
+    state.msecs = now;
+  } else {
+    state.seq = state.seq + 1 | 0;
+    if (state.seq === 0) {
+      state.msecs++;
+    }
+  }
+  return state;
+}
+function v7Bytes(rnds, msecs, seq, buf) {
+  var _msecs, _seq;
+  var offset = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 0;
+  if (rnds.length < 16) {
+    throw new Error('Random bytes length must be >= 16');
+  }
+  if (!buf) {
+    buf = new Uint8Array(16);
+    offset = 0;
+  } else {
+    if (offset < 0 || offset + 16 > buf.length) {
+      throw new RangeError("UUID byte range ".concat(offset, ":").concat(offset + 15, " is out of buffer bounds"));
+    }
+  }
+  (_msecs = msecs) !== null && _msecs !== void 0 ? _msecs : msecs = Date.now();
+  (_seq = seq) !== null && _seq !== void 0 ? _seq : seq = rnds[6] * 0x7f << 24 | rnds[7] << 16 | rnds[8] << 8 | rnds[9];
+  buf[offset++] = msecs / 0x10000000000 & 0xff;
+  buf[offset++] = msecs / 0x100000000 & 0xff;
+  buf[offset++] = msecs / 0x1000000 & 0xff;
+  buf[offset++] = msecs / 0x10000 & 0xff;
+  buf[offset++] = msecs / 0x100 & 0xff;
+  buf[offset++] = msecs & 0xff;
+  buf[offset++] = 0x70 | seq >>> 28 & 0x0f;
+  buf[offset++] = seq >>> 20 & 0xff;
+  buf[offset++] = 0x80 | seq >>> 14 & 0x3f;
+  buf[offset++] = seq >>> 6 & 0xff;
+  buf[offset++] = seq << 2 & 0xff | rnds[10] & 0x03;
+  buf[offset++] = rnds[11];
+  buf[offset++] = rnds[12];
+  buf[offset++] = rnds[13];
+  buf[offset++] = rnds[14];
+  buf[offset++] = rnds[15];
+  return buf;
+}
+
+function version(uuid) {
+  if (!validate(uuid)) {
+    throw TypeError('Invalid UUID');
+  }
+  return parseInt(uuid.slice(14, 15), 16);
+}
+
+var esmBrowser = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	MAX: max,
+	NIL: nil,
+	parse: parse,
+	stringify: stringify,
+	v1: v1,
+	v1ToV6: v1ToV6,
+	v3: v3,
+	v4: v4,
+	v5: v5,
+	v6: v6,
+	v6ToV1: v6ToV1,
+	v7: v7,
+	validate: validate,
+	version: version
+});
+
+var require$$3 = /*@__PURE__*/getAugmentedNamespace(esmBrowser);
+
 var dial = peerDial;
 var express = express$1;
 var cors = libExports;
+var uuid = require$$3;
 var app = express();
 var corsOptions = {
   origin: '*',
@@ -49779,7 +50388,7 @@ var corsOptions = {
   optionsSuccessStatus: 204
 };
 app.use(cors(corsOptions));
-var PORT = 8085;
+var PORT = commonjsGlobal.isTizenTube ? 8095 : 8085;
 var apps = {
   "YouTube": {
     name: "YouTube",
@@ -49793,7 +50402,7 @@ var apps = {
         moduleName: '@foxreis/tizentube',
         moduleType: 'npm',
         args: launchData
-      })])]), "".concat(tbPackageId, ".TizenBrewStandalone"));
+      })])]), "".concat(tbPackageId, ".").concat(commonjsGlobal.isTizenTube ? 'TizenTubeStandalone' : 'TizenBrewStandalone'));
     }
   }
 };
@@ -49803,7 +50412,8 @@ var dialServer = new dial.Server({
   prefix: "/dial",
   manufacturer: 'Reis Can',
   modelName: 'TizenBrew',
-  friendlyName: 'TizenTube',
+  friendlyName: "TizenTube (".concat(tizen.systeminfo.getCapability('http://tizen.org/system/model_name'), ")"),
+  uuid: uuid.v5(tizen.systeminfo.getCapability('http://tizen.org/system/tizenid'), '4bcbc514-bdd6-4163-8215-316526fd1d9b'),
   delegate: {
     getApp: function getApp(appName) {
       return apps[appName];
@@ -49853,7 +50463,7 @@ setInterval(function () {
   tizen.application.getAppsContext(function (appsContext) {
     var tbPackageId = tizen.application.getAppInfo().packageId;
     var app = appsContext.find(function (app) {
-      return app.appId === "".concat(tbPackageId, ".TizenBrewStandalone");
+      return app.appId === "".concat(tbPackageId, ".").concat(commonjsGlobal.isTizenTube ? 'TizenTubeStandalone' : 'TizenBrewStandalone');
     });
     if (!app) {
       apps["YouTube"].state = "stopped";
