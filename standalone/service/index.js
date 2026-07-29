@@ -101,7 +101,7 @@ function isSessionCookieHost(targetUrl) {
     try {
         const hostname = URL.parse(targetUrl).hostname;
         return hostname === 'youtube.com' || hostname === 'www.youtube.com'
-            || hostname === 'accounts.google.com';
+            || hostname === 's.youtube.com' || hostname === 'accounts.google.com';
     } catch (e) {
         return false;
     }
@@ -110,11 +110,16 @@ function isSessionCookieHost(targetUrl) {
 function isYouTubeSessionApiRequest(targetUrl) {
     try {
         const parsed = URL.parse(targetUrl);
+        const pathname = parsed.pathname || '';
+        if (parsed.hostname === 's.youtube.com') {
+            return /^\/api\/stats\/watchtime(?:\/|$)/.test(pathname);
+        }
+
         if (parsed.hostname !== 'youtube.com' && parsed.hostname !== 'www.youtube.com') {
             return false;
         }
 
-        return /^\/(?:youtubei\/|api\/stats\/|log_event(?:\/|$))/.test(parsed.pathname || '');
+        return /^\/(?:youtubei\/|api\/stats\/|log_event(?:\/|$))/.test(pathname);
     } catch (e) {
         return false;
     }
@@ -368,6 +373,9 @@ app.all('*', (req, res) => {
             });
         })
         .then((response) => {
+            if (isMediaProxy && response.status >= 400) {
+                console.warn(`Media proxy returned ${response.status} for ${targetUrl}`);
+            }
             if (req.method === 'OPTIONS') {
                 res.status(200);
             } else {
@@ -453,7 +461,6 @@ app.all('*', (req, res) => {
                     text = text.replace('Set(["www.youtube.com","accounts.google.com"]);', 'Set(["www.youtube.com", "accounts.google.com", "localhost"]);');
                     text = rewriteLogicalLocation(text, isBotGuardResponse);
                     text = text.replace(/https:\/\/s\.youtube\.com/g, `${proxyPrefix}https://s.youtube.com`);
-                    text = text.replace(/redirector.googlevideo.com/g, `${mediaProxyPrefix}https://redirector.googlevideo.com`);
                     text = text.replace(/this.scheme="https"/, 'this.scheme="http"');
                     text = text.replace(/https\:\/\/jnn-pa.googleapis.com/g, `${proxyPrefix}https://jnn-pa.googleapis.com`);
                     text = text.replace(/https:\/\/yt3\.googleusercontent\.com/g, `${proxyPrefix}https://yt3.googleusercontent.com`);
@@ -463,6 +470,10 @@ app.all('*', (req, res) => {
                 });
             } else {
                 if (response.body) {
+                    response.body.on('error', (error) => {
+                        console.error(`Proxy stream error for [${targetUrl}]: ${error.message}`);
+                        if (!res.writableEnded) res.destroy(error);
+                    });
                     response.body.pipe(res);
                 } else {
                     res.end();

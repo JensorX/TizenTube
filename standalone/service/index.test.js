@@ -123,6 +123,7 @@ test('media requests use a separate route and never receive session cookies', ()
 
     assert.equal(isMediaUrl('https://r1---sn.example.googlevideo.com/videoplayback?id=1'), true);
     assert.equal(isSessionCookieHost('https://r1---sn.example.googlevideo.com/videoplayback?id=1'), false);
+    assert.equal(isSessionCookieHost('https://s.youtube.com/api/stats/watchtime'), true);
     assert.equal(headers.cookie, undefined);
     assert.equal(headers.authorization, undefined);
     assert.equal(headers.range, 'bytes=0-');
@@ -177,6 +178,8 @@ test('YouTube session APIs receive a logical authorization even when the browser
     applyLogicalAuthorization(headers, 1700000000, true);
 
     assert.equal(isYouTubeSessionApiRequest('https://www.youtube.com/youtubei/v1/log_event'), true);
+    assert.equal(isYouTubeSessionApiRequest('https://s.youtube.com/api/stats/watchtime'), true);
+    assert.equal(isYouTubeSessionApiRequest('https://s.youtube.com/api/stats/other'), false);
     assert.equal(isYouTubeSessionApiRequest('https://www.youtube.com/tv'), false);
     assert.equal(
         headers.authorization,
