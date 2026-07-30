@@ -95,7 +95,7 @@
 
 		let retryTimer = null;
 
-		function openAppWhenServiceReady() {
+		function startApp() {
 			let args;
 			try {
 				const data = tizen.application.getCurrentApplication().getRequestedAppControl().appControl.data;
@@ -109,15 +109,24 @@
 					if (!response.ok) throw new Error("Service not ready");
 					return response.json();
 				})
-				.then(() => {
-					const targetUrl = `http://localhost:8099/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8095%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ""}`;
-					window.location.replace(targetUrl);
+				.then(state => {
+					if (state.canConnectToDaemon && !state.isConnecting) {
+						// Dev mode available: relaunch via SDB debugger for native YouTube access.
+						// This is required because Tizen blocks localhost navigation without debug mode.
+						// CDP then loads https://youtube.com/tv directly (best path: native context, watch history works).
+						fetch(`http://localhost:8099/tizentube/debugger${args ? `?${args}` : ""}`);
+						tizen.application.getCurrentApplication().exit();
+					} else if (!state.canConnectToDaemon) {
+						// No dev mode: use local proxy fallback.
+						location.href = `http://localhost:8099/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8095%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ""}`;
+					}
+					// If isConnecting, do nothing – the debugger is already starting the app.
 				})
-				.catch(err => {
+				.catch(() => {
 					if (!retryTimer) {
 						retryTimer = setTimeout(() => {
 							retryTimer = null;
-							openAppWhenServiceReady();
+							startApp();
 						}, 200);
 					}
 				});
@@ -127,11 +136,11 @@
 			new tizen.ApplicationControl("http://tizen.org/appcontrol/operation/service"),
 			serviceId,
 			function () {
-				openAppWhenServiceReady();
+				startApp();
 			},
 			function (e) {
 				console.error("Launch Service failed: " + e.message);
-				openAppWhenServiceReady();
+				startApp();
 			}
 		);
 	</script>
