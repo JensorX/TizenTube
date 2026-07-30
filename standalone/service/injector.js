@@ -42,34 +42,78 @@ function connectToDebugger(host, port, args) {
 }
 
 function canConnectToDaemon() {
-	return fetch('http://127.0.0.1:8001/api/v2/').then((response) => response.json())
-		.then((json) => ({
-			canConnectToDaemon: (json.device.developerIP === '127.0.0.1' || json.device.developerIP === '1.0.0.127') &&
-				json.device.developerMode === '1',
-			ip: json.device.ip,
-			isConnecting
-		}))
-		.catch(() => canConnectToDaemon());
+	const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+	const timeoutId = controller ? setTimeout(() => controller.abort(), 2000) : null;
+
+	return fetch('http://127.0.0.1:8001/api/v2/', {
+		signal: controller ? controller.signal : undefined
+	})
+		.then((response) => response.json())
+		.then((json) => {
+			if (timeoutId) clearTimeout(timeoutId);
+			return {
+				canConnectToDaemon: (json.device.developerIP === '127.0.0.1' || json.device.developerIP === '1.0.0.127') &&
+					json.device.developerMode === '1',
+				ip: json.device.ip,
+				isConnecting
+			};
+		})
+		.catch(() => {
+			if (timeoutId) clearTimeout(timeoutId);
+			return {
+				canConnectToDaemon: false,
+				ip: null,
+				isConnecting: false
+			};
+		});
 }
 
 function startDebugger(args) {
 	return canConnectToDaemon().then((state) => {
-		if (!state.canConnectToDaemon) return false;
-		const client = adbhost.createConnection({ host: '127.0.0.1', port: 26101 });
-		client._stream.on('connect', () => {
-			const packageId = tizen.application.getAppInfo().packageId;
-			isConnecting = true;
-			const shell = client.createStream(`shell:0 debug ${packageId}.TizenTubeStandalone${isTizen3 ? ' 0' : ''}`);
-			shell.on('data', (data) => {
-				const output = data.toString();
-				if (output.includes('debug')) {
-					const port = Number(output.substr(output.indexOf(':') + 1, 6).replace(' ', ''));
-					connectToDebugger(state.ip, port, args);
-					setTimeout(() => client._stream.end(), 1000);
+		if (!state.canConnectToDaemon || isConnecting) return false;
+		return new Promise((resolve) => {
+			try {
+				const client = adbhost.createConnection({ host: '127.0.0.1', port: 26101 });
+				if (client && client._stream) {
+					client._stream.on('error', (err) => {
+						console.error('SDB daemon connection error:', err && err.message ? err.message : err);
+						isConnecting = false;
+						resolve(false);
+					});
+					client._stream.on('connect', () => {
+						const packageId = typeof tizen !== 'undefined' ? tizen.application.getAppInfo().packageId : 'xvvl3S1TT1';
+						isConnecting = true;
+						const shell = client.createStream(`shell:0 debug ${packageId}.TizenTubeStandalone${isTizen3 ? ' 0' : ''}`);
+						if (shell) {
+							shell.on('error', (err) => {
+								console.error('SDB shell error:', err && err.message ? err.message : err);
+								isConnecting = false;
+								resolve(false);
+							});
+							shell.on('data', (data) => {
+								const output = data.toString();
+								if (output.includes('debug')) {
+									const port = Number(output.substr(output.indexOf(':') + 1, 6).replace(' ', ''));
+									connectToDebugger(state.ip, port, args);
+									setTimeout(() => {
+										try { client._stream.end(); } catch (_) {}
+									}, 1000);
+									resolve(true);
+								}
+							});
+						} else {
+							resolve(false);
+						}
+					});
+				} else {
+					resolve(false);
 				}
-			});
+			} catch (err) {
+				console.error('Failed to start SDB debugger:', err);
+				isConnecting = false;
+				resolve(false);
+			}
 		});
-		return true;
 	});
 }
 

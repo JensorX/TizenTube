@@ -91,37 +91,47 @@
 		}
 
 		const pkgId = tizen.application.getCurrentApplication().appInfo.packageId;
-
 		const serviceId = pkgId + ".StandaloneService";
 
-		function useInjectorOrProxy() {
-			const data = tizen.application.getCurrentApplication().getRequestedAppControl().appControl.data;
+		let retryTimer = null;
+
+		function openAppWhenServiceReady() {
 			let args;
 			try {
+				const data = tizen.application.getCurrentApplication().getRequestedAppControl().appControl.data;
 				args = JSON.parse(data[0].value[0]).args;
 			} catch (e) {
 				// No launch arguments.
 			}
-			fetch("http://localhost:8099/tizentube/getState")
-				.then(response => response.json())
-				.then(state => {
-					if (state.canConnectToDaemon && !state.isConnecting) {
-						fetch(`http://localhost:8099/tizentube/debugger${args ? `?${args}` : ""}`);
-						tizen.application.getCurrentApplication().exit();
-					} else if (!state.canConnectToDaemon) {
-						location.href = `http://localhost:8099/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8095%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ""}`;
+
+			fetch("http://localhost:8099/tizentube/getState", { cache: "no-store" })
+				.then(response => {
+					if (!response.ok) throw new Error("Service not ready");
+					return response.json();
+				})
+				.then(() => {
+					const targetUrl = `http://localhost:8099/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8095%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ""}`;
+					window.location.replace(targetUrl);
+				})
+				.catch(err => {
+					if (!retryTimer) {
+						retryTimer = setTimeout(() => {
+							retryTimer = null;
+							openAppWhenServiceReady();
+						}, 200);
 					}
-				}).catch(() => window.location.reload());
+				});
 		}
 
 		tizen.application.launchAppControl(
 			new tizen.ApplicationControl("http://tizen.org/appcontrol/operation/service"),
 			serviceId,
 			function () {
-				useInjectorOrProxy();
+				openAppWhenServiceReady();
 			},
 			function (e) {
-				alert("Launch Service failed: " + e.message);
+				console.error("Launch Service failed: " + e.message);
+				openAppWhenServiceReady();
 			}
 		);
 	</script>

@@ -50,20 +50,60 @@ app.use((req, res, next) => {
 	next();
 });
 
-app.get('/tizentube/userScript.js', (req, res) => {
-	fetch(USERSCRIPT_URL)
+let cachedUserScript = null;
+let cachedETag = null;
+
+function fetchAndUpdateUserScriptInBackground() {
+	const headers = {};
+	if (cachedETag) {
+		headers['If-None-Match'] = cachedETag;
+	}
+	const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+	const timeoutId = controller ? setTimeout(() => controller.abort(), 3000) : null;
+
+	return fetch(USERSCRIPT_URL, {
+		headers,
+		signal: controller ? controller.signal : undefined
+	})
 		.then((response) => {
+			if (timeoutId) clearTimeout(timeoutId);
+			if (response.status === 304) {
+				return cachedUserScript;
+			}
 			if (!response.ok) throw new Error(`Userscript download failed with status ${response.status}`);
-			return response.text();
-		})
-		.then((script) => {
-			res.setHeader('Cache-Control', 'no-store');
-			res.type('application/javascript').send(script);
+			const etag = response.headers.get('etag');
+			if (etag) cachedETag = etag;
+
+			return response.text().then((script) => {
+				if (script && script.trim().length > 0) {
+					cachedUserScript = script;
+				}
+				return cachedUserScript;
+			});
 		})
 		.catch((error) => {
-			console.error(`Userscript download failed: ${error.message}`);
-			res.status(502).type('text/plain').send('TizenTube userscript unavailable');
+			if (timeoutId) clearTimeout(timeoutId);
+			console.warn(`Background userscript update check skipped: ${error.message}`);
+			return cachedUserScript;
 		});
+}
+
+app.get('/tizentube/userScript.js', (req, res) => {
+	res.setHeader('Cache-Control', 'no-cache');
+	res.type('application/javascript');
+
+	if (cachedUserScript) {
+		res.send(cachedUserScript);
+		fetchAndUpdateUserScriptInBackground();
+	} else {
+		fetchAndUpdateUserScriptInBackground().then((script) => {
+			if (script) {
+				res.send(script);
+			} else {
+				res.status(502).type('text/plain').send('TizenTube userscript unavailable');
+			}
+		});
+	}
 });
 
 app.get('/tizentube/getState', (req, res) => {
