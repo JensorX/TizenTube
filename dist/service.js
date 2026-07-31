@@ -1,23 +1,23 @@
 'use strict';
 
-var require$$0$3 = require('crypto');
-var require$$0$5 = require('dgram');
-var require$$1$1 = require('events');
+var require$$0$4 = require('dgram');
+var require$$1$2 = require('events');
 var require$$2$2 = require('os');
-var require$$0$4 = require('util');
-var require$$1$2 = require('fs');
+var require$$1$1 = require('util');
+var require$$3$3 = require('fs');
 var require$$1$3 = require('path');
 var require$$7$1 = require('http');
 var require$$8 = require('url');
-var require$$1$4 = require('string_decoder');
 var require$$4$1 = require('timers');
-var require$$1$5 = require('assert');
-var require$$0$6 = require('tty');
+var require$$1$4 = require('assert');
+var require$$0$5 = require('tty');
 var require$$4$2 = require('net');
-var require$$1$6 = require('stream');
-var require$$3$3 = require('zlib');
-var require$$0$7 = require('buffer');
+var require$$1$5 = require('stream');
+var require$$3$4 = require('zlib');
+var require$$0$6 = require('buffer');
+var require$$1$6 = require('string_decoder');
 var require$$8$1 = require('querystring');
+var require$$0$7 = require('crypto');
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -51,9 +51,9 @@ var service = {};
 function _defineProperty(e, r, t) {
   return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
     value: t,
-    enumerable: !0,
-    configurable: !0,
-    writable: !0
+    enumerable: true,
+    configurable: true,
+    writable: true
   }) : e[r] = t, e;
 }
 function ownKeys(e, r) {
@@ -69,7 +69,7 @@ function ownKeys(e, r) {
 function _objectSpread2(e) {
   for (var r = 1; r < arguments.length; r++) {
     var t = null != arguments[r] ? arguments[r] : {};
-    r % 2 ? ownKeys(Object(t), !0).forEach(function (r) {
+    r % 2 ? ownKeys(Object(t), true).forEach(function (r) {
       _defineProperty(e, r, t[r]);
     }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) {
       Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r));
@@ -81,7 +81,7 @@ function _toPrimitive(t, r) {
   if ("object" != typeof t || !t) return t;
   var e = t[Symbol.toPrimitive];
   if (void 0 !== e) {
-    var i = e.call(t, r || "default");
+    var i = e.call(t, r);
     if ("object" != typeof i) return i;
     throw new TypeError("@@toPrimitive must return a primitive value.");
   }
@@ -103,58 +103,79 @@ function _typeof(o) {
 
 var peerDial$1 = {};
 
-// Unique ID creation requires a high quality random # generator.  In node.js
-// this is pretty straight-forward - we use the crypto API.
+// Unique ID creation requires a high quality random # generator. In the browser we therefore
+// require the crypto API and do not support built-in fallback to lower quality random number
+// generators (like Math.random()).
+var getRandomValues$1;
+var rnds8$1 = new Uint8Array(16);
+function rng$1() {
+  // lazy load so that environments that need to polyfill have a chance to do so
+  if (!getRandomValues$1) {
+    // getRandomValues needs to be invoked in a context where "this" is a Crypto implementation.
+    getRandomValues$1 = typeof crypto !== 'undefined' && crypto.getRandomValues && crypto.getRandomValues.bind(crypto);
+    if (!getRandomValues$1) {
+      throw new Error('crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported');
+    }
+  }
+  return getRandomValues$1(rnds8$1);
+}
 
-var crypto$2 = require$$0$3;
-var rng$3 = function nodeRNG() {
-  return crypto$2.randomBytes(16);
-};
+var REGEX$1 = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|00000000-0000-0000-0000-000000000000)$/i;
+
+function validate$1(uuid) {
+  return typeof uuid === 'string' && REGEX$1.test(uuid);
+}
 
 /**
  * Convert array of 16 byte values to UUID string format of the form:
  * XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
  */
+
 var byteToHex$1 = [];
 for (var i$1 = 0; i$1 < 256; ++i$1) {
-  byteToHex$1[i$1] = (i$1 + 0x100).toString(16).substr(1);
+  byteToHex$1.push((i$1 + 0x100).toString(16).slice(1));
 }
-function bytesToUuid$2(buf, offset) {
-  var i = offset || 0;
-  var bth = byteToHex$1;
-  // join used to fix memory issue caused by concatenation: https://bugs.chromium.org/p/v8/issues/detail?id=3175#c4
-  return [bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], '-', bth[buf[i++]], bth[buf[i++]], '-', bth[buf[i++]], bth[buf[i++]], '-', bth[buf[i++]], bth[buf[i++]], '-', bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], bth[buf[i++]], bth[buf[i++]]].join('');
+function unsafeStringify$1(arr) {
+  var offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  // Note: Be careful editing this code!  It's been tuned for performance
+  // and works in ways you may not expect. See https://github.com/uuidjs/uuid/pull/434
+  return byteToHex$1[arr[offset + 0]] + byteToHex$1[arr[offset + 1]] + byteToHex$1[arr[offset + 2]] + byteToHex$1[arr[offset + 3]] + '-' + byteToHex$1[arr[offset + 4]] + byteToHex$1[arr[offset + 5]] + '-' + byteToHex$1[arr[offset + 6]] + byteToHex$1[arr[offset + 7]] + '-' + byteToHex$1[arr[offset + 8]] + byteToHex$1[arr[offset + 9]] + '-' + byteToHex$1[arr[offset + 10]] + byteToHex$1[arr[offset + 11]] + byteToHex$1[arr[offset + 12]] + byteToHex$1[arr[offset + 13]] + byteToHex$1[arr[offset + 14]] + byteToHex$1[arr[offset + 15]];
 }
-var bytesToUuid_1 = bytesToUuid$2;
+function stringify$4(arr) {
+  var offset = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var uuid = unsafeStringify$1(arr, offset); // Consistency check for valid UUID.  If this throws, it's likely due to one
+  // of the following:
+  // - One or more input array values don't map to a hex octet (leading to
+  // "undefined" in the uuid)
+  // - Invalid input values for the RFC `version` or `variant` fields
 
-var rng$2 = rng$3;
-var bytesToUuid$1 = bytesToUuid_1;
+  if (!validate$1(uuid)) {
+    throw TypeError('Stringified UUID is invalid');
+  }
+  return uuid;
+}
 
-// **`v1()` - Generate time-based UUID**
 //
 // Inspired by https://github.com/LiosK/UUID.js
 // and http://docs.python.org/library/uuid.html
 
 var _nodeId;
-var _clockseq;
+var _clockseq; // Previous uuid creation time
 
-// Previous uuid creation time
 var _lastMSecs = 0;
-var _lastNSecs = 0;
+var _lastNSecs = 0; // See https://github.com/uuidjs/uuid for API details
 
-// See https://github.com/uuidjs/uuid for API details
-function v1$2(options, buf, offset) {
+function v1$1(options, buf, offset) {
   var i = buf && offset || 0;
-  var b = buf || [];
+  var b = buf || new Array(16);
   options = options || {};
   var node = options.node || _nodeId;
-  var clockseq = options.clockseq !== undefined ? options.clockseq : _clockseq;
-
-  // node and clockseq need to be initialized to random values if they're not
+  var clockseq = options.clockseq !== undefined ? options.clockseq : _clockseq; // node and clockseq need to be initialized to random values if they're not
   // specified.  We do this lazily to minimize issues related to insufficient
   // system entropy.  See #189
+
   if (node == null || clockseq == null) {
-    var seedBytes = rng$2();
+    var seedBytes = options.random || (options.rng || rng$1)();
     if (node == null) {
       // Per 4.5, create and 48-bit node id, (47 random bits + multicast bit = 1)
       node = _nodeId = [seedBytes[0] | 0x01, seedBytes[1], seedBytes[2], seedBytes[3], seedBytes[4], seedBytes[5]];
@@ -163,104 +184,464 @@ function v1$2(options, buf, offset) {
       // Per 4.2.2, randomize (14 bit) clockseq
       clockseq = _clockseq = (seedBytes[6] << 8 | seedBytes[7]) & 0x3fff;
     }
-  }
-
-  // UUID timestamps are 100 nano-second units since the Gregorian epoch,
+  } // UUID timestamps are 100 nano-second units since the Gregorian epoch,
   // (1582-10-15 00:00).  JSNumbers aren't precise enough for this, so
   // time is handled internally as 'msecs' (integer milliseconds) and 'nsecs'
   // (100-nanoseconds offset from msecs) since unix epoch, 1970-01-01 00:00.
-  var msecs = options.msecs !== undefined ? options.msecs : new Date().getTime();
 
-  // Per 4.2.1.2, use count of uuid's generated during the current clock
+  var msecs = options.msecs !== undefined ? options.msecs : Date.now(); // Per 4.2.1.2, use count of uuid's generated during the current clock
   // cycle to simulate higher resolution clock
-  var nsecs = options.nsecs !== undefined ? options.nsecs : _lastNSecs + 1;
 
-  // Time since last uuid creation (in msecs)
-  var dt = msecs - _lastMSecs + (nsecs - _lastNSecs) / 10000;
+  var nsecs = options.nsecs !== undefined ? options.nsecs : _lastNSecs + 1; // Time since last uuid creation (in msecs)
 
-  // Per 4.2.1.2, Bump clockseq on clock regression
+  var dt = msecs - _lastMSecs + (nsecs - _lastNSecs) / 10000; // Per 4.2.1.2, Bump clockseq on clock regression
+
   if (dt < 0 && options.clockseq === undefined) {
     clockseq = clockseq + 1 & 0x3fff;
-  }
-
-  // Reset nsecs if clock regresses (new clockseq) or we've moved onto a new
+  } // Reset nsecs if clock regresses (new clockseq) or we've moved onto a new
   // time interval
+
   if ((dt < 0 || msecs > _lastMSecs) && options.nsecs === undefined) {
     nsecs = 0;
-  }
+  } // Per 4.2.1.2 Throw error if too many uuids are requested
 
-  // Per 4.2.1.2 Throw error if too many uuids are requested
   if (nsecs >= 10000) {
-    throw new Error('uuid.v1(): Can\'t create more than 10M uuids/sec');
+    throw new Error("uuid.v1(): Can't create more than 10M uuids/sec");
   }
   _lastMSecs = msecs;
   _lastNSecs = nsecs;
-  _clockseq = clockseq;
+  _clockseq = clockseq; // Per 4.1.4 - Convert from unix epoch to Gregorian epoch
 
-  // Per 4.1.4 - Convert from unix epoch to Gregorian epoch
-  msecs += 12219292800000;
+  msecs += 12219292800000; // `time_low`
 
-  // `time_low`
   var tl = ((msecs & 0xfffffff) * 10000 + nsecs) % 0x100000000;
   b[i++] = tl >>> 24 & 0xff;
   b[i++] = tl >>> 16 & 0xff;
   b[i++] = tl >>> 8 & 0xff;
-  b[i++] = tl & 0xff;
+  b[i++] = tl & 0xff; // `time_mid`
 
-  // `time_mid`
   var tmh = msecs / 0x100000000 * 10000 & 0xfffffff;
   b[i++] = tmh >>> 8 & 0xff;
-  b[i++] = tmh & 0xff;
+  b[i++] = tmh & 0xff; // `time_high_and_version`
 
-  // `time_high_and_version`
   b[i++] = tmh >>> 24 & 0xf | 0x10; // include version
-  b[i++] = tmh >>> 16 & 0xff;
 
-  // `clock_seq_hi_and_reserved` (Per 4.2.2 - include variant)
-  b[i++] = clockseq >>> 8 | 0x80;
+  b[i++] = tmh >>> 16 & 0xff; // `clock_seq_hi_and_reserved` (Per 4.2.2 - include variant)
 
-  // `clock_seq_low`
-  b[i++] = clockseq & 0xff;
+  b[i++] = clockseq >>> 8 | 0x80; // `clock_seq_low`
 
-  // `node`
+  b[i++] = clockseq & 0xff; // `node`
+
   for (var n = 0; n < 6; ++n) {
     b[i + n] = node[n];
   }
-  return buf ? buf : bytesToUuid$1(b);
+  return buf || unsafeStringify$1(b);
 }
-var v1_1 = v1$2;
 
-var rng$1 = rng$3;
-var bytesToUuid = bytesToUuid_1;
-function v4$2(options, buf, offset) {
-  var i = buf && offset || 0;
-  if (typeof options == 'string') {
-    buf = options === 'binary' ? new Array(16) : null;
-    options = null;
+function parse$c(uuid) {
+  if (!validate$1(uuid)) {
+    throw TypeError('Invalid UUID');
   }
-  options = options || {};
-  var rnds = options.random || (options.rng || rng$1)();
+  var v;
+  var arr = new Uint8Array(16); // Parse ########-....-....-....-............
 
-  // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
-  rnds[6] = rnds[6] & 0x0f | 0x40;
-  rnds[8] = rnds[8] & 0x3f | 0x80;
+  arr[0] = (v = parseInt(uuid.slice(0, 8), 16)) >>> 24;
+  arr[1] = v >>> 16 & 0xff;
+  arr[2] = v >>> 8 & 0xff;
+  arr[3] = v & 0xff; // Parse ........-####-....-....-............
 
-  // Copy bytes to buffer, if provided
-  if (buf) {
-    for (var ii = 0; ii < 16; ++ii) {
-      buf[i + ii] = rnds[ii];
+  arr[4] = (v = parseInt(uuid.slice(9, 13), 16)) >>> 8;
+  arr[5] = v & 0xff; // Parse ........-....-####-....-............
+
+  arr[6] = (v = parseInt(uuid.slice(14, 18), 16)) >>> 8;
+  arr[7] = v & 0xff; // Parse ........-....-....-####-............
+
+  arr[8] = (v = parseInt(uuid.slice(19, 23), 16)) >>> 8;
+  arr[9] = v & 0xff; // Parse ........-....-....-....-############
+  // (Use "/" to avoid 32-bit truncation when bit-shifting high-order bytes)
+
+  arr[10] = (v = parseInt(uuid.slice(24, 36), 16)) / 0x10000000000 & 0xff;
+  arr[11] = v / 0x100000000 & 0xff;
+  arr[12] = v >>> 24 & 0xff;
+  arr[13] = v >>> 16 & 0xff;
+  arr[14] = v >>> 8 & 0xff;
+  arr[15] = v & 0xff;
+  return arr;
+}
+
+function stringToBytes$1(str) {
+  str = unescape(encodeURIComponent(str)); // UTF8 escape
+
+  var bytes = [];
+  for (var i = 0; i < str.length; ++i) {
+    bytes.push(str.charCodeAt(i));
+  }
+  return bytes;
+}
+var DNS$1 = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+var URL$2 = '6ba7b811-9dad-11d1-80b4-00c04fd430c8';
+function v35$1(name, version, hashfunc) {
+  function generateUUID(value, namespace, buf, offset) {
+    var _namespace;
+    if (typeof value === 'string') {
+      value = stringToBytes$1(value);
+    }
+    if (typeof namespace === 'string') {
+      namespace = parse$c(namespace);
+    }
+    if (((_namespace = namespace) === null || _namespace === void 0 ? void 0 : _namespace.length) !== 16) {
+      throw TypeError('Namespace must be array-like (16 iterable integer values, 0-255)');
+    } // Compute hash of namespace and value, Per 4.3
+    // Future: Use spread syntax when supported on all platforms, e.g. `bytes =
+    // hashfunc([...namespace, ... value])`
+
+    var bytes = new Uint8Array(16 + value.length);
+    bytes.set(namespace);
+    bytes.set(value, namespace.length);
+    bytes = hashfunc(bytes);
+    bytes[6] = bytes[6] & 0x0f | version;
+    bytes[8] = bytes[8] & 0x3f | 0x80;
+    if (buf) {
+      offset = offset || 0;
+      for (var i = 0; i < 16; ++i) {
+        buf[offset + i] = bytes[i];
+      }
+      return buf;
+    }
+    return unsafeStringify$1(bytes);
+  } // Function#name is not settable on some platforms (#270)
+
+  try {
+    generateUUID.name = name; // eslint-disable-next-line no-empty
+  } catch (err) {} // For CommonJS default export support
+
+  generateUUID.DNS = DNS$1;
+  generateUUID.URL = URL$2;
+  return generateUUID;
+}
+
+/*
+ * Browser-compatible JavaScript MD5
+ *
+ * Modification of JavaScript MD5
+ * https://github.com/blueimp/JavaScript-MD5
+ *
+ * Copyright 2011, Sebastian Tschan
+ * https://blueimp.net
+ *
+ * Licensed under the MIT license:
+ * https://opensource.org/licenses/MIT
+ *
+ * Based on
+ * A JavaScript implementation of the RSA Data Security, Inc. MD5 Message
+ * Digest Algorithm, as defined in RFC 1321.
+ * Version 2.2 Copyright (C) Paul Johnston 1999 - 2009
+ * Other contributors: Greg Holt, Andrew Kepert, Ydnar, Lostinet
+ * Distributed under the BSD License
+ * See http://pajhome.org.uk/crypt/md5 for more info.
+ */
+function md5$1(bytes) {
+  if (typeof bytes === 'string') {
+    var msg = unescape(encodeURIComponent(bytes)); // UTF8 escape
+
+    bytes = new Uint8Array(msg.length);
+    for (var i = 0; i < msg.length; ++i) {
+      bytes[i] = msg.charCodeAt(i);
     }
   }
-  return buf || bytesToUuid(rnds);
+  return md5ToHexEncodedArray(wordsToMd5$1(bytesToWords(bytes), bytes.length * 8));
 }
-var v4_1 = v4$2;
+/*
+ * Convert an array of little-endian words to an array of bytes
+ */
 
-var v1$1 = v1_1;
-var v4$1 = v4_1;
-var uuid$2 = v4$1;
-uuid$2.v1 = v1$1;
-uuid$2.v4 = v4$1;
-var uuid_1 = uuid$2;
+function md5ToHexEncodedArray(input) {
+  var output = [];
+  var length32 = input.length * 32;
+  var hexTab = '0123456789abcdef';
+  for (var i = 0; i < length32; i += 8) {
+    var x = input[i >> 5] >>> i % 32 & 0xff;
+    var hex = parseInt(hexTab.charAt(x >>> 4 & 0x0f) + hexTab.charAt(x & 0x0f), 16);
+    output.push(hex);
+  }
+  return output;
+}
+/**
+ * Calculate output length with padding and bit length
+ */
+
+function getOutputLength$1(inputLength8) {
+  return (inputLength8 + 64 >>> 9 << 4) + 14 + 1;
+}
+/*
+ * Calculate the MD5 of an array of little-endian words, and a bit length.
+ */
+
+function wordsToMd5$1(x, len) {
+  /* append padding */
+  x[len >> 5] |= 0x80 << len % 32;
+  x[getOutputLength$1(len) - 1] = len;
+  var a = 1732584193;
+  var b = -271733879;
+  var c = -1732584194;
+  var d = 271733878;
+  for (var i = 0; i < x.length; i += 16) {
+    var olda = a;
+    var oldb = b;
+    var oldc = c;
+    var oldd = d;
+    a = md5ff$1(a, b, c, d, x[i], 7, -680876936);
+    d = md5ff$1(d, a, b, c, x[i + 1], 12, -389564586);
+    c = md5ff$1(c, d, a, b, x[i + 2], 17, 606105819);
+    b = md5ff$1(b, c, d, a, x[i + 3], 22, -1044525330);
+    a = md5ff$1(a, b, c, d, x[i + 4], 7, -176418897);
+    d = md5ff$1(d, a, b, c, x[i + 5], 12, 1200080426);
+    c = md5ff$1(c, d, a, b, x[i + 6], 17, -1473231341);
+    b = md5ff$1(b, c, d, a, x[i + 7], 22, -45705983);
+    a = md5ff$1(a, b, c, d, x[i + 8], 7, 1770035416);
+    d = md5ff$1(d, a, b, c, x[i + 9], 12, -1958414417);
+    c = md5ff$1(c, d, a, b, x[i + 10], 17, -42063);
+    b = md5ff$1(b, c, d, a, x[i + 11], 22, -1990404162);
+    a = md5ff$1(a, b, c, d, x[i + 12], 7, 1804603682);
+    d = md5ff$1(d, a, b, c, x[i + 13], 12, -40341101);
+    c = md5ff$1(c, d, a, b, x[i + 14], 17, -1502002290);
+    b = md5ff$1(b, c, d, a, x[i + 15], 22, 1236535329);
+    a = md5gg$1(a, b, c, d, x[i + 1], 5, -165796510);
+    d = md5gg$1(d, a, b, c, x[i + 6], 9, -1069501632);
+    c = md5gg$1(c, d, a, b, x[i + 11], 14, 643717713);
+    b = md5gg$1(b, c, d, a, x[i], 20, -373897302);
+    a = md5gg$1(a, b, c, d, x[i + 5], 5, -701558691);
+    d = md5gg$1(d, a, b, c, x[i + 10], 9, 38016083);
+    c = md5gg$1(c, d, a, b, x[i + 15], 14, -660478335);
+    b = md5gg$1(b, c, d, a, x[i + 4], 20, -405537848);
+    a = md5gg$1(a, b, c, d, x[i + 9], 5, 568446438);
+    d = md5gg$1(d, a, b, c, x[i + 14], 9, -1019803690);
+    c = md5gg$1(c, d, a, b, x[i + 3], 14, -187363961);
+    b = md5gg$1(b, c, d, a, x[i + 8], 20, 1163531501);
+    a = md5gg$1(a, b, c, d, x[i + 13], 5, -1444681467);
+    d = md5gg$1(d, a, b, c, x[i + 2], 9, -51403784);
+    c = md5gg$1(c, d, a, b, x[i + 7], 14, 1735328473);
+    b = md5gg$1(b, c, d, a, x[i + 12], 20, -1926607734);
+    a = md5hh$1(a, b, c, d, x[i + 5], 4, -378558);
+    d = md5hh$1(d, a, b, c, x[i + 8], 11, -2022574463);
+    c = md5hh$1(c, d, a, b, x[i + 11], 16, 1839030562);
+    b = md5hh$1(b, c, d, a, x[i + 14], 23, -35309556);
+    a = md5hh$1(a, b, c, d, x[i + 1], 4, -1530992060);
+    d = md5hh$1(d, a, b, c, x[i + 4], 11, 1272893353);
+    c = md5hh$1(c, d, a, b, x[i + 7], 16, -155497632);
+    b = md5hh$1(b, c, d, a, x[i + 10], 23, -1094730640);
+    a = md5hh$1(a, b, c, d, x[i + 13], 4, 681279174);
+    d = md5hh$1(d, a, b, c, x[i], 11, -358537222);
+    c = md5hh$1(c, d, a, b, x[i + 3], 16, -722521979);
+    b = md5hh$1(b, c, d, a, x[i + 6], 23, 76029189);
+    a = md5hh$1(a, b, c, d, x[i + 9], 4, -640364487);
+    d = md5hh$1(d, a, b, c, x[i + 12], 11, -421815835);
+    c = md5hh$1(c, d, a, b, x[i + 15], 16, 530742520);
+    b = md5hh$1(b, c, d, a, x[i + 2], 23, -995338651);
+    a = md5ii$1(a, b, c, d, x[i], 6, -198630844);
+    d = md5ii$1(d, a, b, c, x[i + 7], 10, 1126891415);
+    c = md5ii$1(c, d, a, b, x[i + 14], 15, -1416354905);
+    b = md5ii$1(b, c, d, a, x[i + 5], 21, -57434055);
+    a = md5ii$1(a, b, c, d, x[i + 12], 6, 1700485571);
+    d = md5ii$1(d, a, b, c, x[i + 3], 10, -1894986606);
+    c = md5ii$1(c, d, a, b, x[i + 10], 15, -1051523);
+    b = md5ii$1(b, c, d, a, x[i + 1], 21, -2054922799);
+    a = md5ii$1(a, b, c, d, x[i + 8], 6, 1873313359);
+    d = md5ii$1(d, a, b, c, x[i + 15], 10, -30611744);
+    c = md5ii$1(c, d, a, b, x[i + 6], 15, -1560198380);
+    b = md5ii$1(b, c, d, a, x[i + 13], 21, 1309151649);
+    a = md5ii$1(a, b, c, d, x[i + 4], 6, -145523070);
+    d = md5ii$1(d, a, b, c, x[i + 11], 10, -1120210379);
+    c = md5ii$1(c, d, a, b, x[i + 2], 15, 718787259);
+    b = md5ii$1(b, c, d, a, x[i + 9], 21, -343485551);
+    a = safeAdd$1(a, olda);
+    b = safeAdd$1(b, oldb);
+    c = safeAdd$1(c, oldc);
+    d = safeAdd$1(d, oldd);
+  }
+  return [a, b, c, d];
+}
+/*
+ * Convert an array bytes to an array of little-endian words
+ * Characters >255 have their high-byte silently ignored.
+ */
+
+function bytesToWords(input) {
+  if (input.length === 0) {
+    return [];
+  }
+  var length8 = input.length * 8;
+  var output = new Uint32Array(getOutputLength$1(length8));
+  for (var i = 0; i < length8; i += 8) {
+    output[i >> 5] |= (input[i / 8] & 0xff) << i % 32;
+  }
+  return output;
+}
+/*
+ * Add integers, wrapping at 2^32. This uses 16-bit operations internally
+ * to work around bugs in some JS interpreters.
+ */
+
+function safeAdd$1(x, y) {
+  var lsw = (x & 0xffff) + (y & 0xffff);
+  var msw = (x >> 16) + (y >> 16) + (lsw >> 16);
+  return msw << 16 | lsw & 0xffff;
+}
+/*
+ * Bitwise rotate a 32-bit number to the left.
+ */
+
+function bitRotateLeft$1(num, cnt) {
+  return num << cnt | num >>> 32 - cnt;
+}
+/*
+ * These functions implement the four basic operations the algorithm uses.
+ */
+
+function md5cmn$1(q, a, b, x, s, t) {
+  return safeAdd$1(bitRotateLeft$1(safeAdd$1(safeAdd$1(a, q), safeAdd$1(x, t)), s), b);
+}
+function md5ff$1(a, b, c, d, x, s, t) {
+  return md5cmn$1(b & c | ~b & d, a, b, x, s, t);
+}
+function md5gg$1(a, b, c, d, x, s, t) {
+  return md5cmn$1(b & d | c & ~d, a, b, x, s, t);
+}
+function md5hh$1(a, b, c, d, x, s, t) {
+  return md5cmn$1(b ^ c ^ d, a, b, x, s, t);
+}
+function md5ii$1(a, b, c, d, x, s, t) {
+  return md5cmn$1(c ^ (b | ~d), a, b, x, s, t);
+}
+
+var v3$1 = v35$1('v3', 0x30, md5$1);
+
+var randomUUID$1 = typeof crypto !== 'undefined' && crypto.randomUUID && crypto.randomUUID.bind(crypto);
+var _native$1 = {
+  randomUUID: randomUUID$1
+};
+
+function v4$1(options, buf, offset) {
+  if (_native$1.randomUUID && !buf && !options) {
+    return _native$1.randomUUID();
+  }
+  options = options || {};
+  var rnds = options.random || (options.rng || rng$1)(); // Per 4.4, set bits for version and `clock_seq_hi_and_reserved`
+
+  rnds[6] = rnds[6] & 0x0f | 0x40;
+  rnds[8] = rnds[8] & 0x3f | 0x80; // Copy bytes to buffer, if provided
+
+  if (buf) {
+    offset = offset || 0;
+    for (var i = 0; i < 16; ++i) {
+      buf[offset + i] = rnds[i];
+    }
+    return buf;
+  }
+  return unsafeStringify$1(rnds);
+}
+
+// Adapted from Chris Veness' SHA1 code at
+// http://www.movable-type.co.uk/scripts/sha1.html
+function f$1(s, x, y, z) {
+  switch (s) {
+    case 0:
+      return x & y ^ ~x & z;
+    case 1:
+      return x ^ y ^ z;
+    case 2:
+      return x & y ^ x & z ^ y & z;
+    case 3:
+      return x ^ y ^ z;
+  }
+}
+function ROTL$1(x, n) {
+  return x << n | x >>> 32 - n;
+}
+function sha1$1(bytes) {
+  var K = [0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6];
+  var H = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
+  if (typeof bytes === 'string') {
+    var msg = unescape(encodeURIComponent(bytes)); // UTF8 escape
+
+    bytes = [];
+    for (var i = 0; i < msg.length; ++i) {
+      bytes.push(msg.charCodeAt(i));
+    }
+  } else if (!Array.isArray(bytes)) {
+    // Convert Array-like to Array
+    bytes = Array.prototype.slice.call(bytes);
+  }
+  bytes.push(0x80);
+  var l = bytes.length / 4 + 2;
+  var N = Math.ceil(l / 16);
+  var M = new Array(N);
+  for (var _i = 0; _i < N; ++_i) {
+    var arr = new Uint32Array(16);
+    for (var j = 0; j < 16; ++j) {
+      arr[j] = bytes[_i * 64 + j * 4] << 24 | bytes[_i * 64 + j * 4 + 1] << 16 | bytes[_i * 64 + j * 4 + 2] << 8 | bytes[_i * 64 + j * 4 + 3];
+    }
+    M[_i] = arr;
+  }
+  M[N - 1][14] = (bytes.length - 1) * 8 / Math.pow(2, 32);
+  M[N - 1][14] = Math.floor(M[N - 1][14]);
+  M[N - 1][15] = (bytes.length - 1) * 8 & 0xffffffff;
+  for (var _i2 = 0; _i2 < N; ++_i2) {
+    var W = new Uint32Array(80);
+    for (var t = 0; t < 16; ++t) {
+      W[t] = M[_i2][t];
+    }
+    for (var _t = 16; _t < 80; ++_t) {
+      W[_t] = ROTL$1(W[_t - 3] ^ W[_t - 8] ^ W[_t - 14] ^ W[_t - 16], 1);
+    }
+    var a = H[0];
+    var b = H[1];
+    var c = H[2];
+    var d = H[3];
+    var e = H[4];
+    for (var _t2 = 0; _t2 < 80; ++_t2) {
+      var s = Math.floor(_t2 / 20);
+      var T = ROTL$1(a, 5) + f$1(s, b, c, d) + e + K[s] + W[_t2] >>> 0;
+      e = d;
+      d = c;
+      c = ROTL$1(b, 30) >>> 0;
+      b = a;
+      a = T;
+    }
+    H[0] = H[0] + a >>> 0;
+    H[1] = H[1] + b >>> 0;
+    H[2] = H[2] + c >>> 0;
+    H[3] = H[3] + d >>> 0;
+    H[4] = H[4] + e >>> 0;
+  }
+  return [H[0] >> 24 & 0xff, H[0] >> 16 & 0xff, H[0] >> 8 & 0xff, H[0] & 0xff, H[1] >> 24 & 0xff, H[1] >> 16 & 0xff, H[1] >> 8 & 0xff, H[1] & 0xff, H[2] >> 24 & 0xff, H[2] >> 16 & 0xff, H[2] >> 8 & 0xff, H[2] & 0xff, H[3] >> 24 & 0xff, H[3] >> 16 & 0xff, H[3] >> 8 & 0xff, H[3] & 0xff, H[4] >> 24 & 0xff, H[4] >> 16 & 0xff, H[4] >> 8 & 0xff, H[4] & 0xff];
+}
+
+var v5$1 = v35$1('v5', 0x50, sha1$1);
+
+var nil$1 = '00000000-0000-0000-0000-000000000000';
+
+function version$2(uuid) {
+  if (!validate$1(uuid)) {
+    throw TypeError('Invalid UUID');
+  }
+  return parseInt(uuid.slice(14, 15), 16);
+}
+
+var esmBrowser$1 = /*#__PURE__*/Object.freeze({
+	__proto__: null,
+	NIL: nil$1,
+	parse: parse$c,
+	stringify: stringify$4,
+	v1: v1$1,
+	v3: v3$1,
+	v4: v4$1,
+	v5: v5$1,
+	validate: validate$1,
+	version: version$2
+});
+
+var require$$0$3 = /*@__PURE__*/getAugmentedNamespace(esmBrowser$1);
 
 var peerSsdp$1 = {};
 
@@ -286,10 +667,10 @@ var peerSsdp$1 = {};
  *     Alexander Futasz (alexander.futasz@fokus.fraunhofer.de)
  *
  ******************************************************************************/
-var dgram = require$$0$5;
-var events$1 = require$$1$1;
+var dgram = require$$0$4;
+var events$1 = require$$1$2;
 var os$1 = require$$2$2;
-var util$4 = require$$0$4;
+var util$4 = require$$1$1;
 var SSDP_ADDRESS = "239.255.255.250";
 var SSDP_PORT = 1900;
 var SSDP_HOST = SSDP_ADDRESS + ":" + SSDP_PORT;
@@ -653,7 +1034,7 @@ var peerSsdp = peerSsdp$1;
 
 var ejs$1 = {};
 
-var utils$2 = {};
+var utils$4 = {};
 
 /*
  * EJS Embedded JavaScript templates
@@ -888,67 +1269,11 @@ var utils$2 = {};
     }
     return o;
   };
-})(utils$2);
+})(utils$4);
 
-var name = "ejs";
-var description = "Embedded JavaScript templates";
-var keywords = [
-	"template",
-	"engine",
-	"ejs"
-];
 var version$1 = "3.1.10";
-var author = "Matthew Eernisse <mde@fleegix.org> (http://fleegix.org)";
-var license = "Apache-2.0";
-var bin = {
-	ejs: "./bin/cli.js"
-};
-var main = "./lib/ejs.js";
-var jsdelivr = "ejs.min.js";
-var unpkg = "ejs.min.js";
-var repository = {
-	type: "git",
-	url: "git://github.com/mde/ejs.git"
-};
-var bugs = "https://github.com/mde/ejs/issues";
-var homepage = "https://github.com/mde/ejs";
-var dependencies = {
-	jake: "^10.8.5"
-};
-var devDependencies = {
-	browserify: "^16.5.1",
-	eslint: "^6.8.0",
-	"git-directory-deploy": "^1.5.1",
-	jsdoc: "^4.0.2",
-	"lru-cache": "^4.0.1",
-	mocha: "^10.2.0",
-	"uglify-js": "^3.3.16"
-};
-var engines = {
-	node: ">=0.10.0"
-};
-var scripts = {
-	test: "npx jake test"
-};
 var require$$3$2 = {
-	name: name,
-	description: description,
-	keywords: keywords,
-	version: version$1,
-	author: author,
-	license: license,
-	bin: bin,
-	main: main,
-	jsdelivr: jsdelivr,
-	unpkg: unpkg,
-	repository: repository,
-	bugs: bugs,
-	homepage: homepage,
-	dependencies: dependencies,
-	devDependencies: devDependencies,
-	engines: engines,
-	scripts: scripts
-};
+	version: version$1};
 
 /*
  * EJS Embedded JavaScript templates
@@ -994,9 +1319,9 @@ var require$$3$2 = {
    * @module ejs
    * @public
    */
-  var fs = require$$1$2;
+  var fs = require$$3$3;
   var path = require$$1$3;
-  var utils = utils$2;
+  var utils = utils$4;
   var scopeOptionWarned = false;
   /** @type {string} */
   var _VERSION_STRING = require$$3$2.version;
@@ -1832,15 +2157,15 @@ var require$$3$2 = {
 
 var xml2js$1 = {};
 
-var defaults = {};
+var defaults$2 = {};
 
 var hasRequiredDefaults;
 function requireDefaults() {
-  if (hasRequiredDefaults) return defaults;
+  if (hasRequiredDefaults) return defaults$2;
   hasRequiredDefaults = 1;
   // Generated by CoffeeScript 1.12.7
   (function () {
-    defaults.defaults = {
+    defaults$2.defaults = {
       "0.1": {
         explicitCharkey: false,
         trim: true,
@@ -1909,7 +2234,7 @@ function requireDefaults() {
       }
     };
   }).call(commonjsGlobal);
-  return defaults;
+  return defaults$2;
 }
 
 var builder = {};
@@ -5863,10 +6188,10 @@ function requireXMLStreamWriter() {
   return XMLStreamWriter.exports;
 }
 
-var hasRequiredLib$2;
-function requireLib$2() {
-  if (hasRequiredLib$2) return lib$3;
-  hasRequiredLib$2 = 1;
+var hasRequiredLib$1;
+function requireLib$1() {
+  if (hasRequiredLib$1) return lib$3;
+  hasRequiredLib$1 = 1;
   // Generated by CoffeeScript 1.12.7
   (function () {
     var NodeType, WriterState, XMLDOMImplementation, XMLDocument, XMLDocumentCB, XMLStreamWriter, XMLStringWriter, assign, isFunction, ref;
@@ -5932,7 +6257,7 @@ function requireBuilder() {
       requiresCDATA,
       wrapCDATA,
       hasProp = {}.hasOwnProperty;
-    builder$1 = requireLib$2();
+    builder$1 = requireLib$1();
     defaults = requireDefaults().defaults;
     requiresCDATA = function requiresCDATA(entry) {
       return typeof entry === "string" && (entry.indexOf('&') >= 0 || entry.indexOf('>') >= 0 || entry.indexOf('<') >= 0);
@@ -6085,9 +6410,13 @@ function requireSax() {
         clearBuffers(parser);
         parser.q = parser.c = '';
         parser.bufferCheckPosition = sax.MAX_BUFFER_LENGTH;
+        parser.encoding = null;
         parser.opt = opt || {};
         parser.opt.lowercase = parser.opt.lowercase || parser.opt.lowercasetags;
         parser.looseCase = parser.opt.lowercase ? 'toLowerCase' : 'toUpperCase';
+        parser.opt.maxEntityCount = parser.opt.maxEntityCount || 512;
+        parser.opt.maxEntityDepth = parser.opt.maxEntityDepth || 4;
+        parser.entityCount = parser.entityDepth = 0;
         parser.tags = [];
         parser.closed = parser.closedRoot = parser.sawRoot = false;
         parser.tag = parser.error = null;
@@ -6210,6 +6539,32 @@ function requireSax() {
       function createStream(strict, opt) {
         return new SAXStream(strict, opt);
       }
+      function determineBufferEncoding(data, isEnd) {
+        // BOM-based detection is the most reliable signal when present.
+        if (data.length >= 2) {
+          if (data[0] === 0xff && data[1] === 0xfe) {
+            return 'utf-16le';
+          }
+          if (data[0] === 0xfe && data[1] === 0xff) {
+            return 'utf-16be';
+          }
+        }
+        if (data.length >= 3 && data[0] === 0xef && data[1] === 0xbb && data[2] === 0xbf) {
+          return 'utf8';
+        }
+        if (data.length >= 4) {
+          // XML documents without a BOM still start with "<?xml", which is enough
+          // to distinguish UTF-16LE/BE from UTF-8 by looking at the zero bytes.
+          if (data[0] === 0x3c && data[1] === 0x00 && data[2] === 0x3f && data[3] === 0x00) {
+            return 'utf-16le';
+          }
+          if (data[0] === 0x00 && data[1] === 0x3c && data[2] === 0x00 && data[3] === 0x3f) {
+            return 'utf-16be';
+          }
+          return 'utf8';
+        }
+        return isEnd ? 'utf8' : null;
+      }
       function SAXStream(strict, opt) {
         if (!(this instanceof SAXStream)) {
           return new SAXStream(strict, opt);
@@ -6230,6 +6585,7 @@ function requireSax() {
           me._parser.error = null;
         };
         this._decoder = null;
+        this._decoderBuffer = null;
         streamWraps.forEach(function (ev) {
           Object.defineProperty(me, 'on' + ev, {
             get: function get() {
@@ -6253,13 +6609,42 @@ function requireSax() {
           value: SAXStream
         }
       });
+      SAXStream.prototype._decodeBuffer = function (data, isEnd) {
+        if (this._decoderBuffer) {
+          // Keep incomplete leading bytes until we have enough data to infer the
+          // stream encoding, then decode the buffered prefix together with the next chunk.
+          data = Buffer.concat([this._decoderBuffer, data]);
+          this._decoderBuffer = null;
+        }
+        if (!this._decoder) {
+          var encoding = determineBufferEncoding(data, isEnd);
+          if (!encoding) {
+            // A very short first chunk may not contain enough bytes to detect the
+            // encoding yet, so defer decoding until the next write/end call.
+            this._decoderBuffer = data;
+            return '';
+          }
+
+          // Store the detected transport encoding so strict mode can compare it
+          // with the optional encoding declared in the XML prolog later on.
+          this._parser.encoding = encoding;
+          this._decoder = new TextDecoder(encoding);
+        }
+        return this._decoder.decode(data, {
+          stream: !isEnd
+        });
+      };
       SAXStream.prototype.write = function (data) {
         if (typeof Buffer === 'function' && typeof Buffer.isBuffer === 'function' && Buffer.isBuffer(data)) {
-          if (!this._decoder) {
-            var SD = require$$1$4.StringDecoder;
-            this._decoder = new SD('utf8');
+          data = this._decodeBuffer(data, false);
+        } else if (this._decoderBuffer) {
+          // Flush any buffered binary prefix before handling a string chunk.
+          // This only matters if the caller mixes Buffer and string writes (used in test).
+          var remaining = this._decodeBuffer(Buffer.alloc(0), true);
+          if (remaining) {
+            this._parser.write(remaining);
+            this.emit('data', remaining);
           }
-          data = this._decoder.write(data);
         }
         this._parser.write(data.toString());
         this.emit('data', data);
@@ -6268,6 +6653,20 @@ function requireSax() {
       SAXStream.prototype.end = function (chunk) {
         if (chunk && chunk.length) {
           this.write(chunk);
+        }
+        // Flush any remaining decoded data from the TextDecoder
+        if (this._decoderBuffer) {
+          var finalChunk = this._decodeBuffer(Buffer.alloc(0), true);
+          if (finalChunk) {
+            this._parser.write(finalChunk);
+            this.emit('data', finalChunk);
+          }
+        } else if (this._decoder) {
+          var remaining = this._decoder.decode();
+          if (remaining) {
+            this._parser.write(remaining);
+            this.emit('data', remaining);
+          }
         }
         this._parser.end();
         return true;
@@ -6286,8 +6685,8 @@ function requireSax() {
 
       // this really needs to be replaced with character classes.
       // XML allows all manner of ridiculous numbers and digits.
-      var CDATA = '[CDATA[';
-      var DOCTYPE = 'DOCTYPE';
+      var CDATAre = /^\[CDATA\[$/i;
+      var DOCTYPEre = /^DOCTYPE$/i;
       var XML_NAMESPACE = 'http://www.w3.org/XML/1998/namespace';
       var XMLNS_NAMESPACE = 'http://www.w3.org/2000/xmlns/';
       var rootNS = {
@@ -6309,7 +6708,7 @@ function requireSax() {
         return c === ' ' || c === '\n' || c === '\r' || c === '\t';
       }
       function isQuote(c) {
-        return c === '"' || c === '\'';
+        return c === '"' || c === "'";
       }
       function isAttribEnd(c) {
         return c === '>' || isWhitespace(c);
@@ -6394,268 +6793,268 @@ function requireSax() {
         // <script> ...
         SCRIPT_ENDING: S++ // <script> ... <
       };
-      sax.XML_ENTITIES = {
-        'amp': '&',
-        'gt': '>',
-        'lt': '<',
-        'quot': '"',
-        'apos': "'"
-      };
-      sax.ENTITIES = {
-        'amp': '&',
-        'gt': '>',
-        'lt': '<',
-        'quot': '"',
-        'apos': "'",
-        'AElig': 198,
-        'Aacute': 193,
-        'Acirc': 194,
-        'Agrave': 192,
-        'Aring': 197,
-        'Atilde': 195,
-        'Auml': 196,
-        'Ccedil': 199,
-        'ETH': 208,
-        'Eacute': 201,
-        'Ecirc': 202,
-        'Egrave': 200,
-        'Euml': 203,
-        'Iacute': 205,
-        'Icirc': 206,
-        'Igrave': 204,
-        'Iuml': 207,
-        'Ntilde': 209,
-        'Oacute': 211,
-        'Ocirc': 212,
-        'Ograve': 210,
-        'Oslash': 216,
-        'Otilde': 213,
-        'Ouml': 214,
-        'THORN': 222,
-        'Uacute': 218,
-        'Ucirc': 219,
-        'Ugrave': 217,
-        'Uuml': 220,
-        'Yacute': 221,
-        'aacute': 225,
-        'acirc': 226,
-        'aelig': 230,
-        'agrave': 224,
-        'aring': 229,
-        'atilde': 227,
-        'auml': 228,
-        'ccedil': 231,
-        'eacute': 233,
-        'ecirc': 234,
-        'egrave': 232,
-        'eth': 240,
-        'euml': 235,
-        'iacute': 237,
-        'icirc': 238,
-        'igrave': 236,
-        'iuml': 239,
-        'ntilde': 241,
-        'oacute': 243,
-        'ocirc': 244,
-        'ograve': 242,
-        'oslash': 248,
-        'otilde': 245,
-        'ouml': 246,
-        'szlig': 223,
-        'thorn': 254,
-        'uacute': 250,
-        'ucirc': 251,
-        'ugrave': 249,
-        'uuml': 252,
-        'yacute': 253,
-        'yuml': 255,
-        'copy': 169,
-        'reg': 174,
-        'nbsp': 160,
-        'iexcl': 161,
-        'cent': 162,
-        'pound': 163,
-        'curren': 164,
-        'yen': 165,
-        'brvbar': 166,
-        'sect': 167,
-        'uml': 168,
-        'ordf': 170,
-        'laquo': 171,
-        'not': 172,
-        'shy': 173,
-        'macr': 175,
-        'deg': 176,
-        'plusmn': 177,
-        'sup1': 185,
-        'sup2': 178,
-        'sup3': 179,
-        'acute': 180,
-        'micro': 181,
-        'para': 182,
-        'middot': 183,
-        'cedil': 184,
-        'ordm': 186,
-        'raquo': 187,
-        'frac14': 188,
-        'frac12': 189,
-        'frac34': 190,
-        'iquest': 191,
-        'times': 215,
-        'divide': 247,
-        'OElig': 338,
-        'oelig': 339,
-        'Scaron': 352,
-        'scaron': 353,
-        'Yuml': 376,
-        'fnof': 402,
-        'circ': 710,
-        'tilde': 732,
-        'Alpha': 913,
-        'Beta': 914,
-        'Gamma': 915,
-        'Delta': 916,
-        'Epsilon': 917,
-        'Zeta': 918,
-        'Eta': 919,
-        'Theta': 920,
-        'Iota': 921,
-        'Kappa': 922,
-        'Lambda': 923,
-        'Mu': 924,
-        'Nu': 925,
-        'Xi': 926,
-        'Omicron': 927,
-        'Pi': 928,
-        'Rho': 929,
-        'Sigma': 931,
-        'Tau': 932,
-        'Upsilon': 933,
-        'Phi': 934,
-        'Chi': 935,
-        'Psi': 936,
-        'Omega': 937,
-        'alpha': 945,
-        'beta': 946,
-        'gamma': 947,
-        'delta': 948,
-        'epsilon': 949,
-        'zeta': 950,
-        'eta': 951,
-        'theta': 952,
-        'iota': 953,
-        'kappa': 954,
-        'lambda': 955,
-        'mu': 956,
-        'nu': 957,
-        'xi': 958,
-        'omicron': 959,
-        'pi': 960,
-        'rho': 961,
-        'sigmaf': 962,
-        'sigma': 963,
-        'tau': 964,
-        'upsilon': 965,
-        'phi': 966,
-        'chi': 967,
-        'psi': 968,
-        'omega': 969,
-        'thetasym': 977,
-        'upsih': 978,
-        'piv': 982,
-        'ensp': 8194,
-        'emsp': 8195,
-        'thinsp': 8201,
-        'zwnj': 8204,
-        'zwj': 8205,
-        'lrm': 8206,
-        'rlm': 8207,
-        'ndash': 8211,
-        'mdash': 8212,
-        'lsquo': 8216,
-        'rsquo': 8217,
-        'sbquo': 8218,
-        'ldquo': 8220,
-        'rdquo': 8221,
-        'bdquo': 8222,
-        'dagger': 8224,
-        'Dagger': 8225,
-        'bull': 8226,
-        'hellip': 8230,
-        'permil': 8240,
-        'prime': 8242,
-        'Prime': 8243,
-        'lsaquo': 8249,
-        'rsaquo': 8250,
-        'oline': 8254,
-        'frasl': 8260,
-        'euro': 8364,
-        'image': 8465,
-        'weierp': 8472,
-        'real': 8476,
-        'trade': 8482,
-        'alefsym': 8501,
-        'larr': 8592,
-        'uarr': 8593,
-        'rarr': 8594,
-        'darr': 8595,
-        'harr': 8596,
-        'crarr': 8629,
-        'lArr': 8656,
-        'uArr': 8657,
-        'rArr': 8658,
-        'dArr': 8659,
-        'hArr': 8660,
-        'forall': 8704,
-        'part': 8706,
-        'exist': 8707,
-        'empty': 8709,
-        'nabla': 8711,
-        'isin': 8712,
-        'notin': 8713,
-        'ni': 8715,
-        'prod': 8719,
-        'sum': 8721,
-        'minus': 8722,
-        'lowast': 8727,
-        'radic': 8730,
-        'prop': 8733,
-        'infin': 8734,
-        'ang': 8736,
-        'and': 8743,
-        'or': 8744,
-        'cap': 8745,
-        'cup': 8746,
-        'int': 8747,
-        'there4': 8756,
-        'sim': 8764,
-        'cong': 8773,
-        'asymp': 8776,
-        'ne': 8800,
-        'equiv': 8801,
-        'le': 8804,
-        'ge': 8805,
-        'sub': 8834,
-        'sup': 8835,
-        'nsub': 8836,
-        'sube': 8838,
-        'supe': 8839,
-        'oplus': 8853,
-        'otimes': 8855,
-        'perp': 8869,
-        'sdot': 8901,
-        'lceil': 8968,
-        'rceil': 8969,
-        'lfloor': 8970,
-        'rfloor': 8971,
-        'lang': 9001,
-        'rang': 9002,
-        'loz': 9674,
-        'spades': 9824,
-        'clubs': 9827,
-        'hearts': 9829,
-        'diams': 9830
-      };
+      sax.XML_ENTITIES = Object.assign(Object.create(null), {
+        amp: '&',
+        gt: '>',
+        lt: '<',
+        quot: '"',
+        apos: "'"
+      });
+      sax.ENTITIES = Object.assign(Object.create(null), {
+        amp: '&',
+        gt: '>',
+        lt: '<',
+        quot: '"',
+        apos: "'",
+        AElig: 198,
+        Aacute: 193,
+        Acirc: 194,
+        Agrave: 192,
+        Aring: 197,
+        Atilde: 195,
+        Auml: 196,
+        Ccedil: 199,
+        ETH: 208,
+        Eacute: 201,
+        Ecirc: 202,
+        Egrave: 200,
+        Euml: 203,
+        Iacute: 205,
+        Icirc: 206,
+        Igrave: 204,
+        Iuml: 207,
+        Ntilde: 209,
+        Oacute: 211,
+        Ocirc: 212,
+        Ograve: 210,
+        Oslash: 216,
+        Otilde: 213,
+        Ouml: 214,
+        THORN: 222,
+        Uacute: 218,
+        Ucirc: 219,
+        Ugrave: 217,
+        Uuml: 220,
+        Yacute: 221,
+        aacute: 225,
+        acirc: 226,
+        aelig: 230,
+        agrave: 224,
+        aring: 229,
+        atilde: 227,
+        auml: 228,
+        ccedil: 231,
+        eacute: 233,
+        ecirc: 234,
+        egrave: 232,
+        eth: 240,
+        euml: 235,
+        iacute: 237,
+        icirc: 238,
+        igrave: 236,
+        iuml: 239,
+        ntilde: 241,
+        oacute: 243,
+        ocirc: 244,
+        ograve: 242,
+        oslash: 248,
+        otilde: 245,
+        ouml: 246,
+        szlig: 223,
+        thorn: 254,
+        uacute: 250,
+        ucirc: 251,
+        ugrave: 249,
+        uuml: 252,
+        yacute: 253,
+        yuml: 255,
+        copy: 169,
+        reg: 174,
+        nbsp: 160,
+        iexcl: 161,
+        cent: 162,
+        pound: 163,
+        curren: 164,
+        yen: 165,
+        brvbar: 166,
+        sect: 167,
+        uml: 168,
+        ordf: 170,
+        laquo: 171,
+        not: 172,
+        shy: 173,
+        macr: 175,
+        deg: 176,
+        plusmn: 177,
+        sup1: 185,
+        sup2: 178,
+        sup3: 179,
+        acute: 180,
+        micro: 181,
+        para: 182,
+        middot: 183,
+        cedil: 184,
+        ordm: 186,
+        raquo: 187,
+        frac14: 188,
+        frac12: 189,
+        frac34: 190,
+        iquest: 191,
+        times: 215,
+        divide: 247,
+        OElig: 338,
+        oelig: 339,
+        Scaron: 352,
+        scaron: 353,
+        Yuml: 376,
+        fnof: 402,
+        circ: 710,
+        tilde: 732,
+        Alpha: 913,
+        Beta: 914,
+        Gamma: 915,
+        Delta: 916,
+        Epsilon: 917,
+        Zeta: 918,
+        Eta: 919,
+        Theta: 920,
+        Iota: 921,
+        Kappa: 922,
+        Lambda: 923,
+        Mu: 924,
+        Nu: 925,
+        Xi: 926,
+        Omicron: 927,
+        Pi: 928,
+        Rho: 929,
+        Sigma: 931,
+        Tau: 932,
+        Upsilon: 933,
+        Phi: 934,
+        Chi: 935,
+        Psi: 936,
+        Omega: 937,
+        alpha: 945,
+        beta: 946,
+        gamma: 947,
+        delta: 948,
+        epsilon: 949,
+        zeta: 950,
+        eta: 951,
+        theta: 952,
+        iota: 953,
+        kappa: 954,
+        lambda: 955,
+        mu: 956,
+        nu: 957,
+        xi: 958,
+        omicron: 959,
+        pi: 960,
+        rho: 961,
+        sigmaf: 962,
+        sigma: 963,
+        tau: 964,
+        upsilon: 965,
+        phi: 966,
+        chi: 967,
+        psi: 968,
+        omega: 969,
+        thetasym: 977,
+        upsih: 978,
+        piv: 982,
+        ensp: 8194,
+        emsp: 8195,
+        thinsp: 8201,
+        zwnj: 8204,
+        zwj: 8205,
+        lrm: 8206,
+        rlm: 8207,
+        ndash: 8211,
+        mdash: 8212,
+        lsquo: 8216,
+        rsquo: 8217,
+        sbquo: 8218,
+        ldquo: 8220,
+        rdquo: 8221,
+        bdquo: 8222,
+        dagger: 8224,
+        Dagger: 8225,
+        bull: 8226,
+        hellip: 8230,
+        permil: 8240,
+        prime: 8242,
+        Prime: 8243,
+        lsaquo: 8249,
+        rsaquo: 8250,
+        oline: 8254,
+        frasl: 8260,
+        euro: 8364,
+        image: 8465,
+        weierp: 8472,
+        real: 8476,
+        trade: 8482,
+        alefsym: 8501,
+        larr: 8592,
+        uarr: 8593,
+        rarr: 8594,
+        darr: 8595,
+        harr: 8596,
+        crarr: 8629,
+        lArr: 8656,
+        uArr: 8657,
+        rArr: 8658,
+        dArr: 8659,
+        hArr: 8660,
+        forall: 8704,
+        part: 8706,
+        exist: 8707,
+        empty: 8709,
+        nabla: 8711,
+        isin: 8712,
+        notin: 8713,
+        ni: 8715,
+        prod: 8719,
+        sum: 8721,
+        minus: 8722,
+        lowast: 8727,
+        radic: 8730,
+        prop: 8733,
+        infin: 8734,
+        ang: 8736,
+        and: 8743,
+        or: 8744,
+        cap: 8745,
+        cup: 8746,
+        "int": 8747,
+        there4: 8756,
+        sim: 8764,
+        cong: 8773,
+        asymp: 8776,
+        ne: 8800,
+        equiv: 8801,
+        le: 8804,
+        ge: 8805,
+        sub: 8834,
+        sup: 8835,
+        nsub: 8836,
+        sube: 8838,
+        supe: 8839,
+        oplus: 8853,
+        otimes: 8855,
+        perp: 8869,
+        sdot: 8901,
+        lceil: 8968,
+        rceil: 8969,
+        lfloor: 8970,
+        rfloor: 8971,
+        lang: 9001,
+        rang: 9002,
+        loz: 9674,
+        spades: 9824,
+        clubs: 9827,
+        hearts: 9829,
+        diams: 9830
+      });
       Object.keys(sax.ENTITIES).forEach(function (key) {
         var e = sax.ENTITIES[key];
         var s = typeof e === 'number' ? String.fromCharCode(e) : e;
@@ -6669,6 +7068,36 @@ function requireSax() {
       S = sax.STATE;
       function emit(parser, event, data) {
         parser[event] && parser[event](data);
+      }
+      function getDeclaredEncoding(body) {
+        var match = body && body.match(/(?:^|\s)encoding\s*=\s*(['"])([^'"]+)\1/i);
+        return match ? match[2] : null;
+      }
+      function normalizeEncodingName(encoding) {
+        if (!encoding) {
+          return null;
+        }
+        return encoding.toLowerCase().replace(/[^a-z0-9]/g, '');
+      }
+      function encodingsMatch(detectedEncoding, declaredEncoding) {
+        var detected = normalizeEncodingName(detectedEncoding);
+        var declared = normalizeEncodingName(declaredEncoding);
+        if (!detected || !declared) {
+          return true;
+        }
+        if (declared === 'utf16') {
+          return detected === 'utf16le' || detected === 'utf16be';
+        }
+        return detected === declared;
+      }
+      function validateXmlDeclarationEncoding(parser, data) {
+        if (!parser.strict || !parser.encoding || !data || data.name !== 'xml') {
+          return;
+        }
+        var declaredEncoding = getDeclaredEncoding(data.body);
+        if (declaredEncoding && !encodingsMatch(parser.encoding, declaredEncoding)) {
+          strictFail(parser, 'XML declaration encoding ' + declaredEncoding + ' does not match detected stream encoding ' + parser.encoding.toUpperCase());
+        }
       }
       function emitNode(parser, nodeType, data) {
         if (parser.textNode) closeText(parser);
@@ -6954,11 +7383,21 @@ function requireSax() {
           }
         }
         entity = entity.replace(/^0+/, '');
-        if (isNaN(num) || numStr.toLowerCase() !== entity) {
+        if (isNaN(num) || numStr.toLowerCase() !== entity || num < 0 || num > 0x10ffff || !isXmlChar(num)) {
           strictFail(parser, 'Invalid character entity');
           return '&' + parser.entity + ';';
         }
         return String.fromCodePoint(num);
+      }
+
+      // Returns true if `num` is a code point that matches the XML `Char`
+      // production, false otherwise. Character references that resolve to a
+      // character outside this range (e.g. surrogates or restricted control
+      // characters) are not well-formed.
+      // https://www.w3.org/TR/REC-xml/#NT-Char
+      // https://www.w3.org/TR/REC-xml/#wf-Legalchar
+      function isXmlChar(num) {
+        return num === 0x9 || num === 0xa || num === 0xd || num >= 0x20 && num <= 0xd7ff || num >= 0xe000 && num <= 0xfffd || num >= 0x10000 && num <= 0x10ffff;
       }
       function beginWhiteSpace(parser, c) {
         if (c === '<') {
@@ -7104,12 +7543,12 @@ function requireSax() {
                 parser.state = S.DOCTYPE_DTD;
                 parser.doctype += '<!' + parser.sgmlDecl + c;
                 parser.sgmlDecl = '';
-              } else if ((parser.sgmlDecl + c).toUpperCase() === CDATA) {
+              } else if (CDATAre.test(parser.sgmlDecl + c)) {
                 emitNode(parser, 'onopencdata');
                 parser.state = S.CDATA;
                 parser.sgmlDecl = '';
                 parser.cdata = '';
-              } else if ((parser.sgmlDecl + c).toUpperCase() === DOCTYPE) {
+              } else if (DOCTYPEre.test(parser.sgmlDecl + c)) {
                 parser.state = S.DOCTYPE;
                 if (parser.doctype || parser.sawRoot) {
                   strictFail(parser, 'Inappropriately located doctype declaration');
@@ -7212,10 +7651,22 @@ function requireSax() {
               }
               continue;
             case S.CDATA:
+              var starti = i - 1;
+              while (c && c !== ']') {
+                c = charAt(chunk, i++);
+                if (c && parser.trackPosition) {
+                  parser.position++;
+                  if (c === '\n') {
+                    parser.line++;
+                    parser.column = 0;
+                  } else {
+                    parser.column++;
+                  }
+                }
+              }
+              parser.cdata += chunk.substring(starti, i - 1);
               if (c === ']') {
                 parser.state = S.CDATA_ENDING;
-              } else {
-                parser.cdata += c;
               }
               continue;
             case S.CDATA_ENDING:
@@ -7261,10 +7712,12 @@ function requireSax() {
               continue;
             case S.PROC_INST_ENDING:
               if (c === '>') {
-                emitNode(parser, 'onprocessinginstruction', {
+                var procInstEndData = {
                   name: parser.procInstName,
                   body: parser.procInstBody
-                });
+                };
+                validateXmlDeclarationEncoding(parser, procInstEndData);
+                emitNode(parser, 'onprocessinginstruction', procInstEndData);
                 parser.procInstName = parser.procInstBody = '';
                 parser.state = S.TEXT;
               } else {
@@ -7433,7 +7886,7 @@ function requireSax() {
               } else if (isMatch(nameBody, c)) {
                 parser.tagName += c;
               } else if (parser.script) {
-                parser.script += '</' + parser.tagName;
+                parser.script += '</' + parser.tagName + c;
                 parser.tagName = '';
                 parser.state = S.SCRIPT;
               } else {
@@ -7475,9 +7928,16 @@ function requireSax() {
               if (c === ';') {
                 var parsedEntity = parseEntity(parser);
                 if (parser.opt.unparsedEntities && !Object.values(sax.XML_ENTITIES).includes(parsedEntity)) {
+                  if ((parser.entityCount += 1) > parser.opt.maxEntityCount) {
+                    error(parser, 'Parsed entity count exceeds max entity count');
+                  }
+                  if ((parser.entityDepth += 1) > parser.opt.maxEntityDepth) {
+                    error(parser, 'Parsed entity depth exceeds max entity depth');
+                  }
                   parser.entity = '';
                   parser.state = returnState;
                   parser.write(parsedEntity);
+                  parser.entityDepth -= 1;
                 } else {
                   parser[buffer] += parsedEntity;
                   parser.entity = '';
@@ -7528,21 +7988,21 @@ function requireSax() {
               // `NaN`, `+Infinity`, or `-Infinity`
               codePoint < 0 ||
               // not a valid Unicode code point
-              codePoint > 0x10FFFF ||
+              codePoint > 0x10ffff ||
               // not a valid Unicode code point
               floor(codePoint) !== codePoint // not an integer
               ) {
                 throw RangeError('Invalid code point: ' + codePoint);
               }
-              if (codePoint <= 0xFFFF) {
+              if (codePoint <= 0xffff) {
                 // BMP code point
                 codeUnits.push(codePoint);
               } else {
                 // Astral code point; split in surrogate halves
                 // http://mathiasbynens.be/notes/javascript-encoding#surrogate-formulae
                 codePoint -= 0x10000;
-                highSurrogate = (codePoint >> 10) + 0xD800;
-                lowSurrogate = codePoint % 0x400 + 0xDC00;
+                highSurrogate = (codePoint >> 10) + 0xd800;
+                lowSurrogate = codePoint % 0x400 + 0xdc00;
                 codeUnits.push(highSurrogate, lowSurrogate);
               }
               if (index + 1 === length || codeUnits.length > MAX_SIZE) {
@@ -7661,7 +8121,7 @@ function requireParser() {
         },
         hasProp = {}.hasOwnProperty;
       sax = requireSax();
-      events = require$$1$1;
+      events = require$$1$2;
       bom = requireBom();
       processors = requireProcessors();
       setImmediate = require$$4$1.setImmediate;
@@ -8197,7 +8657,7 @@ function append(header, field) {
   }
 
   // get fields array
-  var fields = !Array.isArray(field) ? parse$a(String(field)) : field;
+  var fields = !Array.isArray(field) ? parse$b(String(field)) : field;
 
   // assert on invalid field names
   for (var j = 0; j < fields.length; j++) {
@@ -8213,7 +8673,7 @@ function append(header, field) {
 
   // enumerate current values
   var val = header;
-  var vals = parse$a(header.toLowerCase());
+  var vals = parse$b(header.toLowerCase());
 
   // unspecified vary
   if (fields.indexOf('*') !== -1 || vals.indexOf('*') !== -1) {
@@ -8239,7 +8699,7 @@ function append(header, field) {
  * @private
  */
 
-function parse$a(header) {
+function parse$b(header) {
   var end = 0;
   var list = [];
   var start = 0;
@@ -8514,8 +8974,8 @@ var libExports = lib$2.exports;
 var gate$1 = {};
 
 gate$1.create = create;
-var util$3 = require$$0$4;
-var assert = require$$1$5;
+var util$3 = require$$1$1;
+var assert = require$$1$4;
 var noop$1 = function noop() {};
 function create(options) {
   return new Gate(options);
@@ -8644,13 +9104,13 @@ Async.prototype.makeCallback = function makeCallback(caller, name, mapping) {
   }
 };
 
-var uuid$1 = uuid_1;
+var uuid$1 = require$$0$3;
 var ssdp = peerSsdp;
-var fs$3 = require$$1$2;
+var fs$3 = require$$3$3;
 var ejs = ejs$1;
 var os = require$$2$2;
-var util$2 = require$$0$4;
-var events = require$$1$1;
+var util$2 = require$$1$1;
+var events = require$$1$2;
 var http$3 = require$$7$1;
 var URL$1 = require$$8;
 var xml2js = xml2js$1;
@@ -8785,7 +9245,7 @@ var setupServer = function setupServer() {
   peer.on("ready", function () {
     for (var i = 0; i < serviceTypes.length; i++) {
       var st = serviceTypes[i];
-      peer.alive(merge$2({
+      peer.alive(merge$3({
         NT: st,
         USN: "uuid:" + self.uuid + "::" + st,
         SERVER: SERVER,
@@ -8795,7 +9255,7 @@ var setupServer = function setupServer() {
     self.emit("ready");
   }).on("search", function (headers, address) {
     if (serviceTypes.indexOf(headers.ST) != -1) {
-      peer.reply(merge$2({
+      peer.reply(merge$3({
         LOCATION: location,
         ST: headers.ST,
         "CONFIGID.UPNP.ORG": 7337,
@@ -8820,7 +9280,7 @@ var getExtraHeaders = function getExtraHeaders(dict) {
   }
   return extraHeaders;
 };
-var merge$2 = function merge(obj1, obj2) {
+var merge$3 = function merge(obj1, obj2) {
   for (var key in obj2) {
     var val1 = obj1[key];
     obj1[key] = val1 || obj2[key];
@@ -8891,7 +9351,7 @@ DIALServer.prototype.stop = function () {
   var g = gate.create();
   for (var i = 0; i < serviceTypes.length; i++) {
     var st = serviceTypes[i];
-    peer.byebye(merge$2({
+    peer.byebye(merge$3({
       NT: st,
       USN: "uuid:" + self.uuid + "::" + st,
       SERVER: SERVER,
@@ -9848,7 +10308,7 @@ var TYPE_REGEXP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+\/[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
  */
 
 contentType.format = format$2;
-contentType.parse = parse$9;
+contentType.parse = parse$a;
 
 /**
  * Format object to media type.
@@ -9892,7 +10352,7 @@ function format$2(obj) {
  * @public
  */
 
-function parse$9(string) {
+function parse$a(string) {
   if (!string) {
     throw new TypeError('argument string is required');
   }
@@ -10537,26 +10997,29 @@ function toIdentifier(str) {
 
   /**
    * Get a class name from a name identifier.
+   *
+   * @param {string} name
+   * @returns {string}
    * @private
    */
 
   function toClassName(name) {
-    return name.substr(-5) !== 'Error' ? name + 'Error' : name;
+    return name.slice(-5) === 'Error' ? name : name + 'Error';
   }
 })(httpErrors);
 var httpErrorsExports = httpErrors.exports;
 
-var src = {exports: {}};
+var src$3 = {exports: {}};
 
-var browser = {exports: {}};
+var browser$3 = {exports: {}};
 
-var debug$6 = {exports: {}};
+var debug$9 = {exports: {}};
 
-var ms$2;
-var hasRequiredMs;
-function requireMs() {
-  if (hasRequiredMs) return ms$2;
-  hasRequiredMs = 1;
+var ms$5;
+var hasRequiredMs$3;
+function requireMs$3() {
+  if (hasRequiredMs$3) return ms$5;
+  hasRequiredMs$3 = 1;
   var s = 1000;
   var m = s * 60;
   var h = m * 60;
@@ -10577,7 +11040,7 @@ function requireMs() {
    * @api public
    */
 
-  ms$2 = function ms(val, options) {
+  ms$5 = function ms(val, options) {
     options = options || {};
     var type = _typeof(val);
     if (type === 'string' && val.length > 0) {
@@ -10696,13 +11159,13 @@ function requireMs() {
     }
     return Math.ceil(ms / n) + ' ' + name + 's';
   }
-  return ms$2;
+  return ms$5;
 }
 
-var hasRequiredDebug;
-function requireDebug() {
-  if (hasRequiredDebug) return debug$6.exports;
-  hasRequiredDebug = 1;
+var hasRequiredDebug$3;
+function requireDebug$3() {
+  if (hasRequiredDebug$3) return debug$9.exports;
+  hasRequiredDebug$3 = 1;
   (function (module, exports) {
     /**
      * This is the common logic for both the Node.js and web browser
@@ -10716,7 +11179,7 @@ function requireDebug() {
     exports.disable = disable;
     exports.enable = enable;
     exports.enabled = enabled;
-    exports.humanize = requireMs();
+    exports.humanize = requireMs$3();
 
     /**
      * The currently active debug mode names, and names to skip.
@@ -10894,16 +11357,16 @@ function requireDebug() {
       if (val instanceof Error) return val.stack || val.message;
       return val;
     }
-  })(debug$6, debug$6.exports);
-  return debug$6.exports;
+  })(debug$9, debug$9.exports);
+  return debug$9.exports;
 }
 
-var hasRequiredBrowser;
-function requireBrowser() {
-  if (hasRequiredBrowser) return browser.exports;
-  hasRequiredBrowser = 1;
+var hasRequiredBrowser$3;
+function requireBrowser$3() {
+  if (hasRequiredBrowser$3) return browser$3.exports;
+  hasRequiredBrowser$3 = 1;
   (function (module, exports) {
-    exports = module.exports = requireDebug();
+    exports = module.exports = requireDebug$3();
     exports.log = log;
     exports.formatArgs = formatArgs;
     exports.save = save;
@@ -11059,22 +11522,22 @@ function requireBrowser() {
         return window.localStorage;
       } catch (e) {}
     }
-  })(browser, browser.exports);
-  return browser.exports;
+  })(browser$3, browser$3.exports);
+  return browser$3.exports;
 }
 
-var node = {exports: {}};
+var node$3 = {exports: {}};
 
 /**
  * Module dependencies.
  */
-var hasRequiredNode;
-function requireNode() {
-  if (hasRequiredNode) return node.exports;
-  hasRequiredNode = 1;
+var hasRequiredNode$3;
+function requireNode$3() {
+  if (hasRequiredNode$3) return node$3.exports;
+  hasRequiredNode$3 = 1;
   (function (module, exports) {
-    var tty = require$$0$6;
-    var util = require$$0$4;
+    var tty = require$$0$5;
+    var util = require$$1$1;
 
     /**
      * This is the Node.js implementation of `debug()`.
@@ -11082,7 +11545,7 @@ function requireNode() {
      * Expose `debug()` as the module.
      */
 
-    exports = module.exports = requireDebug();
+    exports = module.exports = requireDebug$3();
     exports.init = init;
     exports.log = log;
     exports.formatArgs = formatArgs;
@@ -11238,7 +11701,7 @@ function requireNode() {
           }
           break;
         case 'FILE':
-          var fs = require$$1$2;
+          var fs = require$$3$3;
           stream = new fs.SyncWriteStream(fd, {
             autoClose: false
           });
@@ -11298,20 +11761,25 @@ function requireNode() {
      */
 
     exports.enable(load());
-  })(node, node.exports);
-  return node.exports;
+  })(node$3, node$3.exports);
+  return node$3.exports;
 }
 
 /**
  * Detect Electron renderer process, which is node, but we should
  * treat as a browser.
  */
-if (typeof process !== 'undefined' && process.type === 'renderer') {
-  src.exports = requireBrowser();
-} else {
-  src.exports = requireNode();
+var hasRequiredSrc;
+function requireSrc() {
+  if (hasRequiredSrc) return src$3.exports;
+  hasRequiredSrc = 1;
+  if (typeof process !== 'undefined' && process.type === 'renderer') {
+    src$3.exports = requireBrowser$3();
+  } else {
+    src$3.exports = requireNode$3();
+  }
+  return src$3.exports;
 }
-var srcExports = src.exports;
 
 /*!
  * destroy
@@ -11325,10 +11793,10 @@ var srcExports = src.exports;
  * @private
  */
 
-var EventEmitter = require$$1$1.EventEmitter;
-var ReadStream = require$$1$2.ReadStream;
-var Stream$1 = require$$1$6;
-var Zlib = require$$3$3;
+var EventEmitter = require$$1$2.EventEmitter;
+var ReadStream = require$$3$3.ReadStream;
+var Stream$1 = require$$1$5;
+var Zlib = require$$3$4;
 
 /**
  * Module exports.
@@ -11516,7 +11984,7 @@ var hasRequiredSafer;
 function requireSafer() {
   if (hasRequiredSafer) return safer_1;
   hasRequiredSafer = 1;
-  var buffer = require$$0$7;
+  var buffer = require$$0$6;
   var Buffer = buffer.Buffer;
   var safer = {};
   var key;
@@ -11691,7 +12159,7 @@ function requireInternal() {
   //------------------------------------------------------------------------------
 
   // We use node.js internal decoder. Its signature is the same as ours.
-  var StringDecoder = require$$1$4.StringDecoder;
+  var StringDecoder = require$$1$6.StringDecoder;
   if (!StringDecoder.prototype.end)
     // Node v0.8 doesn't have this method.
     StringDecoder.prototype.end = function () {};
@@ -12927,7 +13395,7 @@ function requireDbcsCodec() {
   var UNASSIGNED = -1,
     GB18030_CODE = -2,
     SEQ_START = -10,
-    NODE_START = -1000,
+    NODE_START = -1e3,
     UNASSIGNED_NODE = new Array(0x100),
     DEF_CHAR = -1;
   for (var i = 0; i < 0x100; i++) UNASSIGNED_NODE[i] = UNASSIGNED;
@@ -21890,8 +22358,8 @@ var hasRequiredStreams;
 function requireStreams() {
   if (hasRequiredStreams) return streams;
   hasRequiredStreams = 1;
-  var Buffer = require$$0$7.Buffer,
-    Transform = require$$1$6.Transform;
+  var Buffer = require$$0$6.Buffer,
+    Transform = require$$1$5.Transform;
 
   // == Exports ==================================================================
   streams = function streams(iconv) {
@@ -22003,7 +22471,7 @@ var hasRequiredExtendNode;
 function requireExtendNode() {
   if (hasRequiredExtendNode) return extendNode;
   hasRequiredExtendNode = 1;
-  var Buffer = require$$0$7.Buffer;
+  var Buffer = require$$0$6.Buffer;
   // Note: not polyfilled with safer-buffer on a purpose, as overrides Buffer
 
   // == Extend Node primitives to use iconv-lite =================================
@@ -22040,7 +22508,7 @@ function requireExtendNode() {
       };
 
       // -- SlowBuffer -----------------------------------------------------------
-      var SlowBuffer = require$$0$7.SlowBuffer;
+      var SlowBuffer = require$$0$6.SlowBuffer;
       original.SlowBufferToString = SlowBuffer.prototype.toString;
       SlowBuffer.prototype.toString = function (encoding, start, end) {
         encoding = String(encoding || 'utf8').toLowerCase();
@@ -22166,7 +22634,7 @@ function requireExtendNode() {
 
       // -- Readable -------------------------------------------------------------
       if (iconv.supportsStreams) {
-        var Readable = require$$1$6.Readable;
+        var Readable = require$$1$5.Readable;
         original.ReadableSetEncoding = Readable.prototype.setEncoding;
         Readable.prototype.setEncoding = function setEncoding(enc, options) {
           // Use our own decoder, it has the same interface.
@@ -22183,7 +22651,7 @@ function requireExtendNode() {
       if (!iconv.supportsNodeEncodingsExtension) return;
       if (!original) throw new Error("require('iconv-lite').undoExtendNodeEncodings(): Nothing to undo; extendNodeEncodings() is not called.");
       delete Buffer.isNativeEncoding;
-      var SlowBuffer = require$$0$7.SlowBuffer;
+      var SlowBuffer = require$$0$6.SlowBuffer;
       SlowBuffer.prototype.toString = original.SlowBufferToString;
       SlowBuffer.prototype.write = original.SlowBufferWrite;
       Buffer.isEncoding = original.BufferIsEncoding;
@@ -22191,7 +22659,7 @@ function requireExtendNode() {
       Buffer.prototype.toString = original.BufferToString;
       Buffer.prototype.write = original.BufferWrite;
       if (iconv.supportsStreams) {
-        var Readable = require$$1$6.Readable;
+        var Readable = require$$1$5.Readable;
         Readable.prototype.setEncoding = original.ReadableSetEncoding;
         delete Readable.prototype.collect;
       }
@@ -22201,10 +22669,10 @@ function requireExtendNode() {
   return extendNode;
 }
 
-var hasRequiredLib$1;
-function requireLib$1() {
-  if (hasRequiredLib$1) return lib$1.exports;
-  hasRequiredLib$1 = 1;
+var hasRequiredLib;
+function requireLib() {
+  if (hasRequiredLib) return lib$1.exports;
+  hasRequiredLib = 1;
   (function (module) {
 
     // Some environments don't have global Buffer (e.g. React Native).
@@ -22404,7 +22872,7 @@ function requireRawBody() {
   var asyncHooks = tryRequireAsyncHooks();
   var bytes = requireBytes();
   var createError = httpErrorsExports;
-  var iconv = requireLib$1();
+  var iconv = requireLib();
   var unpipe = unpipe_1;
 
   /**
@@ -23014,10 +23482,10 @@ function requireRead() {
   var createError = httpErrorsExports;
   var destroy = destroy_1;
   var getBody = requireRawBody();
-  var iconv = requireLib$1();
+  var iconv = requireLib();
   var onFinished = onFinishedExports;
   var unpipe = unpipe_1;
-  var zlib = require$$3$3;
+  var zlib = require$$3$4;
 
   /**
    * Module exports.
@@ -23262,7 +23730,7 @@ var typeRegExp = /^ *([A-Za-z0-9][A-Za-z0-9!#$&^_-]{0,126})\/([A-Za-z0-9][A-Za-z
  */
 
 mediaTyper.format = format$1;
-mediaTyper.parse = parse$8;
+mediaTyper.parse = parse$9;
 
 /**
  * Format object to media type.
@@ -23321,7 +23789,7 @@ function format$1(obj) {
  * @api public
  */
 
-function parse$8(string) {
+function parse$9(string) {
   if (!string) {
     throw new TypeError('argument string is required');
   }
@@ -34595,7 +35063,7 @@ function requireJson() {
   var bytes = requireBytes();
   var contentType$1 = contentType;
   var createError = httpErrorsExports;
-  var debug = srcExports('body-parser:json');
+  var debug = requireSrc()('body-parser:json');
   var read = requireRead();
   var typeis = typeIsExports;
 
@@ -34632,12 +35100,16 @@ function requireJson() {
 
   function json(options) {
     var opts = options || {};
-    var limit = typeof opts.limit !== 'number' ? bytes.parse(opts.limit || '100kb') : opts.limit;
+    var limit = typeof opts.limit === 'undefined' || opts.limit === null ? 102400 // 100kb default
+    : bytes.parse(opts.limit);
     var inflate = opts.inflate !== false;
     var reviver = opts.reviver;
     var strict = opts.strict !== false;
     var type = opts.type || 'application/json';
     var verify = opts.verify || false;
+    if (limit === null) {
+      throw new TypeError('option limit "' + String(opts.limit) + '" is invalid');
+    }
     if (verify !== false && typeof verify !== 'function') {
       throw new TypeError('option verify must be function');
     }
@@ -34724,10 +35196,7 @@ function requireJson() {
     var index = str.indexOf(_char);
     var partial = '';
     if (index !== -1) {
-      partial = str.substring(0, index) + JSON_SYNTAX_CHAR;
-      for (var i = index + 1; i < str.length; i++) {
-        partial += JSON_SYNTAX_CHAR;
-      }
+      partial = str.substring(0, index) + new Array(str.length - index + 1).join(JSON_SYNTAX_CHAR);
     }
     try {
       JSON.parse(partial); /* istanbul ignore next */
@@ -34824,7 +35293,7 @@ function requireRaw() {
    */
 
   var bytes = requireBytes();
-  var debug = srcExports('body-parser:raw');
+  var debug = requireSrc()('body-parser:raw');
   var read = requireRead();
   var typeis = typeIsExports;
 
@@ -34845,9 +35314,13 @@ function requireRaw() {
   function raw(options) {
     var opts = options || {};
     var inflate = opts.inflate !== false;
-    var limit = typeof opts.limit !== 'number' ? bytes.parse(opts.limit || '100kb') : opts.limit;
+    var limit = typeof opts.limit === 'undefined' || opts.limit === null ? 102400 // 100kb default
+    : bytes.parse(opts.limit);
     var type = opts.type || 'application/octet-stream';
     var verify = opts.verify || false;
+    if (limit === null) {
+      throw new TypeError('option limit "' + String(opts.limit) + '" is invalid');
+    }
     if (verify !== false && typeof verify !== 'function') {
       throw new TypeError('option verify must be function');
     }
@@ -34922,7 +35395,7 @@ function requireText() {
 
   var bytes = requireBytes();
   var contentType$1 = contentType;
-  var debug = srcExports('body-parser:text');
+  var debug = requireSrc()('body-parser:text');
   var read = requireRead();
   var typeis = typeIsExports;
 
@@ -34944,9 +35417,13 @@ function requireText() {
     var opts = options || {};
     var defaultCharset = opts.defaultCharset || 'utf-8';
     var inflate = opts.inflate !== false;
-    var limit = typeof opts.limit !== 'number' ? bytes.parse(opts.limit || '100kb') : opts.limit;
+    var limit = typeof opts.limit === 'undefined' || opts.limit === null ? 102400 // 100kb default
+    : bytes.parse(opts.limit);
     var type = opts.type || 'text/plain';
     var verify = opts.verify || false;
+    if (limit === null) {
+      throw new TypeError('option limit "' + String(opts.limit) + '" is invalid');
+    }
     if (verify !== false && typeof verify !== 'function') {
       throw new TypeError('option verify must be function');
     }
@@ -35022,82 +35499,734 @@ function requireText() {
   return text_1;
 }
 
-var esErrors;
-var hasRequiredEsErrors;
-function requireEsErrors() {
-  if (hasRequiredEsErrors) return esErrors;
-  hasRequiredEsErrors = 1;
+/** @type {import('./type')} */
+var type = TypeError;
 
-  /** @type {import('.')} */
-  esErrors = Error;
-  return esErrors;
+var util_inspect = require$$1$1.inspect;
+
+var hasMap = typeof Map === 'function' && Map.prototype;
+var mapSizeDescriptor = Object.getOwnPropertyDescriptor && hasMap ? Object.getOwnPropertyDescriptor(Map.prototype, 'size') : null;
+var mapSize = hasMap && mapSizeDescriptor && typeof mapSizeDescriptor.get === 'function' ? mapSizeDescriptor.get : null;
+var mapForEach = hasMap && Map.prototype.forEach;
+var hasSet = typeof Set === 'function' && Set.prototype;
+var setSizeDescriptor = Object.getOwnPropertyDescriptor && hasSet ? Object.getOwnPropertyDescriptor(Set.prototype, 'size') : null;
+var setSize = hasSet && setSizeDescriptor && typeof setSizeDescriptor.get === 'function' ? setSizeDescriptor.get : null;
+var setForEach = hasSet && Set.prototype.forEach;
+var hasWeakMap = typeof WeakMap === 'function' && WeakMap.prototype;
+var weakMapHas = hasWeakMap ? WeakMap.prototype.has : null;
+var hasWeakSet = typeof WeakSet === 'function' && WeakSet.prototype;
+var weakSetHas = hasWeakSet ? WeakSet.prototype.has : null;
+var hasWeakRef = typeof WeakRef === 'function' && WeakRef.prototype;
+var weakRefDeref = hasWeakRef ? WeakRef.prototype.deref : null;
+var booleanValueOf = Boolean.prototype.valueOf;
+var objectToString = Object.prototype.toString;
+var functionToString = Function.prototype.toString;
+var $match = String.prototype.match;
+var $slice = String.prototype.slice;
+var $replace$1 = String.prototype.replace;
+var $toUpperCase = String.prototype.toUpperCase;
+var $toLowerCase = String.prototype.toLowerCase;
+var $test = RegExp.prototype.test;
+var $concat$1 = Array.prototype.concat;
+var $join = Array.prototype.join;
+var $arrSlice = Array.prototype.slice;
+var $floor = Math.floor;
+var bigIntValueOf = typeof BigInt === 'function' ? BigInt.prototype.valueOf : null;
+var gOPS = Object.getOwnPropertySymbols;
+var symToString = typeof Symbol === 'function' && _typeof(Symbol.iterator) === 'symbol' ? Symbol.prototype.toString : null;
+var hasShammedSymbols = typeof Symbol === 'function' && _typeof(Symbol.iterator) === 'object';
+// ie, `has-tostringtag/shams
+var toStringTag = typeof Symbol === 'function' && Symbol.toStringTag && (_typeof(Symbol.toStringTag) === hasShammedSymbols ? 'object' : 'symbol') ? Symbol.toStringTag : null;
+var isEnumerable = Object.prototype.propertyIsEnumerable;
+var gPO = (typeof Reflect === 'function' ? Reflect.getPrototypeOf : Object.getPrototypeOf) || ([].__proto__ === Array.prototype // eslint-disable-line no-proto
+? function (O) {
+  return O.__proto__; // eslint-disable-line no-proto
+} : null);
+function addNumericSeparator(num, str) {
+  if (num === Infinity || num === -Infinity || num !== num || num && num > -1e3 && num < 1000 || $test.call(/e/, str)) {
+    return str;
+  }
+  var sepRegex = /[0-9](?=(?:[0-9]{3})+(?![0-9]))/g;
+  if (typeof num === 'number') {
+    var _int = num < 0 ? -$floor(-num) : $floor(num); // trunc(num)
+    if (_int !== num) {
+      var intStr = String(_int);
+      var dec = $slice.call(str, intStr.length + 1);
+      return $replace$1.call(intStr, sepRegex, '$&_') + '.' + $replace$1.call($replace$1.call(dec, /([0-9]{3})/g, '$&_'), /_$/, '');
+    }
+  }
+  return $replace$1.call(str, sepRegex, '$&_');
+}
+var utilInspect = util_inspect;
+var inspectCustom = utilInspect.custom;
+var inspectSymbol = isSymbol(inspectCustom) ? inspectCustom : null;
+var quotes = {
+  __proto__: null,
+  'double': '"',
+  single: "'"
+};
+var quoteREs = {
+  __proto__: null,
+  'double': /(["\\])/g,
+  single: /(['\\])/g
+};
+var objectInspect = function inspect_(obj, options, depth, seen) {
+  var opts = options || {};
+  if (has$3(opts, 'quoteStyle') && !has$3(quotes, opts.quoteStyle)) {
+    throw new TypeError('option "quoteStyle" must be "single" or "double"');
+  }
+  if (has$3(opts, 'maxStringLength') && (typeof opts.maxStringLength === 'number' ? opts.maxStringLength < 0 && opts.maxStringLength !== Infinity : opts.maxStringLength !== null)) {
+    throw new TypeError('option "maxStringLength", if provided, must be a positive integer, Infinity, or `null`');
+  }
+  var customInspect = has$3(opts, 'customInspect') ? opts.customInspect : true;
+  if (typeof customInspect !== 'boolean' && customInspect !== 'symbol') {
+    throw new TypeError('option "customInspect", if provided, must be `true`, `false`, or `\'symbol\'`');
+  }
+  if (has$3(opts, 'indent') && opts.indent !== null && opts.indent !== '\t' && !(parseInt(opts.indent, 10) === opts.indent && opts.indent > 0)) {
+    throw new TypeError('option "indent" must be "\\t", an integer > 0, or `null`');
+  }
+  if (has$3(opts, 'numericSeparator') && typeof opts.numericSeparator !== 'boolean') {
+    throw new TypeError('option "numericSeparator", if provided, must be `true` or `false`');
+  }
+  var numericSeparator = opts.numericSeparator;
+  if (typeof obj === 'undefined') {
+    return 'undefined';
+  }
+  if (obj === null) {
+    return 'null';
+  }
+  if (typeof obj === 'boolean') {
+    return obj ? 'true' : 'false';
+  }
+  if (typeof obj === 'string') {
+    return inspectString(obj, opts);
+  }
+  if (typeof obj === 'number') {
+    if (obj === 0) {
+      return Infinity / obj > 0 ? '0' : '-0';
+    }
+    var str = String(obj);
+    return numericSeparator ? addNumericSeparator(obj, str) : str;
+  }
+  if (typeof obj === 'bigint') {
+    var bigIntStr = String(obj) + 'n';
+    return numericSeparator ? addNumericSeparator(obj, bigIntStr) : bigIntStr;
+  }
+  var maxDepth = typeof opts.depth === 'undefined' ? 5 : opts.depth;
+  if (typeof depth === 'undefined') {
+    depth = 0;
+  }
+  if (depth >= maxDepth && maxDepth > 0 && _typeof(obj) === 'object') {
+    return isArray$3(obj) ? '[Array]' : '[Object]';
+  }
+  var indent = getIndent(opts, depth);
+  if (typeof seen === 'undefined') {
+    seen = [];
+  } else if (indexOf(seen, obj) >= 0) {
+    return '[Circular]';
+  }
+  function inspect(value, from, noIndent) {
+    if (from) {
+      seen = $arrSlice.call(seen);
+      seen.push(from);
+    }
+    if (noIndent) {
+      var newOpts = {
+        depth: opts.depth
+      };
+      if (has$3(opts, 'quoteStyle')) {
+        newOpts.quoteStyle = opts.quoteStyle;
+      }
+      return inspect_(value, newOpts, depth + 1, seen);
+    }
+    return inspect_(value, opts, depth + 1, seen);
+  }
+  if (typeof obj === 'function' && !isRegExp$1(obj)) {
+    // in older engines, regexes are callable
+    var name = nameOf(obj);
+    var keys = arrObjKeys(obj, inspect);
+    return '[Function' + (name ? ': ' + name : ' (anonymous)') + ']' + (keys.length > 0 ? ' { ' + $join.call(keys, ', ') + ' }' : '');
+  }
+  if (isSymbol(obj)) {
+    var symString = hasShammedSymbols ? $replace$1.call(String(obj), /^(Symbol\(.*\))_[^)]*$/, '$1') : symToString.call(obj);
+    return _typeof(obj) === 'object' && !hasShammedSymbols ? markBoxed(symString) : symString;
+  }
+  if (isElement(obj)) {
+    var s = '<' + $toLowerCase.call(String(obj.nodeName));
+    var attrs = obj.attributes || [];
+    for (var i = 0; i < attrs.length; i++) {
+      s += ' ' + attrs[i].name + '=' + wrapQuotes(quote(attrs[i].value), 'double', opts);
+    }
+    s += '>';
+    if (obj.childNodes && obj.childNodes.length) {
+      s += '...';
+    }
+    s += '</' + $toLowerCase.call(String(obj.nodeName)) + '>';
+    return s;
+  }
+  if (isArray$3(obj)) {
+    if (obj.length === 0) {
+      return '[]';
+    }
+    var xs = arrObjKeys(obj, inspect);
+    if (indent && !singleLineValues(xs)) {
+      return '[' + indentedJoin(xs, indent) + ']';
+    }
+    return '[ ' + $join.call(xs, ', ') + ' ]';
+  }
+  if (isError(obj)) {
+    var parts = arrObjKeys(obj, inspect);
+    if (!('cause' in Error.prototype) && 'cause' in obj && !isEnumerable.call(obj, 'cause')) {
+      return '{ [' + String(obj) + '] ' + $join.call($concat$1.call('[cause]: ' + inspect(obj.cause), parts), ', ') + ' }';
+    }
+    if (parts.length === 0) {
+      return '[' + String(obj) + ']';
+    }
+    return '{ [' + String(obj) + '] ' + $join.call(parts, ', ') + ' }';
+  }
+  if (_typeof(obj) === 'object' && customInspect) {
+    if (inspectSymbol && typeof obj[inspectSymbol] === 'function' && utilInspect) {
+      return utilInspect(obj, {
+        depth: maxDepth - depth
+      });
+    } else if (customInspect !== 'symbol' && typeof obj.inspect === 'function') {
+      return obj.inspect();
+    }
+  }
+  if (isMap(obj)) {
+    var mapParts = [];
+    if (mapForEach) {
+      mapForEach.call(obj, function (value, key) {
+        mapParts.push(inspect(key, obj, true) + ' => ' + inspect(value, obj));
+      });
+    }
+    return collectionOf('Map', mapSize.call(obj), mapParts, indent);
+  }
+  if (isSet(obj)) {
+    var setParts = [];
+    if (setForEach) {
+      setForEach.call(obj, function (value) {
+        setParts.push(inspect(value, obj));
+      });
+    }
+    return collectionOf('Set', setSize.call(obj), setParts, indent);
+  }
+  if (isWeakMap(obj)) {
+    return weakCollectionOf('WeakMap');
+  }
+  if (isWeakSet(obj)) {
+    return weakCollectionOf('WeakSet');
+  }
+  if (isWeakRef(obj)) {
+    return weakCollectionOf('WeakRef');
+  }
+  if (isNumber(obj)) {
+    return markBoxed(inspect(Number(obj)));
+  }
+  if (isBigInt(obj)) {
+    return markBoxed(inspect(bigIntValueOf.call(obj)));
+  }
+  if (isBoolean(obj)) {
+    return markBoxed(booleanValueOf.call(obj));
+  }
+  if (isString(obj)) {
+    return markBoxed(inspect(String(obj)));
+  }
+  // note: in IE 8, sometimes `global !== window` but both are the prototypes of each other
+  /* eslint-env browser */
+  if (typeof window !== 'undefined' && obj === window) {
+    return '{ [object Window] }';
+  }
+  if (typeof globalThis !== 'undefined' && obj === globalThis || typeof commonjsGlobal !== 'undefined' && obj === commonjsGlobal) {
+    return '{ [object globalThis] }';
+  }
+  if (!isDate$1(obj) && !isRegExp$1(obj)) {
+    var ys = arrObjKeys(obj, inspect);
+    var isPlainObject = gPO ? gPO(obj) === Object.prototype : obj instanceof Object || obj.constructor === Object;
+    var protoTag = obj instanceof Object ? '' : 'null prototype';
+    var stringTag = !isPlainObject && toStringTag && Object(obj) === obj && toStringTag in obj ? $slice.call(toStr(obj), 8, -1) : protoTag ? 'Object' : '';
+    var constructorTag = isPlainObject || typeof obj.constructor !== 'function' ? '' : obj.constructor.name ? obj.constructor.name + ' ' : '';
+    var tag = constructorTag + (stringTag || protoTag ? '[' + $join.call($concat$1.call([], stringTag || [], protoTag || []), ': ') + '] ' : '');
+    if (ys.length === 0) {
+      return tag + '{}';
+    }
+    if (indent) {
+      return tag + '{' + indentedJoin(ys, indent) + '}';
+    }
+    return tag + '{ ' + $join.call(ys, ', ') + ' }';
+  }
+  return String(obj);
+};
+function wrapQuotes(s, defaultStyle, opts) {
+  var style = opts.quoteStyle || defaultStyle;
+  var quoteChar = quotes[style];
+  return quoteChar + s + quoteChar;
+}
+function quote(s) {
+  return $replace$1.call(String(s), /"/g, '&quot;');
+}
+function canTrustToString(obj) {
+  return !toStringTag || !(_typeof(obj) === 'object' && (toStringTag in obj || typeof obj[toStringTag] !== 'undefined'));
+}
+function isArray$3(obj) {
+  return toStr(obj) === '[object Array]' && canTrustToString(obj);
+}
+function isDate$1(obj) {
+  return toStr(obj) === '[object Date]' && canTrustToString(obj);
+}
+function isRegExp$1(obj) {
+  return toStr(obj) === '[object RegExp]' && canTrustToString(obj);
+}
+function isError(obj) {
+  return toStr(obj) === '[object Error]' && canTrustToString(obj);
+}
+function isString(obj) {
+  return toStr(obj) === '[object String]' && canTrustToString(obj);
+}
+function isNumber(obj) {
+  return toStr(obj) === '[object Number]' && canTrustToString(obj);
+}
+function isBoolean(obj) {
+  return toStr(obj) === '[object Boolean]' && canTrustToString(obj);
 }
 
-var _eval;
-var hasRequired_eval;
-function require_eval() {
-  if (hasRequired_eval) return _eval;
-  hasRequired_eval = 1;
-
-  /** @type {import('./eval')} */
-  _eval = EvalError;
-  return _eval;
+// Symbol and BigInt do have Symbol.toStringTag by spec, so that can't be used to eliminate false positives
+function isSymbol(obj) {
+  if (hasShammedSymbols) {
+    return obj && _typeof(obj) === 'object' && obj instanceof Symbol;
+  }
+  if (_typeof(obj) === 'symbol') {
+    return true;
+  }
+  if (!obj || _typeof(obj) !== 'object' || !symToString) {
+    return false;
+  }
+  try {
+    symToString.call(obj);
+    return true;
+  } catch (e) {}
+  return false;
+}
+function isBigInt(obj) {
+  if (!obj || _typeof(obj) !== 'object' || !bigIntValueOf) {
+    return false;
+  }
+  try {
+    bigIntValueOf.call(obj);
+    return true;
+  } catch (e) {}
+  return false;
+}
+var hasOwn$1 = Object.prototype.hasOwnProperty || function (key) {
+  return key in this;
+};
+function has$3(obj, key) {
+  return hasOwn$1.call(obj, key);
+}
+function toStr(obj) {
+  return objectToString.call(obj);
+}
+function nameOf(f) {
+  if (f.name) {
+    return f.name;
+  }
+  var m = $match.call(functionToString.call(f), /^function\s*([\w$]+)/);
+  if (m) {
+    return m[1];
+  }
+  return null;
+}
+function indexOf(xs, x) {
+  if (xs.indexOf) {
+    return xs.indexOf(x);
+  }
+  for (var i = 0, l = xs.length; i < l; i++) {
+    if (xs[i] === x) {
+      return i;
+    }
+  }
+  return -1;
+}
+function isMap(x) {
+  if (!mapSize || !x || _typeof(x) !== 'object') {
+    return false;
+  }
+  try {
+    mapSize.call(x);
+    try {
+      setSize.call(x);
+    } catch (s) {
+      return true;
+    }
+    return x instanceof Map; // core-js workaround, pre-v2.5.0
+  } catch (e) {}
+  return false;
+}
+function isWeakMap(x) {
+  if (!weakMapHas || !x || _typeof(x) !== 'object') {
+    return false;
+  }
+  try {
+    weakMapHas.call(x, weakMapHas);
+    try {
+      weakSetHas.call(x, weakSetHas);
+    } catch (s) {
+      return true;
+    }
+    return x instanceof WeakMap; // core-js workaround, pre-v2.5.0
+  } catch (e) {}
+  return false;
+}
+function isWeakRef(x) {
+  if (!weakRefDeref || !x || _typeof(x) !== 'object') {
+    return false;
+  }
+  try {
+    weakRefDeref.call(x);
+    return true;
+  } catch (e) {}
+  return false;
+}
+function isSet(x) {
+  if (!setSize || !x || _typeof(x) !== 'object') {
+    return false;
+  }
+  try {
+    setSize.call(x);
+    try {
+      mapSize.call(x);
+    } catch (m) {
+      return true;
+    }
+    return x instanceof Set; // core-js workaround, pre-v2.5.0
+  } catch (e) {}
+  return false;
+}
+function isWeakSet(x) {
+  if (!weakSetHas || !x || _typeof(x) !== 'object') {
+    return false;
+  }
+  try {
+    weakSetHas.call(x, weakSetHas);
+    try {
+      weakMapHas.call(x, weakMapHas);
+    } catch (s) {
+      return true;
+    }
+    return x instanceof WeakSet; // core-js workaround, pre-v2.5.0
+  } catch (e) {}
+  return false;
+}
+function isElement(x) {
+  if (!x || _typeof(x) !== 'object') {
+    return false;
+  }
+  if (typeof HTMLElement !== 'undefined' && x instanceof HTMLElement) {
+    return true;
+  }
+  return typeof x.nodeName === 'string' && typeof x.getAttribute === 'function';
+}
+function inspectString(str, opts) {
+  if (str.length > opts.maxStringLength) {
+    var remaining = str.length - opts.maxStringLength;
+    var trailer = '... ' + remaining + ' more character' + (remaining > 1 ? 's' : '');
+    return inspectString($slice.call(str, 0, opts.maxStringLength), opts) + trailer;
+  }
+  var quoteRE = quoteREs[opts.quoteStyle || 'single'];
+  quoteRE.lastIndex = 0;
+  // eslint-disable-next-line no-control-regex
+  var s = $replace$1.call($replace$1.call(str, quoteRE, '\\$1'), /[\x00-\x1f]/g, lowbyte);
+  return wrapQuotes(s, 'single', opts);
+}
+function lowbyte(c) {
+  var n = c.charCodeAt(0);
+  var x = {
+    8: 'b',
+    9: 't',
+    10: 'n',
+    12: 'f',
+    13: 'r'
+  }[n];
+  if (x) {
+    return '\\' + x;
+  }
+  return '\\x' + (n < 0x10 ? '0' : '') + $toUpperCase.call(n.toString(16));
+}
+function markBoxed(str) {
+  return 'Object(' + str + ')';
+}
+function weakCollectionOf(type) {
+  return type + ' { ? }';
+}
+function collectionOf(type, size, entries, indent) {
+  var joinedEntries = indent ? indentedJoin(entries, indent) : $join.call(entries, ', ');
+  return type + ' (' + size + ') {' + joinedEntries + '}';
+}
+function singleLineValues(xs) {
+  for (var i = 0; i < xs.length; i++) {
+    if (indexOf(xs[i], '\n') >= 0) {
+      return false;
+    }
+  }
+  return true;
+}
+function getIndent(opts, depth) {
+  var baseIndent;
+  if (opts.indent === '\t') {
+    baseIndent = '\t';
+  } else if (typeof opts.indent === 'number' && opts.indent > 0) {
+    baseIndent = $join.call(Array(opts.indent + 1), ' ');
+  } else {
+    return null;
+  }
+  return {
+    base: baseIndent,
+    prev: $join.call(Array(depth + 1), baseIndent)
+  };
+}
+function indentedJoin(xs, indent) {
+  if (xs.length === 0) {
+    return '';
+  }
+  var lineJoiner = '\n' + indent.prev + indent.base;
+  return lineJoiner + $join.call(xs, ',' + lineJoiner) + '\n' + indent.prev;
+}
+function arrObjKeys(obj, inspect) {
+  var isArr = isArray$3(obj);
+  var xs = [];
+  if (isArr) {
+    xs.length = obj.length;
+    for (var i = 0; i < obj.length; i++) {
+      xs[i] = has$3(obj, i) ? inspect(obj[i], obj) : '';
+    }
+  }
+  var syms = typeof gOPS === 'function' ? gOPS(obj) : [];
+  var symMap;
+  if (hasShammedSymbols) {
+    symMap = {};
+    for (var k = 0; k < syms.length; k++) {
+      symMap['$' + syms[k]] = syms[k];
+    }
+  }
+  for (var key in obj) {
+    // eslint-disable-line no-restricted-syntax
+    if (!has$3(obj, key)) {
+      continue;
+    } // eslint-disable-line no-restricted-syntax, no-continue
+    if (isArr && String(Number(key)) === key && key < obj.length) {
+      continue;
+    } // eslint-disable-line no-restricted-syntax, no-continue
+    if (hasShammedSymbols && symMap['$' + key] instanceof Symbol) {
+      // this is to prevent shammed Symbols, which are stored as strings, from being included in the string key section
+      continue; // eslint-disable-line no-restricted-syntax, no-continue
+    } else if ($test.call(/[^\w$]/, key)) {
+      xs.push(inspect(key, obj) + ': ' + inspect(obj[key], obj));
+    } else {
+      xs.push(key + ': ' + inspect(obj[key], obj));
+    }
+  }
+  if (typeof gOPS === 'function') {
+    for (var j = 0; j < syms.length; j++) {
+      if (isEnumerable.call(obj, syms[j])) {
+        xs.push('[' + inspect(syms[j]) + ']: ' + inspect(obj[syms[j]], obj));
+      }
+    }
+  }
+  return xs;
 }
 
-var range;
-var hasRequiredRange;
-function requireRange() {
-  if (hasRequiredRange) return range;
-  hasRequiredRange = 1;
+var inspect$3 = objectInspect;
+var $TypeError$5 = type;
 
-  /** @type {import('./range')} */
-  range = RangeError;
-  return range;
+/*
+* This function traverses the list returning the node corresponding to the given key.
+*
+* That node is also moved to the head of the list, so that if it's accessed again we don't need to traverse the whole list.
+* By doing so, all the recently used nodes can be accessed relatively quickly.
+*/
+/** @type {import('./list.d.ts').listGetNode} */
+// eslint-disable-next-line consistent-return
+var listGetNode = function listGetNode(list, key, isDelete) {
+  /** @type {typeof list | NonNullable<(typeof list)['next']>} */
+  var prev = list;
+  /** @type {(typeof list)['next']} */
+  var curr;
+  // eslint-disable-next-line eqeqeq
+  for (; (curr = prev.next) != null; prev = curr) {
+    if (curr.key === key) {
+      prev.next = curr.next;
+      if (!isDelete) {
+        // eslint-disable-next-line no-extra-parens
+        curr.next = /** @type {NonNullable<typeof list.next>} */list.next;
+        list.next = curr; // eslint-disable-line no-param-reassign
+      }
+      return curr;
+    }
+  }
+};
+
+/** @type {import('./list.d.ts').listGet} */
+var listGet = function listGet(objects, key) {
+  if (!objects) {
+    return void undefined;
+  }
+  var node = listGetNode(objects, key);
+  return node && node.value;
+};
+/** @type {import('./list.d.ts').listSet} */
+var listSet = function listSet(objects, key, value) {
+  var node = listGetNode(objects, key);
+  if (node) {
+    node.value = value;
+  } else {
+    // Prepend the new node to the beginning of the list
+    objects.next = /** @type {import('./list.d.ts').ListNode<typeof value, typeof key>} */{
+      // eslint-disable-line no-param-reassign, no-extra-parens
+      key: key,
+      next: objects.next,
+      value: value
+    };
+  }
+};
+/** @type {import('./list.d.ts').listHas} */
+var listHas = function listHas(objects, key) {
+  if (!objects) {
+    return false;
+  }
+  return !!listGetNode(objects, key);
+};
+/** @type {import('./list.d.ts').listDelete} */
+// eslint-disable-next-line consistent-return
+var listDelete = function listDelete(objects, key) {
+  if (objects) {
+    return listGetNode(objects, key, true);
+  }
+};
+
+/** @type {import('.')} */
+var sideChannelList = function getSideChannelList() {
+  /** @typedef {ReturnType<typeof getSideChannelList>} Channel */
+  /** @typedef {Parameters<Channel['get']>[0]} K */
+  /** @typedef {Parameters<Channel['set']>[1]} V */
+
+  /** @type {import('./list.d.ts').RootNode<V, K> | undefined} */var $o;
+
+  /** @type {Channel} */
+  var channel = {
+    assert: function assert(key) {
+      if (!channel.has(key)) {
+        throw new $TypeError$5('Side channel does not contain ' + inspect$3(key));
+      }
+    },
+    'delete': function _delete(key) {
+      var deletedNode = listDelete($o, key);
+      if (deletedNode && $o && !$o.next) {
+        $o = void undefined;
+      }
+      return !!deletedNode;
+    },
+    get: function get(key) {
+      return listGet($o, key);
+    },
+    has: function has(key) {
+      return listHas($o, key);
+    },
+    set: function set(key, value) {
+      if (!$o) {
+        // Initialize the linked list as an empty node, so that we don't have to special-case handling of the first node: we can always refer to it as (previous node).next, instead of something like (list).head
+        $o = {
+          next: void undefined
+        };
+      }
+      // eslint-disable-next-line no-extra-parens
+      listSet(/** @type {NonNullable<typeof $o>} */$o, key, value);
+    }
+  };
+  return channel;
+};
+
+/** @type {import('.')} */
+var esObjectAtoms = Object;
+
+/** @type {import('.')} */
+var esErrors = Error;
+
+/** @type {import('./eval')} */
+var _eval = EvalError;
+
+/** @type {import('./range')} */
+var range = RangeError;
+
+/** @type {import('./ref')} */
+var ref = ReferenceError;
+
+/** @type {import('./syntax')} */
+var syntax = SyntaxError;
+
+/** @type {import('./uri')} */
+var uri = URIError;
+
+/** @type {import('./abs')} */
+var abs$1 = Math.abs;
+
+/** @type {import('./floor')} */
+var floor$1 = Math.floor;
+
+/** @type {import('./max')} */
+var max$2 = Math.max;
+
+/** @type {import('./min')} */
+var min$1 = Math.min;
+
+/** @type {import('./pow')} */
+var pow$1 = Math.pow;
+
+/** @type {import('./round')} */
+var round$1 = Math.round;
+
+/** @type {import('./isNaN')} */
+var _isNaN = Number.isNaN || function isNaN(a) {
+  return a !== a;
+};
+
+var $isNaN = _isNaN;
+
+/** @type {import('./sign')} */
+var sign$2 = function sign(number) {
+  if ($isNaN(number) || number === 0) {
+    return number;
+  }
+  return number < 0 ? -1 : 1;
+};
+
+/** @type {import('./gOPD')} */
+var gOPD = Object.getOwnPropertyDescriptor;
+
+/** @type {import('.')} */
+var $gOPD$1 = gOPD;
+if ($gOPD$1) {
+  try {
+    $gOPD$1([], 'length');
+  } catch (e) {
+    // IE 8 has a broken gOPD
+    $gOPD$1 = null;
+  }
 }
+var gopd = $gOPD$1;
 
-var ref;
-var hasRequiredRef;
-function requireRef() {
-  if (hasRequiredRef) return ref;
-  hasRequiredRef = 1;
-
-  /** @type {import('./ref')} */
-  ref = ReferenceError;
-  return ref;
+/** @type {import('.')} */
+var $defineProperty$1 = Object.defineProperty || false;
+if ($defineProperty$1) {
+  try {
+    $defineProperty$1({}, 'a', {
+      value: 1
+    });
+  } catch (e) {
+    // IE 8 has a broken defineProperty
+    $defineProperty$1 = false;
+  }
 }
-
-var syntax;
-var hasRequiredSyntax;
-function requireSyntax() {
-  if (hasRequiredSyntax) return syntax;
-  hasRequiredSyntax = 1;
-
-  /** @type {import('./syntax')} */
-  syntax = SyntaxError;
-  return syntax;
-}
-
-var type;
-var hasRequiredType;
-function requireType() {
-  if (hasRequiredType) return type;
-  hasRequiredType = 1;
-
-  /** @type {import('./type')} */
-  type = TypeError;
-  return type;
-}
-
-var uri;
-var hasRequiredUri;
-function requireUri() {
-  if (hasRequiredUri) return uri;
-  hasRequiredUri = 1;
-
-  /** @type {import('./uri')} */
-  uri = URIError;
-  return uri;
-}
+var esDefineProperty = $defineProperty$1;
 
 var shams;
 var hasRequiredShams;
@@ -35105,6 +36234,7 @@ function requireShams() {
   if (hasRequiredShams) return shams;
   hasRequiredShams = 1;
 
+  /** @type {import('./shams')} */
   /* eslint complexity: [2, 18], max-statements: [2, 33] */
   shams = function hasSymbols() {
     if (typeof Symbol !== 'function' || typeof Object.getOwnPropertySymbols !== 'function') {
@@ -35113,6 +36243,8 @@ function requireShams() {
     if (_typeof(Symbol.iterator) === 'symbol') {
       return true;
     }
+
+    /** @type {{ [k in symbol]?: unknown }} */
     var obj = {};
     var sym = Symbol('test');
     var symObj = Object(sym);
@@ -35136,7 +36268,7 @@ function requireShams() {
 
     var symVal = 42;
     obj[sym] = symVal;
-    for (sym in obj) {
+    for (var _ in obj) {
       return false;
     } // eslint-disable-line no-restricted-syntax, no-unreachable-loop
     if (typeof Object.keys === 'function' && Object.keys(obj).length !== 0) {
@@ -35153,7 +36285,8 @@ function requireShams() {
       return false;
     }
     if (typeof Object.getOwnPropertyDescriptor === 'function') {
-      var descriptor = Object.getOwnPropertyDescriptor(obj, sym);
+      // eslint-disable-next-line no-extra-parens
+      var descriptor = /** @type {PropertyDescriptor} */Object.getOwnPropertyDescriptor(obj, sym);
       if (descriptor.value !== symVal || descriptor.enumerable !== true) {
         return false;
       }
@@ -35163,14 +36296,16 @@ function requireShams() {
   return shams;
 }
 
-var hasSymbols;
+var hasSymbols$1;
 var hasRequiredHasSymbols;
 function requireHasSymbols() {
-  if (hasRequiredHasSymbols) return hasSymbols;
+  if (hasRequiredHasSymbols) return hasSymbols$1;
   hasRequiredHasSymbols = 1;
   var origSymbol = typeof Symbol !== 'undefined' && Symbol;
   var hasSymbolSham = requireShams();
-  hasSymbols = function hasNativeSymbols() {
+
+  /** @type {import('.')} */
+  hasSymbols$1 = function hasNativeSymbols() {
     if (typeof origSymbol !== 'function') {
       return false;
     }
@@ -35185,28 +36320,30 @@ function requireHasSymbols() {
     }
     return hasSymbolSham();
   };
-  return hasSymbols;
+  return hasSymbols$1;
 }
 
-var hasProto;
-var hasRequiredHasProto;
-function requireHasProto() {
-  if (hasRequiredHasProto) return hasProto;
-  hasRequiredHasProto = 1;
-  var test = {
-    __proto__: null,
-    foo: {}
-  };
-  var $Object = Object;
+var Reflect_getPrototypeOf;
+var hasRequiredReflect_getPrototypeOf;
+function requireReflect_getPrototypeOf() {
+  if (hasRequiredReflect_getPrototypeOf) return Reflect_getPrototypeOf;
+  hasRequiredReflect_getPrototypeOf = 1;
 
-  /** @type {import('.')} */
-  hasProto = function hasProto() {
-    // @ts-expect-error: TS errors on an inherited property for some reason
-    return {
-      __proto__: test
-    }.foo === test.foo && !(test instanceof $Object);
-  };
-  return hasProto;
+  /** @type {import('./Reflect.getPrototypeOf')} */
+  Reflect_getPrototypeOf = typeof Reflect !== 'undefined' && Reflect.getPrototypeOf || null;
+  return Reflect_getPrototypeOf;
+}
+
+var Object_getPrototypeOf;
+var hasRequiredObject_getPrototypeOf;
+function requireObject_getPrototypeOf() {
+  if (hasRequiredObject_getPrototypeOf) return Object_getPrototypeOf;
+  hasRequiredObject_getPrototypeOf = 1;
+  var $Object = esObjectAtoms;
+
+  /** @type {import('./Object.getPrototypeOf')} */
+  Object_getPrototypeOf = $Object.getPrototypeOf || null;
+  return Object_getPrototypeOf;
 }
 
 var implementation;
@@ -35233,7 +36370,7 @@ function requireImplementation() {
   };
   var slicy = function slicy(arrLike, offset) {
     var arr = [];
-    for (var i = offset , j = 0; i < arrLike.length; i += 1, j += 1) {
+    for (var i = offset, j = 0; i < arrLike.length; i += 1, j += 1) {
       arr[j] = arrLike[i];
     }
     return arr;
@@ -35292,6 +36429,108 @@ function requireFunctionBind() {
   return functionBind;
 }
 
+var functionCall;
+var hasRequiredFunctionCall;
+function requireFunctionCall() {
+  if (hasRequiredFunctionCall) return functionCall;
+  hasRequiredFunctionCall = 1;
+
+  /** @type {import('./functionCall')} */
+  functionCall = Function.prototype.call;
+  return functionCall;
+}
+
+var functionApply;
+var hasRequiredFunctionApply;
+function requireFunctionApply() {
+  if (hasRequiredFunctionApply) return functionApply;
+  hasRequiredFunctionApply = 1;
+
+  /** @type {import('./functionApply')} */
+  functionApply = Function.prototype.apply;
+  return functionApply;
+}
+
+/** @type {import('./reflectApply')} */
+var reflectApply = typeof Reflect !== 'undefined' && Reflect && Reflect.apply;
+
+var bind$2 = requireFunctionBind();
+var $apply$1 = requireFunctionApply();
+var $call$2 = requireFunctionCall();
+var $reflectApply = reflectApply;
+
+/** @type {import('./actualApply')} */
+var actualApply = $reflectApply || bind$2.call($call$2, $apply$1);
+
+var bind$1 = requireFunctionBind();
+var $TypeError$4 = type;
+var $call$1 = requireFunctionCall();
+var $actualApply = actualApply;
+
+/** @type {(args: [Function, thisArg?: unknown, ...args: unknown[]]) => Function} TODO FIXME, find a way to use import('.') */
+var callBindApplyHelpers = function callBindBasic(args) {
+  if (args.length < 1 || typeof args[0] !== 'function') {
+    throw new $TypeError$4('a function is required');
+  }
+  return $actualApply(bind$1, $call$1, args);
+};
+
+var get;
+var hasRequiredGet;
+function requireGet() {
+  if (hasRequiredGet) return get;
+  hasRequiredGet = 1;
+  var callBind = callBindApplyHelpers;
+  var gOPD = gopd;
+  var hasProtoAccessor;
+  try {
+    // eslint-disable-next-line no-extra-parens, no-proto
+    hasProtoAccessor = /** @type {{ __proto__?: typeof Array.prototype }} */[].__proto__ === Array.prototype;
+  } catch (e) {
+    if (!e || _typeof(e) !== 'object' || !('code' in e) || e.code !== 'ERR_PROTO_ACCESS') {
+      throw e;
+    }
+  }
+
+  // eslint-disable-next-line no-extra-parens
+  var desc = !!hasProtoAccessor && gOPD && gOPD(Object.prototype, /** @type {keyof typeof Object.prototype} */'__proto__');
+  var $Object = Object;
+  var $getPrototypeOf = $Object.getPrototypeOf;
+
+  /** @type {import('./get')} */
+  get = desc && typeof desc.get === 'function' ? callBind([desc.get]) : typeof $getPrototypeOf === 'function' ? /** @type {import('./get')} */function getDunder(value) {
+    // eslint-disable-next-line eqeqeq
+    return $getPrototypeOf(value == null ? value : $Object(value));
+  } : false;
+  return get;
+}
+
+var getProto$1;
+var hasRequiredGetProto;
+function requireGetProto() {
+  if (hasRequiredGetProto) return getProto$1;
+  hasRequiredGetProto = 1;
+  var reflectGetProto = requireReflect_getPrototypeOf();
+  var originalGetProto = requireObject_getPrototypeOf();
+  var getDunderProto = requireGet();
+
+  /** @type {import('.')} */
+  getProto$1 = reflectGetProto ? function getProto(O) {
+    // @ts-expect-error TS can't narrow inside a closure, for some reason
+    return reflectGetProto(O);
+  } : originalGetProto ? function getProto(O) {
+    if (!O || _typeof(O) !== 'object' && typeof O !== 'function') {
+      throw new TypeError('getProto: not an object');
+    }
+    // @ts-expect-error TS can't narrow inside a closure, for some reason
+    return originalGetProto(O);
+  } : getDunderProto ? function getProto(O) {
+    // @ts-expect-error TS can't narrow inside a closure, for some reason
+    return getDunderProto(O);
+  } : null;
+  return getProto$1;
+}
+
 var hasown;
 var hasRequiredHasown;
 function requireHasown() {
@@ -35306,1388 +36545,792 @@ function requireHasown() {
   return hasown;
 }
 
-var getIntrinsic;
-var hasRequiredGetIntrinsic;
-function requireGetIntrinsic() {
-  if (hasRequiredGetIntrinsic) return getIntrinsic;
-  hasRequiredGetIntrinsic = 1;
-  var undefined$1;
-  var $Error = requireEsErrors();
-  var $EvalError = require_eval();
-  var $RangeError = requireRange();
-  var $ReferenceError = requireRef();
-  var $SyntaxError = requireSyntax();
-  var $TypeError = requireType();
-  var $URIError = requireUri();
-  var $Function = Function;
+var undefined$1;
+var $Object = esObjectAtoms;
+var $Error = esErrors;
+var $EvalError = _eval;
+var $RangeError = range;
+var $ReferenceError = ref;
+var $SyntaxError = syntax;
+var $TypeError$3 = type;
+var $URIError = uri;
+var abs = abs$1;
+var floor = floor$1;
+var max$1 = max$2;
+var min = min$1;
+var pow = pow$1;
+var round = round$1;
+var sign$1 = sign$2;
+var $Function = Function;
 
-  // eslint-disable-next-line consistent-return
-  var getEvalledConstructor = function getEvalledConstructor(expressionSyntax) {
+// eslint-disable-next-line consistent-return
+var getEvalledConstructor = function getEvalledConstructor(expressionSyntax) {
+  try {
+    return $Function('"use strict"; return (' + expressionSyntax + ').constructor;')();
+  } catch (e) {}
+};
+var $gOPD = gopd;
+var $defineProperty = esDefineProperty;
+var throwTypeError = function throwTypeError() {
+  throw new $TypeError$3();
+};
+var ThrowTypeError = $gOPD ? function () {
+  try {
+    // eslint-disable-next-line no-unused-expressions, no-caller, no-restricted-properties
+    arguments.callee; // IE 8 does not throw here
+    return throwTypeError;
+  } catch (calleeThrows) {
     try {
-      return $Function('"use strict"; return (' + expressionSyntax + ').constructor;')();
-    } catch (e) {}
-  };
-  var $gOPD = Object.getOwnPropertyDescriptor;
-  if ($gOPD) {
-    try {
-      $gOPD({}, '');
-    } catch (e) {
-      $gOPD = null; // this is IE 8, which has a broken gOPD
-    }
-  }
-  var throwTypeError = function throwTypeError() {
-    throw new $TypeError();
-  };
-  var ThrowTypeError = $gOPD ? function () {
-    try {
-      // eslint-disable-next-line no-unused-expressions, no-caller, no-restricted-properties
-      arguments.callee; // IE 8 does not throw here
+      // IE 8 throws on Object.getOwnPropertyDescriptor(arguments, '')
+      return $gOPD(arguments, 'callee').get;
+    } catch (gOPDthrows) {
       return throwTypeError;
-    } catch (calleeThrows) {
-      try {
-        // IE 8 throws on Object.getOwnPropertyDescriptor(arguments, '')
-        return $gOPD(arguments, 'callee').get;
-      } catch (gOPDthrows) {
-        return throwTypeError;
-      }
-    }
-  }() : throwTypeError;
-  var hasSymbols = requireHasSymbols()();
-  var hasProto = requireHasProto()();
-  var getProto = Object.getPrototypeOf || (hasProto ? function (x) {
-    return x.__proto__;
-  } // eslint-disable-line no-proto
-  : null);
-  var needsEval = {};
-  var TypedArray = typeof Uint8Array === 'undefined' || !getProto ? undefined$1 : getProto(Uint8Array);
-  var INTRINSICS = {
-    __proto__: null,
-    '%AggregateError%': typeof AggregateError === 'undefined' ? undefined$1 : AggregateError,
-    '%Array%': Array,
-    '%ArrayBuffer%': typeof ArrayBuffer === 'undefined' ? undefined$1 : ArrayBuffer,
-    '%ArrayIteratorPrototype%': hasSymbols && getProto ? getProto([][Symbol.iterator]()) : undefined$1,
-    '%AsyncFromSyncIteratorPrototype%': undefined$1,
-    '%AsyncFunction%': needsEval,
-    '%AsyncGenerator%': needsEval,
-    '%AsyncGeneratorFunction%': needsEval,
-    '%AsyncIteratorPrototype%': needsEval,
-    '%Atomics%': typeof Atomics === 'undefined' ? undefined$1 : Atomics,
-    '%BigInt%': typeof BigInt === 'undefined' ? undefined$1 : BigInt,
-    '%BigInt64Array%': typeof BigInt64Array === 'undefined' ? undefined$1 : BigInt64Array,
-    '%BigUint64Array%': typeof BigUint64Array === 'undefined' ? undefined$1 : BigUint64Array,
-    '%Boolean%': Boolean,
-    '%DataView%': typeof DataView === 'undefined' ? undefined$1 : DataView,
-    '%Date%': Date,
-    '%decodeURI%': decodeURI,
-    '%decodeURIComponent%': decodeURIComponent,
-    '%encodeURI%': encodeURI,
-    '%encodeURIComponent%': encodeURIComponent,
-    '%Error%': $Error,
-    '%eval%': eval,
-    // eslint-disable-line no-eval
-    '%EvalError%': $EvalError,
-    '%Float32Array%': typeof Float32Array === 'undefined' ? undefined$1 : Float32Array,
-    '%Float64Array%': typeof Float64Array === 'undefined' ? undefined$1 : Float64Array,
-    '%FinalizationRegistry%': typeof FinalizationRegistry === 'undefined' ? undefined$1 : FinalizationRegistry,
-    '%Function%': $Function,
-    '%GeneratorFunction%': needsEval,
-    '%Int8Array%': typeof Int8Array === 'undefined' ? undefined$1 : Int8Array,
-    '%Int16Array%': typeof Int16Array === 'undefined' ? undefined$1 : Int16Array,
-    '%Int32Array%': typeof Int32Array === 'undefined' ? undefined$1 : Int32Array,
-    '%isFinite%': isFinite,
-    '%isNaN%': isNaN,
-    '%IteratorPrototype%': hasSymbols && getProto ? getProto(getProto([][Symbol.iterator]())) : undefined$1,
-    '%JSON%': (typeof JSON === "undefined" ? "undefined" : _typeof(JSON)) === 'object' ? JSON : undefined$1,
-    '%Map%': typeof Map === 'undefined' ? undefined$1 : Map,
-    '%MapIteratorPrototype%': typeof Map === 'undefined' || !hasSymbols || !getProto ? undefined$1 : getProto(new Map()[Symbol.iterator]()),
-    '%Math%': Math,
-    '%Number%': Number,
-    '%Object%': Object,
-    '%parseFloat%': parseFloat,
-    '%parseInt%': parseInt,
-    '%Promise%': typeof Promise === 'undefined' ? undefined$1 : Promise,
-    '%Proxy%': typeof Proxy === 'undefined' ? undefined$1 : Proxy,
-    '%RangeError%': $RangeError,
-    '%ReferenceError%': $ReferenceError,
-    '%Reflect%': typeof Reflect === 'undefined' ? undefined$1 : Reflect,
-    '%RegExp%': RegExp,
-    '%Set%': typeof Set === 'undefined' ? undefined$1 : Set,
-    '%SetIteratorPrototype%': typeof Set === 'undefined' || !hasSymbols || !getProto ? undefined$1 : getProto(new Set()[Symbol.iterator]()),
-    '%SharedArrayBuffer%': typeof SharedArrayBuffer === 'undefined' ? undefined$1 : SharedArrayBuffer,
-    '%String%': String,
-    '%StringIteratorPrototype%': hasSymbols && getProto ? getProto(''[Symbol.iterator]()) : undefined$1,
-    '%Symbol%': hasSymbols ? Symbol : undefined$1,
-    '%SyntaxError%': $SyntaxError,
-    '%ThrowTypeError%': ThrowTypeError,
-    '%TypedArray%': TypedArray,
-    '%TypeError%': $TypeError,
-    '%Uint8Array%': typeof Uint8Array === 'undefined' ? undefined$1 : Uint8Array,
-    '%Uint8ClampedArray%': typeof Uint8ClampedArray === 'undefined' ? undefined$1 : Uint8ClampedArray,
-    '%Uint16Array%': typeof Uint16Array === 'undefined' ? undefined$1 : Uint16Array,
-    '%Uint32Array%': typeof Uint32Array === 'undefined' ? undefined$1 : Uint32Array,
-    '%URIError%': $URIError,
-    '%WeakMap%': typeof WeakMap === 'undefined' ? undefined$1 : WeakMap,
-    '%WeakRef%': typeof WeakRef === 'undefined' ? undefined$1 : WeakRef,
-    '%WeakSet%': typeof WeakSet === 'undefined' ? undefined$1 : WeakSet
-  };
-  if (getProto) {
-    try {
-      null.error; // eslint-disable-line no-unused-expressions
-    } catch (e) {
-      // https://github.com/tc39/proposal-shadowrealm/pull/384#issuecomment-1364264229
-      var errorProto = getProto(getProto(e));
-      INTRINSICS['%Error.prototype%'] = errorProto;
     }
   }
-  var doEval = function doEval(name) {
-    var value;
-    if (name === '%AsyncFunction%') {
-      value = getEvalledConstructor('async function () {}');
-    } else if (name === '%GeneratorFunction%') {
-      value = getEvalledConstructor('function* () {}');
-    } else if (name === '%AsyncGeneratorFunction%') {
-      value = getEvalledConstructor('async function* () {}');
-    } else if (name === '%AsyncGenerator%') {
-      var fn = doEval('%AsyncGeneratorFunction%');
-      if (fn) {
-        value = fn.prototype;
-      }
-    } else if (name === '%AsyncIteratorPrototype%') {
-      var gen = doEval('%AsyncGenerator%');
-      if (gen && getProto) {
-        value = getProto(gen.prototype);
-      }
-    }
-    INTRINSICS[name] = value;
-    return value;
-  };
-  var LEGACY_ALIASES = {
-    __proto__: null,
-    '%ArrayBufferPrototype%': ['ArrayBuffer', 'prototype'],
-    '%ArrayPrototype%': ['Array', 'prototype'],
-    '%ArrayProto_entries%': ['Array', 'prototype', 'entries'],
-    '%ArrayProto_forEach%': ['Array', 'prototype', 'forEach'],
-    '%ArrayProto_keys%': ['Array', 'prototype', 'keys'],
-    '%ArrayProto_values%': ['Array', 'prototype', 'values'],
-    '%AsyncFunctionPrototype%': ['AsyncFunction', 'prototype'],
-    '%AsyncGenerator%': ['AsyncGeneratorFunction', 'prototype'],
-    '%AsyncGeneratorPrototype%': ['AsyncGeneratorFunction', 'prototype', 'prototype'],
-    '%BooleanPrototype%': ['Boolean', 'prototype'],
-    '%DataViewPrototype%': ['DataView', 'prototype'],
-    '%DatePrototype%': ['Date', 'prototype'],
-    '%ErrorPrototype%': ['Error', 'prototype'],
-    '%EvalErrorPrototype%': ['EvalError', 'prototype'],
-    '%Float32ArrayPrototype%': ['Float32Array', 'prototype'],
-    '%Float64ArrayPrototype%': ['Float64Array', 'prototype'],
-    '%FunctionPrototype%': ['Function', 'prototype'],
-    '%Generator%': ['GeneratorFunction', 'prototype'],
-    '%GeneratorPrototype%': ['GeneratorFunction', 'prototype', 'prototype'],
-    '%Int8ArrayPrototype%': ['Int8Array', 'prototype'],
-    '%Int16ArrayPrototype%': ['Int16Array', 'prototype'],
-    '%Int32ArrayPrototype%': ['Int32Array', 'prototype'],
-    '%JSONParse%': ['JSON', 'parse'],
-    '%JSONStringify%': ['JSON', 'stringify'],
-    '%MapPrototype%': ['Map', 'prototype'],
-    '%NumberPrototype%': ['Number', 'prototype'],
-    '%ObjectPrototype%': ['Object', 'prototype'],
-    '%ObjProto_toString%': ['Object', 'prototype', 'toString'],
-    '%ObjProto_valueOf%': ['Object', 'prototype', 'valueOf'],
-    '%PromisePrototype%': ['Promise', 'prototype'],
-    '%PromiseProto_then%': ['Promise', 'prototype', 'then'],
-    '%Promise_all%': ['Promise', 'all'],
-    '%Promise_reject%': ['Promise', 'reject'],
-    '%Promise_resolve%': ['Promise', 'resolve'],
-    '%RangeErrorPrototype%': ['RangeError', 'prototype'],
-    '%ReferenceErrorPrototype%': ['ReferenceError', 'prototype'],
-    '%RegExpPrototype%': ['RegExp', 'prototype'],
-    '%SetPrototype%': ['Set', 'prototype'],
-    '%SharedArrayBufferPrototype%': ['SharedArrayBuffer', 'prototype'],
-    '%StringPrototype%': ['String', 'prototype'],
-    '%SymbolPrototype%': ['Symbol', 'prototype'],
-    '%SyntaxErrorPrototype%': ['SyntaxError', 'prototype'],
-    '%TypedArrayPrototype%': ['TypedArray', 'prototype'],
-    '%TypeErrorPrototype%': ['TypeError', 'prototype'],
-    '%Uint8ArrayPrototype%': ['Uint8Array', 'prototype'],
-    '%Uint8ClampedArrayPrototype%': ['Uint8ClampedArray', 'prototype'],
-    '%Uint16ArrayPrototype%': ['Uint16Array', 'prototype'],
-    '%Uint32ArrayPrototype%': ['Uint32Array', 'prototype'],
-    '%URIErrorPrototype%': ['URIError', 'prototype'],
-    '%WeakMapPrototype%': ['WeakMap', 'prototype'],
-    '%WeakSetPrototype%': ['WeakSet', 'prototype']
-  };
-  var bind = requireFunctionBind();
-  var hasOwn = requireHasown();
-  var $concat = bind.call(Function.call, Array.prototype.concat);
-  var $spliceApply = bind.call(Function.apply, Array.prototype.splice);
-  var $replace = bind.call(Function.call, String.prototype.replace);
-  var $strSlice = bind.call(Function.call, String.prototype.slice);
-  var $exec = bind.call(Function.call, RegExp.prototype.exec);
-
-  /* adapted from https://github.com/lodash/lodash/blob/4.17.15/dist/lodash.js#L6735-L6744 */
-  var rePropName = /[^%.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|%$))/g;
-  var reEscapeChar = /\\(\\)?/g; /** Used to match backslashes in property paths. */
-  var stringToPath = function stringToPath(string) {
-    var first = $strSlice(string, 0, 1);
-    var last = $strSlice(string, -1);
-    if (first === '%' && last !== '%') {
-      throw new $SyntaxError('invalid intrinsic syntax, expected closing `%`');
-    } else if (last === '%' && first !== '%') {
-      throw new $SyntaxError('invalid intrinsic syntax, expected opening `%`');
-    }
-    var result = [];
-    $replace(string, rePropName, function (match, number, quote, subString) {
-      result[result.length] = quote ? $replace(subString, reEscapeChar, '$1') : number || match;
-    });
-    return result;
-  };
-  /* end adaptation */
-
-  var getBaseIntrinsic = function getBaseIntrinsic(name, allowMissing) {
-    var intrinsicName = name;
-    var alias;
-    if (hasOwn(LEGACY_ALIASES, intrinsicName)) {
-      alias = LEGACY_ALIASES[intrinsicName];
-      intrinsicName = '%' + alias[0] + '%';
-    }
-    if (hasOwn(INTRINSICS, intrinsicName)) {
-      var value = INTRINSICS[intrinsicName];
-      if (value === needsEval) {
-        value = doEval(intrinsicName);
-      }
-      if (typeof value === 'undefined' && !allowMissing) {
-        throw new $TypeError('intrinsic ' + name + ' exists, but is not available. Please file an issue!');
-      }
-      return {
-        alias: alias,
-        name: intrinsicName,
-        value: value
-      };
-    }
-    throw new $SyntaxError('intrinsic ' + name + ' does not exist!');
-  };
-  getIntrinsic = function GetIntrinsic(name, allowMissing) {
-    if (typeof name !== 'string' || name.length === 0) {
-      throw new $TypeError('intrinsic name must be a non-empty string');
-    }
-    if (arguments.length > 1 && typeof allowMissing !== 'boolean') {
-      throw new $TypeError('"allowMissing" argument must be a boolean');
-    }
-    if ($exec(/^%?[^%]*%?$/, name) === null) {
-      throw new $SyntaxError('`%` may not be present anywhere but at the beginning and end of the intrinsic name');
-    }
-    var parts = stringToPath(name);
-    var intrinsicBaseName = parts.length > 0 ? parts[0] : '';
-    var intrinsic = getBaseIntrinsic('%' + intrinsicBaseName + '%', allowMissing);
-    var intrinsicRealName = intrinsic.name;
-    var value = intrinsic.value;
-    var skipFurtherCaching = false;
-    var alias = intrinsic.alias;
-    if (alias) {
-      intrinsicBaseName = alias[0];
-      $spliceApply(parts, $concat([0, 1], alias));
-    }
-    for (var i = 1, isOwn = true; i < parts.length; i += 1) {
-      var part = parts[i];
-      var first = $strSlice(part, 0, 1);
-      var last = $strSlice(part, -1);
-      if ((first === '"' || first === "'" || first === '`' || last === '"' || last === "'" || last === '`') && first !== last) {
-        throw new $SyntaxError('property names with quotes must have matching quotes');
-      }
-      if (part === 'constructor' || !isOwn) {
-        skipFurtherCaching = true;
-      }
-      intrinsicBaseName += '.' + part;
-      intrinsicRealName = '%' + intrinsicBaseName + '%';
-      if (hasOwn(INTRINSICS, intrinsicRealName)) {
-        value = INTRINSICS[intrinsicRealName];
-      } else if (value != null) {
-        if (!(part in value)) {
-          if (!allowMissing) {
-            throw new $TypeError('base intrinsic for ' + name + ' exists, but the property is not available.');
-          }
-          return void undefined$1;
-        }
-        if ($gOPD && i + 1 >= parts.length) {
-          var desc = $gOPD(value, part);
-          isOwn = !!desc;
-
-          // By convention, when a data property is converted to an accessor
-          // property to emulate a data property that does not suffer from
-          // the override mistake, that accessor's getter is marked with
-          // an `originalValue` property. Here, when we detect this, we
-          // uphold the illusion by pretending to see that original data
-          // property, i.e., returning the value rather than the getter
-          // itself.
-          if (isOwn && 'get' in desc && !('originalValue' in desc.get)) {
-            value = desc.get;
-          } else {
-            value = value[part];
-          }
-        } else {
-          isOwn = hasOwn(value, part);
-          value = value[part];
-        }
-        if (isOwn && !skipFurtherCaching) {
-          INTRINSICS[intrinsicRealName] = value;
-        }
-      }
-    }
-    return value;
-  };
-  return getIntrinsic;
+}() : throwTypeError;
+var hasSymbols = requireHasSymbols()();
+var getProto = requireGetProto();
+var $ObjectGPO = requireObject_getPrototypeOf();
+var $ReflectGPO = requireReflect_getPrototypeOf();
+var $apply = requireFunctionApply();
+var $call = requireFunctionCall();
+var needsEval = {};
+var TypedArray = typeof Uint8Array === 'undefined' || !getProto ? undefined$1 : getProto(Uint8Array);
+var INTRINSICS = {
+  __proto__: null,
+  '%AggregateError%': typeof AggregateError === 'undefined' ? undefined$1 : AggregateError,
+  '%Array%': Array,
+  '%ArrayBuffer%': typeof ArrayBuffer === 'undefined' ? undefined$1 : ArrayBuffer,
+  '%ArrayIteratorPrototype%': hasSymbols && getProto ? getProto([][Symbol.iterator]()) : undefined$1,
+  '%AsyncFromSyncIteratorPrototype%': undefined$1,
+  '%AsyncFunction%': needsEval,
+  '%AsyncGenerator%': needsEval,
+  '%AsyncGeneratorFunction%': needsEval,
+  '%AsyncIteratorPrototype%': needsEval,
+  '%Atomics%': typeof Atomics === 'undefined' ? undefined$1 : Atomics,
+  '%BigInt%': typeof BigInt === 'undefined' ? undefined$1 : BigInt,
+  '%BigInt64Array%': typeof BigInt64Array === 'undefined' ? undefined$1 : BigInt64Array,
+  '%BigUint64Array%': typeof BigUint64Array === 'undefined' ? undefined$1 : BigUint64Array,
+  '%Boolean%': Boolean,
+  '%DataView%': typeof DataView === 'undefined' ? undefined$1 : DataView,
+  '%Date%': Date,
+  '%decodeURI%': decodeURI,
+  '%decodeURIComponent%': decodeURIComponent,
+  '%encodeURI%': encodeURI,
+  '%encodeURIComponent%': encodeURIComponent,
+  '%Error%': $Error,
+  '%eval%': eval,
+  // eslint-disable-line no-eval
+  '%EvalError%': $EvalError,
+  '%Float16Array%': typeof Float16Array === 'undefined' ? undefined$1 : Float16Array,
+  '%Float32Array%': typeof Float32Array === 'undefined' ? undefined$1 : Float32Array,
+  '%Float64Array%': typeof Float64Array === 'undefined' ? undefined$1 : Float64Array,
+  '%FinalizationRegistry%': typeof FinalizationRegistry === 'undefined' ? undefined$1 : FinalizationRegistry,
+  '%Function%': $Function,
+  '%GeneratorFunction%': needsEval,
+  '%Int8Array%': typeof Int8Array === 'undefined' ? undefined$1 : Int8Array,
+  '%Int16Array%': typeof Int16Array === 'undefined' ? undefined$1 : Int16Array,
+  '%Int32Array%': typeof Int32Array === 'undefined' ? undefined$1 : Int32Array,
+  '%isFinite%': isFinite,
+  '%isNaN%': isNaN,
+  '%IteratorPrototype%': hasSymbols && getProto ? getProto(getProto([][Symbol.iterator]())) : undefined$1,
+  '%JSON%': (typeof JSON === "undefined" ? "undefined" : _typeof(JSON)) === 'object' ? JSON : undefined$1,
+  '%Map%': typeof Map === 'undefined' ? undefined$1 : Map,
+  '%MapIteratorPrototype%': typeof Map === 'undefined' || !hasSymbols || !getProto ? undefined$1 : getProto(new Map()[Symbol.iterator]()),
+  '%Math%': Math,
+  '%Number%': Number,
+  '%Object%': $Object,
+  '%Object.getOwnPropertyDescriptor%': $gOPD,
+  '%parseFloat%': parseFloat,
+  '%parseInt%': parseInt,
+  '%Promise%': typeof Promise === 'undefined' ? undefined$1 : Promise,
+  '%Proxy%': typeof Proxy === 'undefined' ? undefined$1 : Proxy,
+  '%RangeError%': $RangeError,
+  '%ReferenceError%': $ReferenceError,
+  '%Reflect%': typeof Reflect === 'undefined' ? undefined$1 : Reflect,
+  '%RegExp%': RegExp,
+  '%Set%': typeof Set === 'undefined' ? undefined$1 : Set,
+  '%SetIteratorPrototype%': typeof Set === 'undefined' || !hasSymbols || !getProto ? undefined$1 : getProto(new Set()[Symbol.iterator]()),
+  '%SharedArrayBuffer%': typeof SharedArrayBuffer === 'undefined' ? undefined$1 : SharedArrayBuffer,
+  '%String%': String,
+  '%StringIteratorPrototype%': hasSymbols && getProto ? getProto(''[Symbol.iterator]()) : undefined$1,
+  '%Symbol%': hasSymbols ? Symbol : undefined$1,
+  '%SyntaxError%': $SyntaxError,
+  '%ThrowTypeError%': ThrowTypeError,
+  '%TypedArray%': TypedArray,
+  '%TypeError%': $TypeError$3,
+  '%Uint8Array%': typeof Uint8Array === 'undefined' ? undefined$1 : Uint8Array,
+  '%Uint8ClampedArray%': typeof Uint8ClampedArray === 'undefined' ? undefined$1 : Uint8ClampedArray,
+  '%Uint16Array%': typeof Uint16Array === 'undefined' ? undefined$1 : Uint16Array,
+  '%Uint32Array%': typeof Uint32Array === 'undefined' ? undefined$1 : Uint32Array,
+  '%URIError%': $URIError,
+  '%WeakMap%': typeof WeakMap === 'undefined' ? undefined$1 : WeakMap,
+  '%WeakRef%': typeof WeakRef === 'undefined' ? undefined$1 : WeakRef,
+  '%WeakSet%': typeof WeakSet === 'undefined' ? undefined$1 : WeakSet,
+  '%Function.prototype.call%': $call,
+  '%Function.prototype.apply%': $apply,
+  '%Object.defineProperty%': $defineProperty,
+  '%Object.getPrototypeOf%': $ObjectGPO,
+  '%Math.abs%': abs,
+  '%Math.floor%': floor,
+  '%Math.max%': max$1,
+  '%Math.min%': min,
+  '%Math.pow%': pow,
+  '%Math.round%': round,
+  '%Math.sign%': sign$1,
+  '%Reflect.getPrototypeOf%': $ReflectGPO
+};
+if (getProto) {
+  try {
+    null.error; // eslint-disable-line no-unused-expressions
+  } catch (e) {
+    // https://github.com/tc39/proposal-shadowrealm/pull/384#issuecomment-1364264229
+    var errorProto = getProto(getProto(e));
+    INTRINSICS['%Error.prototype%'] = errorProto;
+  }
 }
+var doEval = function doEval(name) {
+  var value;
+  if (name === '%AsyncFunction%') {
+    value = getEvalledConstructor('async function () {}');
+  } else if (name === '%GeneratorFunction%') {
+    value = getEvalledConstructor('function* () {}');
+  } else if (name === '%AsyncGeneratorFunction%') {
+    value = getEvalledConstructor('async function* () {}');
+  } else if (name === '%AsyncGenerator%') {
+    var fn = doEval('%AsyncGeneratorFunction%');
+    if (fn) {
+      value = fn.prototype;
+    }
+  } else if (name === '%AsyncIteratorPrototype%') {
+    var gen = doEval('%AsyncGenerator%');
+    if (gen && getProto) {
+      value = getProto(gen.prototype);
+    }
+  }
+  INTRINSICS[name] = value;
+  return value;
+};
+var LEGACY_ALIASES = {
+  __proto__: null,
+  '%ArrayBufferPrototype%': ['ArrayBuffer', 'prototype'],
+  '%ArrayPrototype%': ['Array', 'prototype'],
+  '%ArrayProto_entries%': ['Array', 'prototype', 'entries'],
+  '%ArrayProto_forEach%': ['Array', 'prototype', 'forEach'],
+  '%ArrayProto_keys%': ['Array', 'prototype', 'keys'],
+  '%ArrayProto_values%': ['Array', 'prototype', 'values'],
+  '%AsyncFunctionPrototype%': ['AsyncFunction', 'prototype'],
+  '%AsyncGenerator%': ['AsyncGeneratorFunction', 'prototype'],
+  '%AsyncGeneratorPrototype%': ['AsyncGeneratorFunction', 'prototype', 'prototype'],
+  '%BooleanPrototype%': ['Boolean', 'prototype'],
+  '%DataViewPrototype%': ['DataView', 'prototype'],
+  '%DatePrototype%': ['Date', 'prototype'],
+  '%ErrorPrototype%': ['Error', 'prototype'],
+  '%EvalErrorPrototype%': ['EvalError', 'prototype'],
+  '%Float32ArrayPrototype%': ['Float32Array', 'prototype'],
+  '%Float64ArrayPrototype%': ['Float64Array', 'prototype'],
+  '%FunctionPrototype%': ['Function', 'prototype'],
+  '%Generator%': ['GeneratorFunction', 'prototype'],
+  '%GeneratorPrototype%': ['GeneratorFunction', 'prototype', 'prototype'],
+  '%Int8ArrayPrototype%': ['Int8Array', 'prototype'],
+  '%Int16ArrayPrototype%': ['Int16Array', 'prototype'],
+  '%Int32ArrayPrototype%': ['Int32Array', 'prototype'],
+  '%JSONParse%': ['JSON', 'parse'],
+  '%JSONStringify%': ['JSON', 'stringify'],
+  '%MapPrototype%': ['Map', 'prototype'],
+  '%NumberPrototype%': ['Number', 'prototype'],
+  '%ObjectPrototype%': ['Object', 'prototype'],
+  '%ObjProto_toString%': ['Object', 'prototype', 'toString'],
+  '%ObjProto_valueOf%': ['Object', 'prototype', 'valueOf'],
+  '%PromisePrototype%': ['Promise', 'prototype'],
+  '%PromiseProto_then%': ['Promise', 'prototype', 'then'],
+  '%Promise_all%': ['Promise', 'all'],
+  '%Promise_reject%': ['Promise', 'reject'],
+  '%Promise_resolve%': ['Promise', 'resolve'],
+  '%RangeErrorPrototype%': ['RangeError', 'prototype'],
+  '%ReferenceErrorPrototype%': ['ReferenceError', 'prototype'],
+  '%RegExpPrototype%': ['RegExp', 'prototype'],
+  '%SetPrototype%': ['Set', 'prototype'],
+  '%SharedArrayBufferPrototype%': ['SharedArrayBuffer', 'prototype'],
+  '%StringPrototype%': ['String', 'prototype'],
+  '%SymbolPrototype%': ['Symbol', 'prototype'],
+  '%SyntaxErrorPrototype%': ['SyntaxError', 'prototype'],
+  '%TypedArrayPrototype%': ['TypedArray', 'prototype'],
+  '%TypeErrorPrototype%': ['TypeError', 'prototype'],
+  '%Uint8ArrayPrototype%': ['Uint8Array', 'prototype'],
+  '%Uint8ClampedArrayPrototype%': ['Uint8ClampedArray', 'prototype'],
+  '%Uint16ArrayPrototype%': ['Uint16Array', 'prototype'],
+  '%Uint32ArrayPrototype%': ['Uint32Array', 'prototype'],
+  '%URIErrorPrototype%': ['URIError', 'prototype'],
+  '%WeakMapPrototype%': ['WeakMap', 'prototype'],
+  '%WeakSetPrototype%': ['WeakSet', 'prototype']
+};
+var bind = requireFunctionBind();
+var hasOwn = requireHasown();
+var $concat = bind.call($call, Array.prototype.concat);
+var $spliceApply = bind.call($apply, Array.prototype.splice);
+var $replace = bind.call($call, String.prototype.replace);
+var $strSlice = bind.call($call, String.prototype.slice);
+var $exec = bind.call($call, RegExp.prototype.exec);
 
-var callBind = {exports: {}};
+/* adapted from https://github.com/lodash/lodash/blob/4.17.15/dist/lodash.js#L6735-L6744 */
+var rePropName = /[^%.[\]]+|\[(?:(-?\d+(?:\.\d+)?)|(["'])((?:(?!\2)[^\\]|\\.)*?)\2)\]|(?=(?:\.|\[\])(?:\.|\[\]|%$))/g;
+var reEscapeChar = /\\(\\)?/g; /** Used to match backslashes in property paths. */
+var stringToPath = function stringToPath(string) {
+  var first = $strSlice(string, 0, 1);
+  var last = $strSlice(string, -1);
+  if (first === '%' && last !== '%') {
+    throw new $SyntaxError('invalid intrinsic syntax, expected closing `%`');
+  } else if (last === '%' && first !== '%') {
+    throw new $SyntaxError('invalid intrinsic syntax, expected opening `%`');
+  }
+  var result = [];
+  $replace(string, rePropName, function (match, number, quote, subString) {
+    result[result.length] = quote ? $replace(subString, reEscapeChar, '$1') : number || match;
+  });
+  return result;
+};
+/* end adaptation */
 
-var esDefineProperty;
-var hasRequiredEsDefineProperty;
-function requireEsDefineProperty() {
-  if (hasRequiredEsDefineProperty) return esDefineProperty;
-  hasRequiredEsDefineProperty = 1;
-  var GetIntrinsic = requireGetIntrinsic();
-
-  /** @type {import('.')} */
-  var $defineProperty = GetIntrinsic('%Object.defineProperty%', true) || false;
-  if ($defineProperty) {
-    try {
-      $defineProperty({}, 'a', {
-        value: 1
-      });
-    } catch (e) {
-      // IE 8 has a broken defineProperty
-      $defineProperty = false;
-    }
+var getBaseIntrinsic = function getBaseIntrinsic(name, allowMissing) {
+  var intrinsicName = name;
+  var alias;
+  if (hasOwn(LEGACY_ALIASES, intrinsicName)) {
+    alias = LEGACY_ALIASES[intrinsicName];
+    intrinsicName = '%' + alias[0] + '%';
   }
-  esDefineProperty = $defineProperty;
-  return esDefineProperty;
-}
-
-var gopd;
-var hasRequiredGopd;
-function requireGopd() {
-  if (hasRequiredGopd) return gopd;
-  hasRequiredGopd = 1;
-  var GetIntrinsic = requireGetIntrinsic();
-  var $gOPD = GetIntrinsic('%Object.getOwnPropertyDescriptor%', true);
-  if ($gOPD) {
-    try {
-      $gOPD([], 'length');
-    } catch (e) {
-      // IE 8 has a broken gOPD
-      $gOPD = null;
-    }
-  }
-  gopd = $gOPD;
-  return gopd;
-}
-
-var defineDataProperty;
-var hasRequiredDefineDataProperty;
-function requireDefineDataProperty() {
-  if (hasRequiredDefineDataProperty) return defineDataProperty;
-  hasRequiredDefineDataProperty = 1;
-  var $defineProperty = requireEsDefineProperty();
-  var $SyntaxError = requireSyntax();
-  var $TypeError = requireType();
-  var gopd = requireGopd();
-
-  /** @type {import('.')} */
-  defineDataProperty = function defineDataProperty(obj, property, value) {
-    if (!obj || _typeof(obj) !== 'object' && typeof obj !== 'function') {
-      throw new $TypeError('`obj` must be an object or a function`');
-    }
-    if (typeof property !== 'string' && _typeof(property) !== 'symbol') {
-      throw new $TypeError('`property` must be a string or a symbol`');
-    }
-    if (arguments.length > 3 && typeof arguments[3] !== 'boolean' && arguments[3] !== null) {
-      throw new $TypeError('`nonEnumerable`, if provided, must be a boolean or null');
-    }
-    if (arguments.length > 4 && typeof arguments[4] !== 'boolean' && arguments[4] !== null) {
-      throw new $TypeError('`nonWritable`, if provided, must be a boolean or null');
-    }
-    if (arguments.length > 5 && typeof arguments[5] !== 'boolean' && arguments[5] !== null) {
-      throw new $TypeError('`nonConfigurable`, if provided, must be a boolean or null');
-    }
-    if (arguments.length > 6 && typeof arguments[6] !== 'boolean') {
-      throw new $TypeError('`loose`, if provided, must be a boolean');
-    }
-    var nonEnumerable = arguments.length > 3 ? arguments[3] : null;
-    var nonWritable = arguments.length > 4 ? arguments[4] : null;
-    var nonConfigurable = arguments.length > 5 ? arguments[5] : null;
-    var loose = arguments.length > 6 ? arguments[6] : false;
-
-    /* @type {false | TypedPropertyDescriptor<unknown>} */
-    var desc = !!gopd && gopd(obj, property);
-    if ($defineProperty) {
-      $defineProperty(obj, property, {
-        configurable: nonConfigurable === null && desc ? desc.configurable : !nonConfigurable,
-        enumerable: nonEnumerable === null && desc ? desc.enumerable : !nonEnumerable,
-        value: value,
-        writable: nonWritable === null && desc ? desc.writable : !nonWritable
-      });
-    } else if (loose || !nonEnumerable && !nonWritable && !nonConfigurable) {
-      // must fall back to [[Set]], and was not explicitly asked to make non-enumerable, non-writable, or non-configurable
-      obj[property] = value; // eslint-disable-line no-param-reassign
-    } else {
-      throw new $SyntaxError('This environment does not support defining a property as non-configurable, non-writable, or non-enumerable.');
-    }
-  };
-  return defineDataProperty;
-}
-
-var hasPropertyDescriptors_1;
-var hasRequiredHasPropertyDescriptors;
-function requireHasPropertyDescriptors() {
-  if (hasRequiredHasPropertyDescriptors) return hasPropertyDescriptors_1;
-  hasRequiredHasPropertyDescriptors = 1;
-  var $defineProperty = requireEsDefineProperty();
-  var hasPropertyDescriptors = function hasPropertyDescriptors() {
-    return !!$defineProperty;
-  };
-  hasPropertyDescriptors.hasArrayLengthDefineBug = function hasArrayLengthDefineBug() {
-    // node v0.6 has a bug where array lengths can be Set but not Defined
-    if (!$defineProperty) {
-      return null;
-    }
-    try {
-      return $defineProperty([], 'length', {
-        value: 1
-      }).length !== 1;
-    } catch (e) {
-      // In Firefox 4-22, defining length on an array throws an exception.
-      return true;
-    }
-  };
-  hasPropertyDescriptors_1 = hasPropertyDescriptors;
-  return hasPropertyDescriptors_1;
-}
-
-var setFunctionLength;
-var hasRequiredSetFunctionLength;
-function requireSetFunctionLength() {
-  if (hasRequiredSetFunctionLength) return setFunctionLength;
-  hasRequiredSetFunctionLength = 1;
-  var GetIntrinsic = requireGetIntrinsic();
-  var define = requireDefineDataProperty();
-  var hasDescriptors = requireHasPropertyDescriptors()();
-  var gOPD = requireGopd();
-  var $TypeError = requireType();
-  var $floor = GetIntrinsic('%Math.floor%');
-
-  /** @type {import('.')} */
-  setFunctionLength = function setFunctionLength(fn, length) {
-    if (typeof fn !== 'function') {
-      throw new $TypeError('`fn` is not a function');
-    }
-    if (typeof length !== 'number' || length < 0 || length > 0xFFFFFFFF || $floor(length) !== length) {
-      throw new $TypeError('`length` must be a positive 32-bit integer');
-    }
-    var loose = arguments.length > 2 && !!arguments[2];
-    var functionLengthIsConfigurable = true;
-    var functionLengthIsWritable = true;
-    if ('length' in fn && gOPD) {
-      var desc = gOPD(fn, 'length');
-      if (desc && !desc.configurable) {
-        functionLengthIsConfigurable = false;
-      }
-      if (desc && !desc.writable) {
-        functionLengthIsWritable = false;
-      }
-    }
-    if (functionLengthIsConfigurable || functionLengthIsWritable || !loose) {
-      if (hasDescriptors) {
-        define( /** @type {Parameters<define>[0]} */fn, 'length', length, true, true);
-      } else {
-        define( /** @type {Parameters<define>[0]} */fn, 'length', length);
-      }
-    }
-    return fn;
-  };
-  return setFunctionLength;
-}
-
-var hasRequiredCallBind;
-function requireCallBind() {
-  if (hasRequiredCallBind) return callBind.exports;
-  hasRequiredCallBind = 1;
-  (function (module) {
-
-    var bind = requireFunctionBind();
-    var GetIntrinsic = requireGetIntrinsic();
-    var setFunctionLength = requireSetFunctionLength();
-    var $TypeError = requireType();
-    var $apply = GetIntrinsic('%Function.prototype.apply%');
-    var $call = GetIntrinsic('%Function.prototype.call%');
-    var $reflectApply = GetIntrinsic('%Reflect.apply%', true) || bind.call($call, $apply);
-    var $defineProperty = requireEsDefineProperty();
-    var $max = GetIntrinsic('%Math.max%');
-    module.exports = function callBind(originalFunction) {
-      if (typeof originalFunction !== 'function') {
-        throw new $TypeError('a function is required');
-      }
-      var func = $reflectApply(bind, $call, arguments);
-      return setFunctionLength(func, 1 + $max(0, originalFunction.length - (arguments.length - 1)), true);
-    };
-    var applyBind = function applyBind() {
-      return $reflectApply(bind, $apply, arguments);
-    };
-    if ($defineProperty) {
-      $defineProperty(module.exports, 'apply', {
-        value: applyBind
-      });
-    } else {
-      module.exports.apply = applyBind;
-    }
-  })(callBind);
-  return callBind.exports;
-}
-
-var callBound;
-var hasRequiredCallBound;
-function requireCallBound() {
-  if (hasRequiredCallBound) return callBound;
-  hasRequiredCallBound = 1;
-  var GetIntrinsic = requireGetIntrinsic();
-  var callBind = requireCallBind();
-  var $indexOf = callBind(GetIntrinsic('String.prototype.indexOf'));
-  callBound = function callBoundIntrinsic(name, allowMissing) {
-    var intrinsic = GetIntrinsic(name, !!allowMissing);
-    if (typeof intrinsic === 'function' && $indexOf(name, '.prototype.') > -1) {
-      return callBind(intrinsic);
-    }
-    return intrinsic;
-  };
-  return callBound;
-}
-
-var util_inspect;
-var hasRequiredUtil_inspect;
-function requireUtil_inspect() {
-  if (hasRequiredUtil_inspect) return util_inspect;
-  hasRequiredUtil_inspect = 1;
-  util_inspect = require$$0$4.inspect;
-  return util_inspect;
-}
-
-var objectInspect;
-var hasRequiredObjectInspect;
-function requireObjectInspect() {
-  if (hasRequiredObjectInspect) return objectInspect;
-  hasRequiredObjectInspect = 1;
-  var hasMap = typeof Map === 'function' && Map.prototype;
-  var mapSizeDescriptor = Object.getOwnPropertyDescriptor && hasMap ? Object.getOwnPropertyDescriptor(Map.prototype, 'size') : null;
-  var mapSize = hasMap && mapSizeDescriptor && typeof mapSizeDescriptor.get === 'function' ? mapSizeDescriptor.get : null;
-  var mapForEach = hasMap && Map.prototype.forEach;
-  var hasSet = typeof Set === 'function' && Set.prototype;
-  var setSizeDescriptor = Object.getOwnPropertyDescriptor && hasSet ? Object.getOwnPropertyDescriptor(Set.prototype, 'size') : null;
-  var setSize = hasSet && setSizeDescriptor && typeof setSizeDescriptor.get === 'function' ? setSizeDescriptor.get : null;
-  var setForEach = hasSet && Set.prototype.forEach;
-  var hasWeakMap = typeof WeakMap === 'function' && WeakMap.prototype;
-  var weakMapHas = hasWeakMap ? WeakMap.prototype.has : null;
-  var hasWeakSet = typeof WeakSet === 'function' && WeakSet.prototype;
-  var weakSetHas = hasWeakSet ? WeakSet.prototype.has : null;
-  var hasWeakRef = typeof WeakRef === 'function' && WeakRef.prototype;
-  var weakRefDeref = hasWeakRef ? WeakRef.prototype.deref : null;
-  var booleanValueOf = Boolean.prototype.valueOf;
-  var objectToString = Object.prototype.toString;
-  var functionToString = Function.prototype.toString;
-  var $match = String.prototype.match;
-  var $slice = String.prototype.slice;
-  var $replace = String.prototype.replace;
-  var $toUpperCase = String.prototype.toUpperCase;
-  var $toLowerCase = String.prototype.toLowerCase;
-  var $test = RegExp.prototype.test;
-  var $concat = Array.prototype.concat;
-  var $join = Array.prototype.join;
-  var $arrSlice = Array.prototype.slice;
-  var $floor = Math.floor;
-  var bigIntValueOf = typeof BigInt === 'function' ? BigInt.prototype.valueOf : null;
-  var gOPS = Object.getOwnPropertySymbols;
-  var symToString = typeof Symbol === 'function' && _typeof(Symbol.iterator) === 'symbol' ? Symbol.prototype.toString : null;
-  var hasShammedSymbols = typeof Symbol === 'function' && _typeof(Symbol.iterator) === 'object';
-  // ie, `has-tostringtag/shams
-  var toStringTag = typeof Symbol === 'function' && Symbol.toStringTag && (_typeof(Symbol.toStringTag) === hasShammedSymbols ? 'object' : 'symbol') ? Symbol.toStringTag : null;
-  var isEnumerable = Object.prototype.propertyIsEnumerable;
-  var gPO = (typeof Reflect === 'function' ? Reflect.getPrototypeOf : Object.getPrototypeOf) || ([].__proto__ === Array.prototype // eslint-disable-line no-proto
-  ? function (O) {
-    return O.__proto__; // eslint-disable-line no-proto
-  } : null);
-  function addNumericSeparator(num, str) {
-    if (num === Infinity || num === -Infinity || num !== num || num && num > -1000 && num < 1000 || $test.call(/e/, str)) {
-      return str;
-    }
-    var sepRegex = /[0-9](?=(?:[0-9]{3})+(?![0-9]))/g;
-    if (typeof num === 'number') {
-      var _int = num < 0 ? -$floor(-num) : $floor(num); // trunc(num)
-      if (_int !== num) {
-        var intStr = String(_int);
-        var dec = $slice.call(str, intStr.length + 1);
-        return $replace.call(intStr, sepRegex, '$&_') + '.' + $replace.call($replace.call(dec, /([0-9]{3})/g, '$&_'), /_$/, '');
-      }
-    }
-    return $replace.call(str, sepRegex, '$&_');
-  }
-  var utilInspect = requireUtil_inspect();
-  var inspectCustom = utilInspect.custom;
-  var inspectSymbol = isSymbol(inspectCustom) ? inspectCustom : null;
-  objectInspect = function inspect_(obj, options, depth, seen) {
-    var opts = options || {};
-    if (has(opts, 'quoteStyle') && opts.quoteStyle !== 'single' && opts.quoteStyle !== 'double') {
-      throw new TypeError('option "quoteStyle" must be "single" or "double"');
-    }
-    if (has(opts, 'maxStringLength') && (typeof opts.maxStringLength === 'number' ? opts.maxStringLength < 0 && opts.maxStringLength !== Infinity : opts.maxStringLength !== null)) {
-      throw new TypeError('option "maxStringLength", if provided, must be a positive integer, Infinity, or `null`');
-    }
-    var customInspect = has(opts, 'customInspect') ? opts.customInspect : true;
-    if (typeof customInspect !== 'boolean' && customInspect !== 'symbol') {
-      throw new TypeError('option "customInspect", if provided, must be `true`, `false`, or `\'symbol\'`');
-    }
-    if (has(opts, 'indent') && opts.indent !== null && opts.indent !== '\t' && !(parseInt(opts.indent, 10) === opts.indent && opts.indent > 0)) {
-      throw new TypeError('option "indent" must be "\\t", an integer > 0, or `null`');
-    }
-    if (has(opts, 'numericSeparator') && typeof opts.numericSeparator !== 'boolean') {
-      throw new TypeError('option "numericSeparator", if provided, must be `true` or `false`');
-    }
-    var numericSeparator = opts.numericSeparator;
-    if (typeof obj === 'undefined') {
-      return 'undefined';
-    }
-    if (obj === null) {
-      return 'null';
-    }
-    if (typeof obj === 'boolean') {
-      return obj ? 'true' : 'false';
-    }
-    if (typeof obj === 'string') {
-      return inspectString(obj, opts);
-    }
-    if (typeof obj === 'number') {
-      if (obj === 0) {
-        return Infinity / obj > 0 ? '0' : '-0';
-      }
-      var str = String(obj);
-      return numericSeparator ? addNumericSeparator(obj, str) : str;
-    }
-    if (typeof obj === 'bigint') {
-      var bigIntStr = String(obj) + 'n';
-      return numericSeparator ? addNumericSeparator(obj, bigIntStr) : bigIntStr;
-    }
-    var maxDepth = typeof opts.depth === 'undefined' ? 5 : opts.depth;
-    if (typeof depth === 'undefined') {
-      depth = 0;
-    }
-    if (depth >= maxDepth && maxDepth > 0 && _typeof(obj) === 'object') {
-      return isArray(obj) ? '[Array]' : '[Object]';
-    }
-    var indent = getIndent(opts, depth);
-    if (typeof seen === 'undefined') {
-      seen = [];
-    } else if (indexOf(seen, obj) >= 0) {
-      return '[Circular]';
-    }
-    function inspect(value, from, noIndent) {
-      if (from) {
-        seen = $arrSlice.call(seen);
-        seen.push(from);
-      }
-      if (noIndent) {
-        var newOpts = {
-          depth: opts.depth
-        };
-        if (has(opts, 'quoteStyle')) {
-          newOpts.quoteStyle = opts.quoteStyle;
-        }
-        return inspect_(value, newOpts, depth + 1, seen);
-      }
-      return inspect_(value, opts, depth + 1, seen);
-    }
-    if (typeof obj === 'function' && !isRegExp(obj)) {
-      // in older engines, regexes are callable
-      var name = nameOf(obj);
-      var keys = arrObjKeys(obj, inspect);
-      return '[Function' + (name ? ': ' + name : ' (anonymous)') + ']' + (keys.length > 0 ? ' { ' + $join.call(keys, ', ') + ' }' : '');
-    }
-    if (isSymbol(obj)) {
-      var symString = hasShammedSymbols ? $replace.call(String(obj), /^(Symbol\(.*\))_[^)]*$/, '$1') : symToString.call(obj);
-      return _typeof(obj) === 'object' && !hasShammedSymbols ? markBoxed(symString) : symString;
-    }
-    if (isElement(obj)) {
-      var s = '<' + $toLowerCase.call(String(obj.nodeName));
-      var attrs = obj.attributes || [];
-      for (var i = 0; i < attrs.length; i++) {
-        s += ' ' + attrs[i].name + '=' + wrapQuotes(quote(attrs[i].value), 'double', opts);
-      }
-      s += '>';
-      if (obj.childNodes && obj.childNodes.length) {
-        s += '...';
-      }
-      s += '</' + $toLowerCase.call(String(obj.nodeName)) + '>';
-      return s;
-    }
-    if (isArray(obj)) {
-      if (obj.length === 0) {
-        return '[]';
-      }
-      var xs = arrObjKeys(obj, inspect);
-      if (indent && !singleLineValues(xs)) {
-        return '[' + indentedJoin(xs, indent) + ']';
-      }
-      return '[ ' + $join.call(xs, ', ') + ' ]';
-    }
-    if (isError(obj)) {
-      var parts = arrObjKeys(obj, inspect);
-      if (!('cause' in Error.prototype) && 'cause' in obj && !isEnumerable.call(obj, 'cause')) {
-        return '{ [' + String(obj) + '] ' + $join.call($concat.call('[cause]: ' + inspect(obj.cause), parts), ', ') + ' }';
-      }
-      if (parts.length === 0) {
-        return '[' + String(obj) + ']';
-      }
-      return '{ [' + String(obj) + '] ' + $join.call(parts, ', ') + ' }';
-    }
-    if (_typeof(obj) === 'object' && customInspect) {
-      if (inspectSymbol && typeof obj[inspectSymbol] === 'function' && utilInspect) {
-        return utilInspect(obj, {
-          depth: maxDepth - depth
-        });
-      } else if (customInspect !== 'symbol' && typeof obj.inspect === 'function') {
-        return obj.inspect();
-      }
-    }
-    if (isMap(obj)) {
-      var mapParts = [];
-      if (mapForEach) {
-        mapForEach.call(obj, function (value, key) {
-          mapParts.push(inspect(key, obj, true) + ' => ' + inspect(value, obj));
-        });
-      }
-      return collectionOf('Map', mapSize.call(obj), mapParts, indent);
-    }
-    if (isSet(obj)) {
-      var setParts = [];
-      if (setForEach) {
-        setForEach.call(obj, function (value) {
-          setParts.push(inspect(value, obj));
-        });
-      }
-      return collectionOf('Set', setSize.call(obj), setParts, indent);
-    }
-    if (isWeakMap(obj)) {
-      return weakCollectionOf('WeakMap');
-    }
-    if (isWeakSet(obj)) {
-      return weakCollectionOf('WeakSet');
-    }
-    if (isWeakRef(obj)) {
-      return weakCollectionOf('WeakRef');
-    }
-    if (isNumber(obj)) {
-      return markBoxed(inspect(Number(obj)));
-    }
-    if (isBigInt(obj)) {
-      return markBoxed(inspect(bigIntValueOf.call(obj)));
-    }
-    if (isBoolean(obj)) {
-      return markBoxed(booleanValueOf.call(obj));
-    }
-    if (isString(obj)) {
-      return markBoxed(inspect(String(obj)));
-    }
-    // note: in IE 8, sometimes `global !== window` but both are the prototypes of each other
-    /* eslint-env browser */
-    if (typeof window !== 'undefined' && obj === window) {
-      return '{ [object Window] }';
-    }
-    if (typeof globalThis !== 'undefined' && obj === globalThis || typeof commonjsGlobal !== 'undefined' && obj === commonjsGlobal) {
-      return '{ [object globalThis] }';
-    }
-    if (!isDate(obj) && !isRegExp(obj)) {
-      var ys = arrObjKeys(obj, inspect);
-      var isPlainObject = gPO ? gPO(obj) === Object.prototype : obj instanceof Object || obj.constructor === Object;
-      var protoTag = obj instanceof Object ? '' : 'null prototype';
-      var stringTag = !isPlainObject && toStringTag && Object(obj) === obj && toStringTag in obj ? $slice.call(toStr(obj), 8, -1) : protoTag ? 'Object' : '';
-      var constructorTag = isPlainObject || typeof obj.constructor !== 'function' ? '' : obj.constructor.name ? obj.constructor.name + ' ' : '';
-      var tag = constructorTag + (stringTag || protoTag ? '[' + $join.call($concat.call([], stringTag || [], protoTag || []), ': ') + '] ' : '');
-      if (ys.length === 0) {
-        return tag + '{}';
-      }
-      if (indent) {
-        return tag + '{' + indentedJoin(ys, indent) + '}';
-      }
-      return tag + '{ ' + $join.call(ys, ', ') + ' }';
-    }
-    return String(obj);
-  };
-  function wrapQuotes(s, defaultStyle, opts) {
-    var quoteChar = (opts.quoteStyle || defaultStyle) === 'double' ? '"' : "'";
-    return quoteChar + s + quoteChar;
-  }
-  function quote(s) {
-    return $replace.call(String(s), /"/g, '&quot;');
-  }
-  function isArray(obj) {
-    return toStr(obj) === '[object Array]' && (!toStringTag || !(_typeof(obj) === 'object' && toStringTag in obj));
-  }
-  function isDate(obj) {
-    return toStr(obj) === '[object Date]' && (!toStringTag || !(_typeof(obj) === 'object' && toStringTag in obj));
-  }
-  function isRegExp(obj) {
-    return toStr(obj) === '[object RegExp]' && (!toStringTag || !(_typeof(obj) === 'object' && toStringTag in obj));
-  }
-  function isError(obj) {
-    return toStr(obj) === '[object Error]' && (!toStringTag || !(_typeof(obj) === 'object' && toStringTag in obj));
-  }
-  function isString(obj) {
-    return toStr(obj) === '[object String]' && (!toStringTag || !(_typeof(obj) === 'object' && toStringTag in obj));
-  }
-  function isNumber(obj) {
-    return toStr(obj) === '[object Number]' && (!toStringTag || !(_typeof(obj) === 'object' && toStringTag in obj));
-  }
-  function isBoolean(obj) {
-    return toStr(obj) === '[object Boolean]' && (!toStringTag || !(_typeof(obj) === 'object' && toStringTag in obj));
-  }
-
-  // Symbol and BigInt do have Symbol.toStringTag by spec, so that can't be used to eliminate false positives
-  function isSymbol(obj) {
-    if (hasShammedSymbols) {
-      return obj && _typeof(obj) === 'object' && obj instanceof Symbol;
-    }
-    if (_typeof(obj) === 'symbol') {
-      return true;
-    }
-    if (!obj || _typeof(obj) !== 'object' || !symToString) {
-      return false;
-    }
-    try {
-      symToString.call(obj);
-      return true;
-    } catch (e) {}
-    return false;
-  }
-  function isBigInt(obj) {
-    if (!obj || _typeof(obj) !== 'object' || !bigIntValueOf) {
-      return false;
-    }
-    try {
-      bigIntValueOf.call(obj);
-      return true;
-    } catch (e) {}
-    return false;
-  }
-  var hasOwn = Object.prototype.hasOwnProperty || function (key) {
-    return key in this;
-  };
-  function has(obj, key) {
-    return hasOwn.call(obj, key);
-  }
-  function toStr(obj) {
-    return objectToString.call(obj);
-  }
-  function nameOf(f) {
-    if (f.name) {
-      return f.name;
-    }
-    var m = $match.call(functionToString.call(f), /^function\s*([\w$]+)/);
-    if (m) {
-      return m[1];
-    }
-    return null;
-  }
-  function indexOf(xs, x) {
-    if (xs.indexOf) {
-      return xs.indexOf(x);
-    }
-    for (var i = 0, l = xs.length; i < l; i++) {
-      if (xs[i] === x) {
-        return i;
-      }
-    }
-    return -1;
-  }
-  function isMap(x) {
-    if (!mapSize || !x || _typeof(x) !== 'object') {
-      return false;
-    }
-    try {
-      mapSize.call(x);
-      try {
-        setSize.call(x);
-      } catch (s) {
-        return true;
-      }
-      return x instanceof Map; // core-js workaround, pre-v2.5.0
-    } catch (e) {}
-    return false;
-  }
-  function isWeakMap(x) {
-    if (!weakMapHas || !x || _typeof(x) !== 'object') {
-      return false;
-    }
-    try {
-      weakMapHas.call(x, weakMapHas);
-      try {
-        weakSetHas.call(x, weakSetHas);
-      } catch (s) {
-        return true;
-      }
-      return x instanceof WeakMap; // core-js workaround, pre-v2.5.0
-    } catch (e) {}
-    return false;
-  }
-  function isWeakRef(x) {
-    if (!weakRefDeref || !x || _typeof(x) !== 'object') {
-      return false;
-    }
-    try {
-      weakRefDeref.call(x);
-      return true;
-    } catch (e) {}
-    return false;
-  }
-  function isSet(x) {
-    if (!setSize || !x || _typeof(x) !== 'object') {
-      return false;
-    }
-    try {
-      setSize.call(x);
-      try {
-        mapSize.call(x);
-      } catch (m) {
-        return true;
-      }
-      return x instanceof Set; // core-js workaround, pre-v2.5.0
-    } catch (e) {}
-    return false;
-  }
-  function isWeakSet(x) {
-    if (!weakSetHas || !x || _typeof(x) !== 'object') {
-      return false;
-    }
-    try {
-      weakSetHas.call(x, weakSetHas);
-      try {
-        weakMapHas.call(x, weakMapHas);
-      } catch (s) {
-        return true;
-      }
-      return x instanceof WeakSet; // core-js workaround, pre-v2.5.0
-    } catch (e) {}
-    return false;
-  }
-  function isElement(x) {
-    if (!x || _typeof(x) !== 'object') {
-      return false;
-    }
-    if (typeof HTMLElement !== 'undefined' && x instanceof HTMLElement) {
-      return true;
-    }
-    return typeof x.nodeName === 'string' && typeof x.getAttribute === 'function';
-  }
-  function inspectString(str, opts) {
-    if (str.length > opts.maxStringLength) {
-      var remaining = str.length - opts.maxStringLength;
-      var trailer = '... ' + remaining + ' more character' + (remaining > 1 ? 's' : '');
-      return inspectString($slice.call(str, 0, opts.maxStringLength), opts) + trailer;
-    }
-    // eslint-disable-next-line no-control-regex
-    var s = $replace.call($replace.call(str, /(['\\])/g, '\\$1'), /[\x00-\x1f]/g, lowbyte);
-    return wrapQuotes(s, 'single', opts);
-  }
-  function lowbyte(c) {
-    var n = c.charCodeAt(0);
-    var x = {
-      8: 'b',
-      9: 't',
-      10: 'n',
-      12: 'f',
-      13: 'r'
-    }[n];
-    if (x) {
-      return '\\' + x;
-    }
-    return '\\x' + (n < 0x10 ? '0' : '') + $toUpperCase.call(n.toString(16));
-  }
-  function markBoxed(str) {
-    return 'Object(' + str + ')';
-  }
-  function weakCollectionOf(type) {
-    return type + ' { ? }';
-  }
-  function collectionOf(type, size, entries, indent) {
-    var joinedEntries = indent ? indentedJoin(entries, indent) : $join.call(entries, ', ');
-    return type + ' (' + size + ') {' + joinedEntries + '}';
-  }
-  function singleLineValues(xs) {
-    for (var i = 0; i < xs.length; i++) {
-      if (indexOf(xs[i], '\n') >= 0) {
-        return false;
-      }
-    }
-    return true;
-  }
-  function getIndent(opts, depth) {
-    var baseIndent;
-    if (opts.indent === '\t') {
-      baseIndent = '\t';
-    } else if (typeof opts.indent === 'number' && opts.indent > 0) {
-      baseIndent = $join.call(Array(opts.indent + 1), ' ');
-    } else {
-      return null;
+  if (hasOwn(INTRINSICS, intrinsicName)) {
+    var value = INTRINSICS[intrinsicName];
+    if (value === needsEval) {
+      value = doEval(intrinsicName);
+    }
+    if (typeof value === 'undefined' && !allowMissing) {
+      throw new $TypeError$3('intrinsic ' + name + ' exists, but is not available. Please file an issue!');
     }
     return {
-      base: baseIndent,
-      prev: $join.call(Array(depth + 1), baseIndent)
+      alias: alias,
+      name: intrinsicName,
+      value: value
     };
   }
-  function indentedJoin(xs, indent) {
-    if (xs.length === 0) {
-      return '';
-    }
-    var lineJoiner = '\n' + indent.prev + indent.base;
-    return lineJoiner + $join.call(xs, ',' + lineJoiner) + '\n' + indent.prev;
+  throw new $SyntaxError('intrinsic ' + name + ' does not exist!');
+};
+var getIntrinsic = function GetIntrinsic(name, allowMissing) {
+  if (typeof name !== 'string' || name.length === 0) {
+    throw new $TypeError$3('intrinsic name must be a non-empty string');
   }
-  function arrObjKeys(obj, inspect) {
-    var isArr = isArray(obj);
-    var xs = [];
-    if (isArr) {
-      xs.length = obj.length;
-      for (var i = 0; i < obj.length; i++) {
-        xs[i] = has(obj, i) ? inspect(obj[i], obj) : '';
-      }
+  if (arguments.length > 1 && typeof allowMissing !== 'boolean') {
+    throw new $TypeError$3('"allowMissing" argument must be a boolean');
+  }
+  if ($exec(/^%?[^%]*%?$/, name) === null) {
+    throw new $SyntaxError('`%` may not be present anywhere but at the beginning and end of the intrinsic name');
+  }
+  var parts = stringToPath(name);
+  var intrinsicBaseName = parts.length > 0 ? parts[0] : '';
+  var intrinsic = getBaseIntrinsic('%' + intrinsicBaseName + '%', allowMissing);
+  var intrinsicRealName = intrinsic.name;
+  var value = intrinsic.value;
+  var skipFurtherCaching = false;
+  var alias = intrinsic.alias;
+  if (alias) {
+    intrinsicBaseName = alias[0];
+    $spliceApply(parts, $concat([0, 1], alias));
+  }
+  for (var i = 1, isOwn = true; i < parts.length; i += 1) {
+    var part = parts[i];
+    var first = $strSlice(part, 0, 1);
+    var last = $strSlice(part, -1);
+    if ((first === '"' || first === "'" || first === '`' || last === '"' || last === "'" || last === '`') && first !== last) {
+      throw new $SyntaxError('property names with quotes must have matching quotes');
     }
-    var syms = typeof gOPS === 'function' ? gOPS(obj) : [];
-    var symMap;
-    if (hasShammedSymbols) {
-      symMap = {};
-      for (var k = 0; k < syms.length; k++) {
-        symMap['$' + syms[k]] = syms[k];
-      }
+    if (part === 'constructor' || !isOwn) {
+      skipFurtherCaching = true;
     }
-    for (var key in obj) {
-      // eslint-disable-line no-restricted-syntax
-      if (!has(obj, key)) {
-        continue;
-      } // eslint-disable-line no-restricted-syntax, no-continue
-      if (isArr && String(Number(key)) === key && key < obj.length) {
-        continue;
-      } // eslint-disable-line no-restricted-syntax, no-continue
-      if (hasShammedSymbols && symMap['$' + key] instanceof Symbol) {
-        // this is to prevent shammed Symbols, which are stored as strings, from being included in the string key section
-        continue; // eslint-disable-line no-restricted-syntax, no-continue
-      } else if ($test.call(/[^\w$]/, key)) {
-        xs.push(inspect(key, obj) + ': ' + inspect(obj[key], obj));
+    intrinsicBaseName += '.' + part;
+    intrinsicRealName = '%' + intrinsicBaseName + '%';
+    if (hasOwn(INTRINSICS, intrinsicRealName)) {
+      value = INTRINSICS[intrinsicRealName];
+    } else if (value != null) {
+      if (!(part in value)) {
+        if (!allowMissing) {
+          throw new $TypeError$3('base intrinsic for ' + name + ' exists, but the property is not available.');
+        }
+        return void undefined$1;
+      }
+      if ($gOPD && i + 1 >= parts.length) {
+        var desc = $gOPD(value, part);
+        isOwn = !!desc;
+
+        // By convention, when a data property is converted to an accessor
+        // property to emulate a data property that does not suffer from
+        // the override mistake, that accessor's getter is marked with
+        // an `originalValue` property. Here, when we detect this, we
+        // uphold the illusion by pretending to see that original data
+        // property, i.e., returning the value rather than the getter
+        // itself.
+        if (isOwn && 'get' in desc && !('originalValue' in desc.get)) {
+          value = desc.get;
+        } else {
+          value = value[part];
+        }
       } else {
-        xs.push(key + ': ' + inspect(obj[key], obj));
+        isOwn = hasOwn(value, part);
+        value = value[part];
+      }
+      if (isOwn && !skipFurtherCaching) {
+        INTRINSICS[intrinsicRealName] = value;
       }
     }
-    if (typeof gOPS === 'function') {
-      for (var j = 0; j < syms.length; j++) {
-        if (isEnumerable.call(obj, syms[j])) {
-          xs.push('[' + inspect(syms[j]) + ']: ' + inspect(obj[syms[j]], obj));
-        }
-      }
-    }
-    return xs;
   }
-  return objectInspect;
-}
+  return value;
+};
 
-var sideChannel;
-var hasRequiredSideChannel;
-function requireSideChannel() {
-  if (hasRequiredSideChannel) return sideChannel;
-  hasRequiredSideChannel = 1;
-  var GetIntrinsic = requireGetIntrinsic();
-  var callBound = requireCallBound();
-  var inspect = requireObjectInspect();
-  var $TypeError = requireType();
-  var $WeakMap = GetIntrinsic('%WeakMap%', true);
-  var $Map = GetIntrinsic('%Map%', true);
-  var $weakMapGet = callBound('WeakMap.prototype.get', true);
-  var $weakMapSet = callBound('WeakMap.prototype.set', true);
-  var $weakMapHas = callBound('WeakMap.prototype.has', true);
-  var $mapGet = callBound('Map.prototype.get', true);
-  var $mapSet = callBound('Map.prototype.set', true);
-  var $mapHas = callBound('Map.prototype.has', true);
+var GetIntrinsic$2 = getIntrinsic;
+var callBindBasic = callBindApplyHelpers;
 
-  /*
-  * This function traverses the list returning the node corresponding to the given key.
-  *
-  * That node is also moved to the head of the list, so that if it's accessed again we don't need to traverse the whole list. By doing so, all the recently used nodes can be accessed relatively quickly.
-  */
-  /** @type {import('.').listGetNode} */
-  var listGetNode = function listGetNode(list, key) {
-    // eslint-disable-line consistent-return
-    /** @type {typeof list | NonNullable<(typeof list)['next']>} */
-    var prev = list;
-    /** @type {(typeof list)['next']} */
-    var curr;
-    for (; (curr = prev.next) !== null; prev = curr) {
-      if (curr.key === key) {
-        prev.next = curr.next;
-        // eslint-disable-next-line no-extra-parens
-        curr.next = /** @type {NonNullable<typeof list.next>} */list.next;
-        list.next = curr; // eslint-disable-line no-param-reassign
-        return curr;
-      }
-    }
-  };
+/** @type {(thisArg: string, searchString: string, position?: number) => number} */
+var $indexOf = callBindBasic([GetIntrinsic$2('%String.prototype.indexOf%')]);
 
-  /** @type {import('.').listGet} */
-  var listGet = function listGet(objects, key) {
-    var node = listGetNode(objects, key);
-    return node && node.value;
-  };
-  /** @type {import('.').listSet} */
-  var listSet = function listSet(objects, key, value) {
-    var node = listGetNode(objects, key);
-    if (node) {
-      node.value = value;
-    } else {
-      // Prepend the new node to the beginning of the list
-      objects.next = /** @type {import('.').ListNode<typeof value>} */{
-        // eslint-disable-line no-param-reassign, no-extra-parens
-        key: key,
-        next: objects.next,
-        value: value
-      };
-    }
-  };
-  /** @type {import('.').listHas} */
-  var listHas = function listHas(objects, key) {
-    return !!listGetNode(objects, key);
-  };
+/** @type {import('.')} */
+var callBound$2 = function callBoundIntrinsic(name, allowMissing) {
+  /* eslint no-extra-parens: 0 */
 
-  /** @type {import('.')} */
-  sideChannel = function getSideChannel() {
-    /** @type {WeakMap<object, unknown>} */var $wm;
-    /** @type {Map<object, unknown>} */
-    var $m;
-    /** @type {import('.').RootNode<unknown>} */
-    var $o;
+  var intrinsic = /** @type {(this: unknown, ...args: unknown[]) => unknown} */GetIntrinsic$2(name, !!allowMissing);
+  if (typeof intrinsic === 'function' && $indexOf(name, '.prototype.') > -1) {
+    return callBindBasic(/** @type {const} */[intrinsic]);
+  }
+  return intrinsic;
+};
 
-    /** @type {import('.').Channel} */
-    var channel = {
-      assert: function assert(key) {
-        if (!channel.has(key)) {
-          throw new $TypeError('Side channel does not contain ' + inspect(key));
-        }
-      },
-      get: function get(key) {
-        // eslint-disable-line consistent-return
-        if ($WeakMap && key && (_typeof(key) === 'object' || typeof key === 'function')) {
-          if ($wm) {
-            return $weakMapGet($wm, key);
-          }
-        } else if ($Map) {
-          if ($m) {
-            return $mapGet($m, key);
-          }
-        } else {
-          if ($o) {
-            // eslint-disable-line no-lonely-if
-            return listGet($o, key);
-          }
-        }
-      },
-      has: function has(key) {
-        if ($WeakMap && key && (_typeof(key) === 'object' || typeof key === 'function')) {
-          if ($wm) {
-            return $weakMapHas($wm, key);
-          }
-        } else if ($Map) {
-          if ($m) {
-            return $mapHas($m, key);
-          }
-        } else {
-          if ($o) {
-            // eslint-disable-line no-lonely-if
-            return listHas($o, key);
-          }
-        }
-        return false;
-      },
-      set: function set(key, value) {
-        if ($WeakMap && key && (_typeof(key) === 'object' || typeof key === 'function')) {
-          if (!$wm) {
-            $wm = new $WeakMap();
-          }
-          $weakMapSet($wm, key, value);
-        } else if ($Map) {
-          if (!$m) {
-            $m = new $Map();
-          }
-          $mapSet($m, key, value);
-        } else {
-          if (!$o) {
-            // Initialize the linked list as an empty node, so that we don't have to special-case handling of the first node: we can always refer to it as (previous node).next, instead of something like (list).head
-            $o = {
-              key: {},
-              next: null
-            };
-          }
-          listSet($o, key, value);
-        }
-      }
-    };
-    return channel;
-  };
-  return sideChannel;
-}
+var GetIntrinsic$1 = getIntrinsic;
+var callBound$1 = callBound$2;
+var inspect$2 = objectInspect;
+var $TypeError$2 = type;
+var $Map = GetIntrinsic$1('%Map%', true);
 
-var formats;
-var hasRequiredFormats;
-function requireFormats() {
-  if (hasRequiredFormats) return formats;
-  hasRequiredFormats = 1;
-  var replace = String.prototype.replace;
-  var percentTwenties = /%20/g;
-  var Format = {
-    RFC1738: 'RFC1738',
-    RFC3986: 'RFC3986'
-  };
-  formats = {
-    'default': Format.RFC3986,
-    formatters: {
-      RFC1738: function RFC1738(value) {
-        return replace.call(value, percentTwenties, '+');
-      },
-      RFC3986: function RFC3986(value) {
-        return String(value);
+/** @type {<K, V>(thisArg: Map<K, V>, key: K) => V} */
+var $mapGet = callBound$1('Map.prototype.get', true);
+/** @type {<K, V>(thisArg: Map<K, V>, key: K, value: V) => void} */
+var $mapSet = callBound$1('Map.prototype.set', true);
+/** @type {<K, V>(thisArg: Map<K, V>, key: K) => boolean} */
+var $mapHas = callBound$1('Map.prototype.has', true);
+/** @type {<K, V>(thisArg: Map<K, V>, key: K) => boolean} */
+var $mapDelete = callBound$1('Map.prototype.delete', true);
+/** @type {<K, V>(thisArg: Map<K, V>) => number} */
+var $mapSize = callBound$1('Map.prototype.size', true);
+
+/** @type {import('.')} */
+var sideChannelMap = !!$Map && /** @type {Exclude<import('.'), false>} */function getSideChannelMap() {
+  /** @typedef {ReturnType<typeof getSideChannelMap>} Channel */
+  /** @typedef {Parameters<Channel['get']>[0]} K */
+  /** @typedef {Parameters<Channel['set']>[1]} V */
+
+  /** @type {Map<K, V> | undefined} */var $m;
+
+  /** @type {Channel} */
+  var channel = {
+    assert: function assert(key) {
+      if (!channel.has(key)) {
+        throw new $TypeError$2('Side channel does not contain ' + inspect$2(key));
       }
     },
-    RFC1738: Format.RFC1738,
-    RFC3986: Format.RFC3986
+    'delete': function _delete(key) {
+      if ($m) {
+        var result = $mapDelete($m, key);
+        if ($mapSize($m) === 0) {
+          $m = void undefined;
+        }
+        return result;
+      }
+      return false;
+    },
+    get: function get(key) {
+      // eslint-disable-line consistent-return
+      if ($m) {
+        return $mapGet($m, key);
+      }
+    },
+    has: function has(key) {
+      if ($m) {
+        return $mapHas($m, key);
+      }
+      return false;
+    },
+    set: function set(key, value) {
+      if (!$m) {
+        // @ts-expect-error TS can't handle narrowing a variable inside a closure
+        $m = new $Map();
+      }
+      $mapSet($m, key, value);
+    }
   };
-  return formats;
-}
 
-var utils$1;
-var hasRequiredUtils;
-function requireUtils() {
-  if (hasRequiredUtils) return utils$1;
-  hasRequiredUtils = 1;
-  var formats = requireFormats();
-  var has = Object.prototype.hasOwnProperty;
-  var isArray = Array.isArray;
-  var hexTable = function () {
-    var array = [];
-    for (var i = 0; i < 256; ++i) {
-      array.push('%' + ((i < 16 ? '0' : '') + i.toString(16)).toUpperCase());
-    }
-    return array;
-  }();
-  var compactQueue = function compactQueue(queue) {
-    while (queue.length > 1) {
-      var item = queue.pop();
-      var obj = item.obj[item.prop];
-      if (isArray(obj)) {
-        var compacted = [];
-        for (var j = 0; j < obj.length; ++j) {
-          if (typeof obj[j] !== 'undefined') {
-            compacted.push(obj[j]);
-          }
+  // @ts-expect-error TODO: figure out why TS is erroring here
+  return channel;
+};
+
+var GetIntrinsic = getIntrinsic;
+var callBound = callBound$2;
+var inspect$1 = objectInspect;
+var getSideChannelMap$1 = sideChannelMap;
+var $TypeError$1 = type;
+var $WeakMap = GetIntrinsic('%WeakMap%', true);
+
+/** @type {<K extends object, V>(thisArg: WeakMap<K, V>, key: K) => V} */
+var $weakMapGet = callBound('WeakMap.prototype.get', true);
+/** @type {<K extends object, V>(thisArg: WeakMap<K, V>, key: K, value: V) => void} */
+var $weakMapSet = callBound('WeakMap.prototype.set', true);
+/** @type {<K extends object, V>(thisArg: WeakMap<K, V>, key: K) => boolean} */
+var $weakMapHas = callBound('WeakMap.prototype.has', true);
+/** @type {<K extends object, V>(thisArg: WeakMap<K, V>, key: K) => boolean} */
+var $weakMapDelete = callBound('WeakMap.prototype.delete', true);
+
+/** @type {import('.')} */
+var sideChannelWeakmap = $WeakMap ? /** @type {Exclude<import('.'), false>} */function getSideChannelWeakMap() {
+  /** @typedef {ReturnType<typeof getSideChannelWeakMap>} Channel */
+  /** @typedef {Parameters<Channel['get']>[0]} K */
+  /** @typedef {Parameters<Channel['set']>[1]} V */
+
+  /** @type {WeakMap<K & object, V> | undefined} */var $wm;
+  /** @type {Channel | undefined} */
+  var $m;
+
+  /** @type {Channel} */
+  var channel = {
+    assert: function assert(key) {
+      if (!channel.has(key)) {
+        throw new $TypeError$1('Side channel does not contain ' + inspect$1(key));
+      }
+    },
+    'delete': function _delete(key) {
+      if ($WeakMap && key && (_typeof(key) === 'object' || typeof key === 'function')) {
+        if ($wm) {
+          return $weakMapDelete($wm, key);
         }
-        item.obj[item.prop] = compacted;
+      } else if (getSideChannelMap$1) {
+        if ($m) {
+          return $m['delete'](key);
+        }
+      }
+      return false;
+    },
+    get: function get(key) {
+      if ($WeakMap && key && (_typeof(key) === 'object' || typeof key === 'function')) {
+        if ($wm) {
+          return $weakMapGet($wm, key);
+        }
+      }
+      return $m && $m.get(key);
+    },
+    has: function has(key) {
+      if ($WeakMap && key && (_typeof(key) === 'object' || typeof key === 'function')) {
+        if ($wm) {
+          return $weakMapHas($wm, key);
+        }
+      }
+      return !!$m && $m.has(key);
+    },
+    set: function set(key, value) {
+      if ($WeakMap && key && (_typeof(key) === 'object' || typeof key === 'function')) {
+        if (!$wm) {
+          $wm = new $WeakMap();
+        }
+        $weakMapSet($wm, key, value);
+      } else if (getSideChannelMap$1) {
+        if (!$m) {
+          $m = getSideChannelMap$1();
+        }
+        // eslint-disable-next-line no-extra-parens
+        /** @type {NonNullable<typeof $m>} */
+        $m.set(key, value);
       }
     }
   };
-  var arrayToObject = function arrayToObject(source, options) {
-    var obj = options && options.plainObjects ? Object.create(null) : {};
-    for (var i = 0; i < source.length; ++i) {
-      if (typeof source[i] !== 'undefined') {
-        obj[i] = source[i];
+
+  // @ts-expect-error TODO: figure out why this is erroring
+  return channel;
+} : getSideChannelMap$1;
+
+var $TypeError = type;
+var inspect = objectInspect;
+var getSideChannelList = sideChannelList;
+var getSideChannelMap = sideChannelMap;
+var getSideChannelWeakMap = sideChannelWeakmap;
+var makeChannel = getSideChannelWeakMap || getSideChannelMap || getSideChannelList;
+
+/** @type {import('.')} */
+var sideChannel = function getSideChannel() {
+  /** @typedef {ReturnType<typeof getSideChannel>} Channel */
+
+  /** @type {Channel | undefined} */var $channelData;
+
+  /** @type {Channel} */
+  var channel = {
+    assert: function assert(key) {
+      if (!channel.has(key)) {
+        var keyDesc = key && Object(key) === key ? 'the given object key' : inspect(key);
+        throw new $TypeError('Side channel does not contain ' + keyDesc);
       }
+    },
+    'delete': function _delete(key) {
+      return !!$channelData && $channelData['delete'](key);
+    },
+    get: function get(key) {
+      return $channelData && $channelData.get(key);
+    },
+    has: function has(key) {
+      return !!$channelData && $channelData.has(key);
+    },
+    set: function set(key, value) {
+      if (!$channelData) {
+        $channelData = makeChannel();
+      }
+      $channelData.set(key, value);
     }
-    return obj;
   };
-  var merge = function merge(target, source, options) {
-    /* eslint no-param-reassign: 0 */
-    if (!source) {
-      return target;
+  return channel;
+};
+
+var replace = String.prototype.replace;
+var percentTwenties = /%20/g;
+var Format = {
+  RFC1738: 'RFC1738',
+  RFC3986: 'RFC3986'
+};
+var formats$3 = {
+  'default': Format.RFC3986,
+  formatters: {
+    RFC1738: function RFC1738(value) {
+      return replace.call(value, percentTwenties, '+');
+    },
+    RFC3986: function RFC3986(value) {
+      return String(value);
     }
-    if (_typeof(source) !== 'object') {
-      if (isArray(target)) {
-        target.push(source);
-      } else if (target && _typeof(target) === 'object') {
-        if (options && (options.plainObjects || options.allowPrototypes) || !has.call(Object.prototype, source)) {
-          target[source] = true;
+  },
+  RFC1738: Format.RFC1738,
+  RFC3986: Format.RFC3986
+};
+
+var formats$2 = formats$3;
+var getSideChannel$1 = sideChannel;
+var defineProperty = esDefineProperty;
+var has$2 = Object.prototype.hasOwnProperty;
+var isArray$2 = Array.isArray;
+
+// Track objects created from arrayLimit overflow using side-channel
+// Stores the current max numeric index for O(1) lookup
+var overflowChannel = getSideChannel$1();
+var markOverflow = function markOverflow(obj, maxIndex) {
+  overflowChannel.set(obj, maxIndex);
+  return obj;
+};
+var isOverflow = function isOverflow(obj) {
+  return overflowChannel.has(obj);
+};
+var getMaxIndex = function getMaxIndex(obj) {
+  return overflowChannel.get(obj);
+};
+var setMaxIndex = function setMaxIndex(obj, maxIndex) {
+  overflowChannel.set(obj, maxIndex);
+};
+var hexTable = function () {
+  var array = [];
+  for (var i = 0; i < 256; ++i) {
+    array[array.length] = '%' + ((i < 16 ? '0' : '') + i.toString(16)).toUpperCase();
+  }
+  return array;
+}();
+var compactQueue = function compactQueue(queue) {
+  while (queue.length > 1) {
+    var item = queue.pop();
+    var obj = item.obj[item.prop];
+    if (isArray$2(obj)) {
+      var compacted = [];
+      for (var j = 0; j < obj.length; ++j) {
+        if (typeof obj[j] !== 'undefined') {
+          compacted[compacted.length] = obj[j];
         }
-      } else {
+      }
+      item.obj[item.prop] = compacted;
+    }
+  }
+};
+var arrayToObject = function arrayToObject(source, options) {
+  var obj = options && options.plainObjects ? {
+    __proto__: null
+  } : {};
+  for (var i = 0; i < source.length; ++i) {
+    if (typeof source[i] !== 'undefined') {
+      obj[i] = source[i];
+    }
+  }
+  return obj;
+};
+var setProperty = function setProperty(obj, key, value) {
+  if (key === '__proto__' && defineProperty) {
+    defineProperty(obj, key, {
+      configurable: true,
+      enumerable: true,
+      value: value,
+      writable: true
+    });
+  } else {
+    obj[key] = value;
+  }
+};
+var merge$2 = function merge(target, source, options) {
+  /* eslint no-param-reassign: 0 */
+  if (!source) {
+    return target;
+  }
+  if (_typeof(source) !== 'object' && typeof source !== 'function') {
+    if (isArray$2(target)) {
+      var nextIndex = target.length;
+      if (options && typeof options.arrayLimit === 'number' && nextIndex >= options.arrayLimit) {
+        if (options.throwOnLimitExceeded) {
+          throw new RangeError('Array limit exceeded. Only ' + options.arrayLimit + ' element' + (options.arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
+        }
+        return markOverflow(arrayToObject(target.concat(source), options), nextIndex);
+      }
+      target[nextIndex] = source;
+    } else if (target && _typeof(target) === 'object') {
+      if (isOverflow(target)) {
+        // Add at next numeric index for overflow objects
+        var newIndex = getMaxIndex(target) + 1;
+        target[newIndex] = source;
+        setMaxIndex(target, newIndex);
+      } else if (options && options.strictMerge) {
         return [target, source];
+      } else if (options && (options.plainObjects || options.allowPrototypes) || !has$2.call(Object.prototype, source)) {
+        target[source] = true;
       }
-      return target;
+    } else {
+      return [target, source];
     }
-    if (!target || _typeof(target) !== 'object') {
-      return [target].concat(source);
+    return target;
+  }
+  if (!target || _typeof(target) !== 'object') {
+    if (isOverflow(source)) {
+      // Create new object with target at 0, source values shifted by 1
+      var sourceKeys = Object.keys(source);
+      var result = options && options.plainObjects ? {
+        __proto__: null,
+        0: target
+      } : {
+        0: target
+      };
+      for (var m = 0; m < sourceKeys.length; m++) {
+        var oldKey = parseInt(sourceKeys[m], 10);
+        result[oldKey + 1] = source[sourceKeys[m]];
+      }
+      return markOverflow(result, getMaxIndex(source) + 1);
     }
-    var mergeTarget = target;
-    if (isArray(target) && !isArray(source)) {
-      mergeTarget = arrayToObject(target, options);
+    var combined = [target].concat(source);
+    if (options && typeof options.arrayLimit === 'number' && combined.length > options.arrayLimit) {
+      if (options.throwOnLimitExceeded) {
+        throw new RangeError('Array limit exceeded. Only ' + options.arrayLimit + ' element' + (options.arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
+      }
+      return markOverflow(arrayToObject(combined, options), combined.length - 1);
     }
-    if (isArray(target) && isArray(source)) {
-      source.forEach(function (item, i) {
-        if (has.call(target, i)) {
-          var targetItem = target[i];
-          if (targetItem && _typeof(targetItem) === 'object' && item && _typeof(item) === 'object') {
-            target[i] = merge(targetItem, item, options);
-          } else {
-            target.push(item);
-          }
+    return combined;
+  }
+  var mergeTarget = target;
+  if (isArray$2(target) && !isArray$2(source)) {
+    mergeTarget = arrayToObject(target, options);
+  }
+  if (isArray$2(target) && isArray$2(source)) {
+    source.forEach(function (item, i) {
+      if (has$2.call(target, i)) {
+        var targetItem = target[i];
+        if (targetItem && _typeof(targetItem) === 'object' && item && _typeof(item) === 'object') {
+          target[i] = merge(targetItem, item, options);
         } else {
-          target[i] = item;
+          target[target.length] = item;
         }
-      });
-      return target;
-    }
-    return Object.keys(source).reduce(function (acc, key) {
-      var value = source[key];
-      if (has.call(acc, key)) {
-        acc[key] = merge(acc[key], value, options);
       } else {
-        acc[key] = value;
+        target[i] = item;
       }
-      return acc;
-    }, mergeTarget);
-  };
-  var assign = function assignSingleSource(target, source) {
-    return Object.keys(source).reduce(function (acc, key) {
-      acc[key] = source[key];
-      return acc;
-    }, target);
-  };
-  var decode = function decode(str, decoder, charset) {
-    var strWithoutPlus = str.replace(/\+/g, ' ');
-    if (charset === 'iso-8859-1') {
-      // unescape never throws, no try...catch needed:
-      return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
+    });
+    if (options && typeof options.arrayLimit === 'number' && target.length > options.arrayLimit) {
+      if (options.throwOnLimitExceeded) {
+        throw new RangeError('Array limit exceeded. Only ' + options.arrayLimit + ' element' + (options.arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
+      }
+      return markOverflow(arrayToObject(target, options), target.length - 1);
     }
-    // utf-8
-    try {
-      return decodeURIComponent(strWithoutPlus);
-    } catch (e) {
-      return strWithoutPlus;
+    return target;
+  }
+  return Object.keys(source).reduce(function (acc, key) {
+    var value = source[key];
+    if (has$2.call(acc, key)) {
+      setProperty(acc, key, merge(acc[key], value, options));
+    } else {
+      setProperty(acc, key, value);
     }
-  };
-  var encode = function encode(str, defaultEncoder, charset, kind, format) {
-    // This code was originally written by Brian White (mscdex) for the io.js core querystring library.
-    // It has been adapted here for stricter adherence to RFC 3986
-    if (str.length === 0) {
-      return str;
+    if (isOverflow(source) && !isOverflow(acc)) {
+      markOverflow(acc, getMaxIndex(source));
     }
-    var string = str;
-    if (_typeof(str) === 'symbol') {
-      string = Symbol.prototype.toString.call(str);
-    } else if (typeof str !== 'string') {
-      string = String(str);
+    if (isOverflow(acc)) {
+      var keyNum = parseInt(key, 10);
+      if (String(keyNum) === key && keyNum >= 0 && keyNum > getMaxIndex(acc)) {
+        setMaxIndex(acc, keyNum);
+      }
     }
-    if (charset === 'iso-8859-1') {
-      return escape(string).replace(/%u[0-9a-f]{4}/gi, function ($0) {
-        return '%26%23' + parseInt($0.slice(2), 16) + '%3B';
-      });
+    return acc;
+  }, mergeTarget);
+};
+var assign = function assignSingleSource(target, source) {
+  return Object.keys(source).reduce(function (acc, key) {
+    setProperty(acc, key, source[key]);
+    return acc;
+  }, target);
+};
+var decode$2 = function decode(str, defaultDecoder, charset) {
+  var strWithoutPlus = str.replace(/\+/g, ' ');
+  if (charset === 'iso-8859-1') {
+    // unescape never throws, no try...catch needed:
+    return strWithoutPlus.replace(/%[0-9a-f]{2}/gi, unescape);
+  }
+  // utf-8
+  try {
+    return decodeURIComponent(strWithoutPlus);
+  } catch (e) {
+    return strWithoutPlus;
+  }
+};
+var limit = 1024;
+
+/* eslint operator-linebreak: [2, "before"] */
+
+var encode = function encode(str, defaultEncoder, charset, kind, format) {
+  // This code was originally written by Brian White (mscdex) for the io.js core querystring library.
+  // It has been adapted here for stricter adherence to RFC 3986
+  if (str.length === 0) {
+    return str;
+  }
+  var string = str;
+  if (_typeof(str) === 'symbol') {
+    string = Symbol.prototype.toString.call(str);
+  } else if (typeof str !== 'string') {
+    string = String(str);
+  }
+  if (charset === 'iso-8859-1') {
+    return escape(string).replace(/%u[0-9a-f]{4}/gi, function ($0) {
+      return '%26%23' + parseInt($0.slice(2), 16) + '%3B';
+    });
+  }
+  var out = '';
+  for (var j = 0; j < string.length; j += limit) {
+    var segment = string.length >= limit ? string.slice(j, j + limit) : string;
+    if (j + limit < string.length) {
+      var last = segment.charCodeAt(segment.length - 1);
+      if (last >= 0xD800 && last <= 0xDBFF) {
+        segment = segment.slice(0, -1);
+        j -= 1;
+      }
     }
-    var out = '';
-    for (var i = 0; i < string.length; ++i) {
-      var c = string.charCodeAt(i);
+    var arr = [];
+    for (var i = 0; i < segment.length; ++i) {
+      var c = segment.charCodeAt(i);
       if (c === 0x2D // -
       || c === 0x2E // .
       || c === 0x5F // _
@@ -36695,577 +37338,711 @@ function requireUtils() {
       || c >= 0x30 && c <= 0x39 // 0-9
       || c >= 0x41 && c <= 0x5A // a-z
       || c >= 0x61 && c <= 0x7A // A-Z
-      || format === formats.RFC1738 && (c === 0x28 || c === 0x29) // ( )
+      || format === formats$2.RFC1738 && (c === 0x28 || c === 0x29) // ( )
       ) {
-        out += string.charAt(i);
+        arr[arr.length] = segment.charAt(i);
         continue;
       }
       if (c < 0x80) {
-        out = out + hexTable[c];
+        arr[arr.length] = hexTable[c];
         continue;
       }
       if (c < 0x800) {
-        out = out + (hexTable[0xC0 | c >> 6] + hexTable[0x80 | c & 0x3F]);
+        arr[arr.length] = hexTable[0xC0 | c >> 6] + hexTable[0x80 | c & 0x3F];
         continue;
       }
       if (c < 0xD800 || c >= 0xE000) {
-        out = out + (hexTable[0xE0 | c >> 12] + hexTable[0x80 | c >> 6 & 0x3F] + hexTable[0x80 | c & 0x3F]);
+        arr[arr.length] = hexTable[0xE0 | c >> 12] + hexTable[0x80 | c >> 6 & 0x3F] + hexTable[0x80 | c & 0x3F];
         continue;
       }
       i += 1;
-      c = 0x10000 + ((c & 0x3FF) << 10 | string.charCodeAt(i) & 0x3FF);
-      /* eslint operator-linebreak: [2, "before"] */
-      out += hexTable[0xF0 | c >> 18] + hexTable[0x80 | c >> 12 & 0x3F] + hexTable[0x80 | c >> 6 & 0x3F] + hexTable[0x80 | c & 0x3F];
+      c = 0x10000 + ((c & 0x3FF) << 10 | segment.charCodeAt(i) & 0x3FF);
+      arr[arr.length] = hexTable[0xF0 | c >> 18] + hexTable[0x80 | c >> 12 & 0x3F] + hexTable[0x80 | c >> 6 & 0x3F] + hexTable[0x80 | c & 0x3F];
     }
-    return out;
-  };
-  var compact = function compact(value) {
-    var queue = [{
-      obj: {
-        o: value
-      },
-      prop: 'o'
-    }];
-    var refs = [];
-    for (var i = 0; i < queue.length; ++i) {
-      var item = queue[i];
-      var obj = item.obj[item.prop];
-      var keys = Object.keys(obj);
-      for (var j = 0; j < keys.length; ++j) {
-        var key = keys[j];
-        var val = obj[key];
-        if (_typeof(val) === 'object' && val !== null && refs.indexOf(val) === -1) {
-          queue.push({
-            obj: obj,
-            prop: key
-          });
-          refs.push(val);
-        }
+    out += arr.join('');
+  }
+  return out;
+};
+var compact = function compact(value) {
+  var queue = [{
+    obj: {
+      o: value
+    },
+    prop: 'o'
+  }];
+  var refs = getSideChannel$1();
+  for (var i = 0; i < queue.length; ++i) {
+    var item = queue[i];
+    var obj = item.obj[item.prop];
+    var keys = Object.keys(obj);
+    for (var j = 0; j < keys.length; ++j) {
+      var key = keys[j];
+      var val = obj[key];
+      if (_typeof(val) === 'object' && val !== null && !refs.has(val)) {
+        queue[queue.length] = {
+          obj: obj,
+          prop: key
+        };
+        refs.set(val, true);
       }
     }
-    compactQueue(queue);
-    return value;
-  };
-  var isRegExp = function isRegExp(obj) {
-    return Object.prototype.toString.call(obj) === '[object RegExp]';
-  };
-  var isBuffer = function isBuffer(obj) {
-    if (!obj || _typeof(obj) !== 'object') {
-      return false;
+  }
+  compactQueue(queue);
+  return value;
+};
+var isRegExp = function isRegExp(obj) {
+  return Object.prototype.toString.call(obj) === '[object RegExp]';
+};
+var isBuffer = function isBuffer(obj) {
+  if (!obj || _typeof(obj) !== 'object') {
+    return false;
+  }
+  return !!(obj.constructor && obj.constructor.isBuffer && obj.constructor.isBuffer(obj));
+};
+var combine = function combine(a, b, arrayLimit, plainObjects, throwOnLimitExceeded) {
+  // If 'a' is already an overflow object, add to it
+  if (isOverflow(a)) {
+    if (throwOnLimitExceeded) {
+      throw new RangeError('Array limit exceeded. Only ' + arrayLimit + ' element' + (arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
     }
-    return !!(obj.constructor && obj.constructor.isBuffer && obj.constructor.isBuffer(obj));
-  };
-  var combine = function combine(a, b) {
-    return [].concat(a, b);
-  };
-  var maybeMap = function maybeMap(val, fn) {
-    if (isArray(val)) {
-      var mapped = [];
-      for (var i = 0; i < val.length; i += 1) {
-        mapped.push(fn(val[i]));
-      }
-      return mapped;
+    var newIndex = getMaxIndex(a) + 1;
+    a[newIndex] = b;
+    setMaxIndex(a, newIndex);
+    return a;
+  }
+  var result = [].concat(a, b);
+  if (result.length > arrayLimit) {
+    if (throwOnLimitExceeded) {
+      throw new RangeError('Array limit exceeded. Only ' + arrayLimit + ' element' + (arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
     }
-    return fn(val);
-  };
-  utils$1 = {
-    arrayToObject: arrayToObject,
-    assign: assign,
-    combine: combine,
-    compact: compact,
-    decode: decode,
-    encode: encode,
-    isBuffer: isBuffer,
-    isRegExp: isRegExp,
-    maybeMap: maybeMap,
-    merge: merge
-  };
-  return utils$1;
-}
+    return markOverflow(arrayToObject(result, {
+      plainObjects: plainObjects
+    }), result.length - 1);
+  }
+  return result;
+};
+var maybeMap = function maybeMap(val, fn) {
+  if (isArray$2(val)) {
+    var mapped = [];
+    for (var i = 0; i < val.length; i += 1) {
+      mapped[mapped.length] = fn(val[i]);
+    }
+    return mapped;
+  }
+  return fn(val);
+};
+var utils$3 = {
+  arrayToObject: arrayToObject,
+  assign: assign,
+  combine: combine,
+  compact: compact,
+  decode: decode$2,
+  encode: encode,
+  isBuffer: isBuffer,
+  isOverflow: isOverflow,
+  isRegExp: isRegExp,
+  markOverflow: markOverflow,
+  maybeMap: maybeMap,
+  merge: merge$2
+};
 
-var stringify_1;
-var hasRequiredStringify;
-function requireStringify() {
-  if (hasRequiredStringify) return stringify_1;
-  hasRequiredStringify = 1;
-  var getSideChannel = requireSideChannel();
-  var utils = requireUtils();
-  var formats = requireFormats();
-  var has = Object.prototype.hasOwnProperty;
-  var arrayPrefixGenerators = {
-    brackets: function brackets(prefix) {
-      return prefix + '[]';
-    },
-    comma: 'comma',
-    indices: function indices(prefix, key) {
-      return prefix + '[' + key + ']';
-    },
-    repeat: function repeat(prefix) {
-      return prefix;
-    }
-  };
-  var isArray = Array.isArray;
-  var split = String.prototype.split;
-  var push = Array.prototype.push;
-  var pushToArray = function pushToArray(arr, valueOrArray) {
-    push.apply(arr, isArray(valueOrArray) ? valueOrArray : [valueOrArray]);
-  };
-  var toISO = Date.prototype.toISOString;
-  var defaultFormat = formats['default'];
-  var defaults = {
-    addQueryPrefix: false,
-    allowDots: false,
-    charset: 'utf-8',
-    charsetSentinel: false,
-    delimiter: '&',
-    encode: true,
-    encoder: utils.encode,
-    encodeValuesOnly: false,
-    format: defaultFormat,
-    formatter: formats.formatters[defaultFormat],
-    // deprecated
-    indices: false,
-    serializeDate: function serializeDate(date) {
-      return toISO.call(date);
-    },
-    skipNulls: false,
-    strictNullHandling: false
-  };
-  var isNonNullishPrimitive = function isNonNullishPrimitive(v) {
-    return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || _typeof(v) === 'symbol' || typeof v === 'bigint';
-  };
-  var sentinel = {};
-  var stringify = function stringify(object, prefix, generateArrayPrefix, commaRoundTrip, strictNullHandling, skipNulls, encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, sideChannel) {
-    var obj = object;
-    var tmpSc = sideChannel;
-    var step = 0;
-    var findFlag = false;
-    while ((tmpSc = tmpSc.get(sentinel)) !== void undefined && !findFlag) {
-      // Where object last appeared in the ref tree
-      var pos = tmpSc.get(object);
-      step += 1;
-      if (typeof pos !== 'undefined') {
-        if (pos === step) {
-          throw new RangeError('Cyclic object value');
-        } else {
-          findFlag = true; // Break while
-        }
-      }
-      if (typeof tmpSc.get(sentinel) === 'undefined') {
-        step = 0;
+var getSideChannel = sideChannel;
+var utils$2 = utils$3;
+var formats$1 = formats$3;
+var has$1 = Object.prototype.hasOwnProperty;
+var arrayPrefixGenerators = {
+  brackets: function brackets(prefix) {
+    return prefix + '[]';
+  },
+  comma: 'comma',
+  indices: function indices(prefix, key) {
+    return prefix + '[' + key + ']';
+  },
+  repeat: function repeat(prefix) {
+    return prefix;
+  }
+};
+var isArray$1 = Array.isArray;
+var push = Array.prototype.push;
+var pushToArray = function pushToArray(arr, valueOrArray) {
+  push.apply(arr, isArray$1(valueOrArray) ? valueOrArray : [valueOrArray]);
+};
+var toISO = Date.prototype.toISOString;
+var defaultFormat = formats$1['default'];
+var defaults$1 = {
+  addQueryPrefix: false,
+  allowDots: false,
+  allowEmptyArrays: false,
+  arrayFormat: 'indices',
+  charset: 'utf-8',
+  charsetSentinel: false,
+  commaRoundTrip: false,
+  delimiter: '&',
+  encode: true,
+  encodeDotInKeys: false,
+  encoder: utils$2.encode,
+  encodeValuesOnly: false,
+  filter: void undefined,
+  format: defaultFormat,
+  formatter: formats$1.formatters[defaultFormat],
+  // deprecated
+  indices: false,
+  serializeDate: function serializeDate(date) {
+    return toISO.call(date);
+  },
+  skipNulls: false,
+  strictNullHandling: false
+};
+var isNonNullishPrimitive = function isNonNullishPrimitive(v) {
+  return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || _typeof(v) === 'symbol' || typeof v === 'bigint';
+};
+var sentinel = {};
+var stringify$3 = function stringify(object, prefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, sideChannel) {
+  var obj = object;
+  var tmpSc = sideChannel;
+  var step = 0;
+  var findFlag = false;
+  while ((tmpSc = tmpSc.get(sentinel)) !== void undefined && !findFlag) {
+    // Where object last appeared in the ref tree
+    var pos = tmpSc.get(object);
+    step += 1;
+    if (typeof pos !== 'undefined') {
+      if (pos === step) {
+        throw new RangeError('Cyclic object value');
+      } else {
+        findFlag = true; // Break while
       }
     }
-    if (typeof filter === 'function') {
-      obj = filter(prefix, obj);
-    } else if (obj instanceof Date) {
-      obj = serializeDate(obj);
-    } else if (generateArrayPrefix === 'comma' && isArray(obj)) {
-      obj = utils.maybeMap(obj, function (value) {
-        if (value instanceof Date) {
-          return serializeDate(value);
-        }
-        return value;
+    if (typeof tmpSc.get(sentinel) === 'undefined') {
+      step = 0;
+    }
+  }
+  if (typeof filter === 'function') {
+    obj = filter(prefix, obj);
+  } else if (obj instanceof Date) {
+    obj = serializeDate(obj);
+  } else if (generateArrayPrefix === 'comma' && isArray$1(obj)) {
+    obj = utils$2.maybeMap(obj, function (value) {
+      if (value instanceof Date) {
+        return serializeDate(value);
+      }
+      return value;
+    });
+  }
+  if (obj === null) {
+    if (strictNullHandling) {
+      return formatter(encoder && !encodeValuesOnly ? encoder(prefix, defaults$1.encoder, charset, 'key', format) : prefix);
+    }
+    obj = '';
+  }
+  if (isNonNullishPrimitive(obj) || utils$2.isBuffer(obj)) {
+    if (encoder) {
+      var keyValue = encodeValuesOnly ? prefix : encoder(prefix, defaults$1.encoder, charset, 'key', format);
+      return [formatter(keyValue) + '=' + formatter(encoder(obj, defaults$1.encoder, charset, 'value', format))];
+    }
+    return [formatter(prefix) + '=' + formatter(String(obj))];
+  }
+  var values = [];
+  if (typeof obj === 'undefined') {
+    return values;
+  }
+  var objKeys;
+  if (generateArrayPrefix === 'comma' && isArray$1(obj)) {
+    // we need to join elements in
+    if (encodeValuesOnly && encoder) {
+      obj = utils$2.maybeMap(obj, function (v) {
+        return v == null ? v : encoder(v);
       });
     }
-    if (obj === null) {
-      if (strictNullHandling) {
-        return encoder && !encodeValuesOnly ? encoder(prefix, defaults.encoder, charset, 'key', format) : prefix;
-      }
-      obj = '';
+    objKeys = [{
+      value: obj.length > 0 ? obj.join(',') || null : void undefined
+    }];
+  } else if (isArray$1(filter)) {
+    objKeys = filter;
+  } else {
+    var keys = Object.keys(obj);
+    objKeys = sort ? keys.sort(sort) : keys;
+  }
+  var encodedPrefix = encodeDotInKeys ? String(prefix).replace(/\./g, '%2E') : String(prefix);
+  var adjustedPrefix = commaRoundTrip && isArray$1(obj) && obj.length === 1 ? encodedPrefix + '[]' : encodedPrefix;
+  if (allowEmptyArrays && isArray$1(obj) && obj.length === 0) {
+    return adjustedPrefix + '[]';
+  }
+  for (var j = 0; j < objKeys.length; ++j) {
+    var key = objKeys[j];
+    var value = _typeof(key) === 'object' && key && typeof key.value !== 'undefined' ? key.value : obj[key];
+    if (skipNulls && value === null) {
+      continue;
     }
-    if (isNonNullishPrimitive(obj) || utils.isBuffer(obj)) {
-      if (encoder) {
-        var keyValue = encodeValuesOnly ? prefix : encoder(prefix, defaults.encoder, charset, 'key', format);
-        if (generateArrayPrefix === 'comma' && encodeValuesOnly) {
-          var valuesArray = split.call(String(obj), ',');
-          var valuesJoined = '';
-          for (var i = 0; i < valuesArray.length; ++i) {
-            valuesJoined += (i === 0 ? '' : ',') + formatter(encoder(valuesArray[i], defaults.encoder, charset, 'value', format));
-          }
-          return [formatter(keyValue) + (commaRoundTrip && isArray(obj) && valuesArray.length === 1 ? '[]' : '') + '=' + valuesJoined];
-        }
-        return [formatter(keyValue) + '=' + formatter(encoder(obj, defaults.encoder, charset, 'value', format))];
-      }
-      return [formatter(prefix) + '=' + formatter(String(obj))];
+    var encodedKey = allowDots && encodeDotInKeys ? String(key).replace(/\./g, '%2E') : String(key);
+    var keyPrefix = isArray$1(obj) ? typeof generateArrayPrefix === 'function' ? generateArrayPrefix(adjustedPrefix, encodedKey) : adjustedPrefix : adjustedPrefix + (allowDots ? '.' + encodedKey : '[' + encodedKey + ']');
+    sideChannel.set(object, step);
+    var valueSideChannel = getSideChannel();
+    valueSideChannel.set(sentinel, sideChannel);
+    pushToArray(values, stringify(value, keyPrefix, generateArrayPrefix, commaRoundTrip, allowEmptyArrays, strictNullHandling, skipNulls, encodeDotInKeys, generateArrayPrefix === 'comma' && encodeValuesOnly && isArray$1(obj) ? null : encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, valueSideChannel));
+  }
+  return values;
+};
+var normalizeStringifyOptions = function normalizeStringifyOptions(opts) {
+  if (!opts) {
+    return defaults$1;
+  }
+  if (typeof opts.allowEmptyArrays !== 'undefined' && typeof opts.allowEmptyArrays !== 'boolean') {
+    throw new TypeError('`allowEmptyArrays` option can only be `true` or `false`, when provided');
+  }
+  if (typeof opts.encodeDotInKeys !== 'undefined' && typeof opts.encodeDotInKeys !== 'boolean') {
+    throw new TypeError('`encodeDotInKeys` option can only be `true` or `false`, when provided');
+  }
+  if (opts.encoder !== null && typeof opts.encoder !== 'undefined' && typeof opts.encoder !== 'function') {
+    throw new TypeError('Encoder has to be a function.');
+  }
+  var charset = opts.charset || defaults$1.charset;
+  if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
+    throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
+  }
+  var format = formats$1['default'];
+  if (typeof opts.format !== 'undefined') {
+    if (!has$1.call(formats$1.formatters, opts.format)) {
+      throw new TypeError('Unknown format option provided.');
     }
-    var values = [];
-    if (typeof obj === 'undefined') {
-      return values;
+    format = opts.format;
+  }
+  var formatter = formats$1.formatters[format];
+  var filter = defaults$1.filter;
+  if (typeof opts.filter === 'function' || isArray$1(opts.filter)) {
+    filter = opts.filter;
+  }
+  var arrayFormat;
+  if (opts.arrayFormat in arrayPrefixGenerators) {
+    arrayFormat = opts.arrayFormat;
+  } else if ('indices' in opts) {
+    arrayFormat = opts.indices ? 'indices' : 'repeat';
+  } else {
+    arrayFormat = defaults$1.arrayFormat;
+  }
+  if ('commaRoundTrip' in opts && typeof opts.commaRoundTrip !== 'boolean') {
+    throw new TypeError('`commaRoundTrip` must be a boolean, or absent');
+  }
+  var allowDots = typeof opts.allowDots === 'undefined' ? opts.encodeDotInKeys === true ? true : defaults$1.allowDots : !!opts.allowDots;
+  return {
+    addQueryPrefix: typeof opts.addQueryPrefix === 'boolean' ? opts.addQueryPrefix : defaults$1.addQueryPrefix,
+    allowDots: allowDots,
+    allowEmptyArrays: typeof opts.allowEmptyArrays === 'boolean' ? !!opts.allowEmptyArrays : defaults$1.allowEmptyArrays,
+    arrayFormat: arrayFormat,
+    charset: charset,
+    charsetSentinel: typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults$1.charsetSentinel,
+    commaRoundTrip: !!opts.commaRoundTrip,
+    delimiter: typeof opts.delimiter === 'undefined' ? defaults$1.delimiter : opts.delimiter,
+    encode: typeof opts.encode === 'boolean' ? opts.encode : defaults$1.encode,
+    encodeDotInKeys: typeof opts.encodeDotInKeys === 'boolean' ? opts.encodeDotInKeys : defaults$1.encodeDotInKeys,
+    encoder: typeof opts.encoder === 'function' ? opts.encoder : defaults$1.encoder,
+    encodeValuesOnly: typeof opts.encodeValuesOnly === 'boolean' ? opts.encodeValuesOnly : defaults$1.encodeValuesOnly,
+    filter: filter,
+    format: format,
+    formatter: formatter,
+    serializeDate: typeof opts.serializeDate === 'function' ? opts.serializeDate : defaults$1.serializeDate,
+    skipNulls: typeof opts.skipNulls === 'boolean' ? opts.skipNulls : defaults$1.skipNulls,
+    sort: typeof opts.sort === 'function' ? opts.sort : null,
+    strictNullHandling: typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults$1.strictNullHandling
+  };
+};
+var stringify_1 = function stringify_1(object, opts) {
+  var obj = object;
+  var options = normalizeStringifyOptions(opts);
+  var objKeys;
+  var filter;
+  if (typeof options.filter === 'function') {
+    filter = options.filter;
+    obj = filter('', obj);
+  } else if (isArray$1(options.filter)) {
+    filter = options.filter;
+    objKeys = filter;
+  }
+  var keys = [];
+  if (_typeof(obj) !== 'object' || obj === null) {
+    return '';
+  }
+  var generateArrayPrefix = arrayPrefixGenerators[options.arrayFormat];
+  var commaRoundTrip = generateArrayPrefix === 'comma' && options.commaRoundTrip;
+  if (!objKeys) {
+    objKeys = Object.keys(obj);
+  }
+  if (options.sort) {
+    objKeys.sort(options.sort);
+  }
+  var sideChannel = getSideChannel();
+  for (var i = 0; i < objKeys.length; ++i) {
+    var key = objKeys[i];
+    if (typeof key === 'undefined' || key === null) {
+      continue;
     }
-    var objKeys;
-    if (generateArrayPrefix === 'comma' && isArray(obj)) {
-      // we need to join elements in
-      objKeys = [{
-        value: obj.length > 0 ? obj.join(',') || null : void undefined
-      }];
-    } else if (isArray(filter)) {
-      objKeys = filter;
+    var value = obj[key];
+    if (options.skipNulls && value === null) {
+      continue;
+    }
+    pushToArray(keys, stringify$3(value, key, generateArrayPrefix, commaRoundTrip, options.allowEmptyArrays, options.strictNullHandling, options.skipNulls, options.encodeDotInKeys, options.encode ? options.encoder : null, options.filter, options.sort, options.allowDots, options.serializeDate, options.format, options.formatter, options.encodeValuesOnly, options.charset, sideChannel));
+  }
+  var joined = keys.join(options.delimiter);
+  var prefix = options.addQueryPrefix === true ? '?' : '';
+  if (options.charsetSentinel) {
+    if (options.charset === 'iso-8859-1') {
+      // encodeURIComponent('&#10003;'), the "numeric entity" representation of a checkmark
+      prefix += 'utf8=%26%2310003%3B' + options.delimiter;
     } else {
-      var keys = Object.keys(obj);
-      objKeys = sort ? keys.sort(sort) : keys;
+      // encodeURIComponent('✓')
+      prefix += 'utf8=%E2%9C%93' + options.delimiter;
     }
-    var adjustedPrefix = commaRoundTrip && isArray(obj) && obj.length === 1 ? prefix + '[]' : prefix;
-    for (var j = 0; j < objKeys.length; ++j) {
-      var key = objKeys[j];
-      var value = _typeof(key) === 'object' && typeof key.value !== 'undefined' ? key.value : obj[key];
-      if (skipNulls && value === null) {
-        continue;
-      }
-      var keyPrefix = isArray(obj) ? typeof generateArrayPrefix === 'function' ? generateArrayPrefix(adjustedPrefix, key) : adjustedPrefix : adjustedPrefix + (allowDots ? '.' + key : '[' + key + ']');
-      sideChannel.set(object, step);
-      var valueSideChannel = getSideChannel();
-      valueSideChannel.set(sentinel, sideChannel);
-      pushToArray(values, stringify(value, keyPrefix, generateArrayPrefix, commaRoundTrip, strictNullHandling, skipNulls, encoder, filter, sort, allowDots, serializeDate, format, formatter, encodeValuesOnly, charset, valueSideChannel));
-    }
-    return values;
-  };
-  var normalizeStringifyOptions = function normalizeStringifyOptions(opts) {
-    if (!opts) {
-      return defaults;
-    }
-    if (opts.encoder !== null && typeof opts.encoder !== 'undefined' && typeof opts.encoder !== 'function') {
-      throw new TypeError('Encoder has to be a function.');
-    }
-    var charset = opts.charset || defaults.charset;
-    if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
-      throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
-    }
-    var format = formats['default'];
-    if (typeof opts.format !== 'undefined') {
-      if (!has.call(formats.formatters, opts.format)) {
-        throw new TypeError('Unknown format option provided.');
-      }
-      format = opts.format;
-    }
-    var formatter = formats.formatters[format];
-    var filter = defaults.filter;
-    if (typeof opts.filter === 'function' || isArray(opts.filter)) {
-      filter = opts.filter;
-    }
-    return {
-      addQueryPrefix: typeof opts.addQueryPrefix === 'boolean' ? opts.addQueryPrefix : defaults.addQueryPrefix,
-      allowDots: typeof opts.allowDots === 'undefined' ? defaults.allowDots : !!opts.allowDots,
-      charset: charset,
-      charsetSentinel: typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
-      delimiter: typeof opts.delimiter === 'undefined' ? defaults.delimiter : opts.delimiter,
-      encode: typeof opts.encode === 'boolean' ? opts.encode : defaults.encode,
-      encoder: typeof opts.encoder === 'function' ? opts.encoder : defaults.encoder,
-      encodeValuesOnly: typeof opts.encodeValuesOnly === 'boolean' ? opts.encodeValuesOnly : defaults.encodeValuesOnly,
-      filter: filter,
-      format: format,
-      formatter: formatter,
-      serializeDate: typeof opts.serializeDate === 'function' ? opts.serializeDate : defaults.serializeDate,
-      skipNulls: typeof opts.skipNulls === 'boolean' ? opts.skipNulls : defaults.skipNulls,
-      sort: typeof opts.sort === 'function' ? opts.sort : null,
-      strictNullHandling: typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling
-    };
-  };
-  stringify_1 = function stringify_1(object, opts) {
-    var obj = object;
-    var options = normalizeStringifyOptions(opts);
-    var objKeys;
-    var filter;
-    if (typeof options.filter === 'function') {
-      filter = options.filter;
-      obj = filter('', obj);
-    } else if (isArray(options.filter)) {
-      filter = options.filter;
-      objKeys = filter;
-    }
-    var keys = [];
-    if (_typeof(obj) !== 'object' || obj === null) {
-      return '';
-    }
-    var arrayFormat;
-    if (opts && opts.arrayFormat in arrayPrefixGenerators) {
-      arrayFormat = opts.arrayFormat;
-    } else if (opts && 'indices' in opts) {
-      arrayFormat = opts.indices ? 'indices' : 'repeat';
-    } else {
-      arrayFormat = 'indices';
-    }
-    var generateArrayPrefix = arrayPrefixGenerators[arrayFormat];
-    if (opts && 'commaRoundTrip' in opts && typeof opts.commaRoundTrip !== 'boolean') {
-      throw new TypeError('`commaRoundTrip` must be a boolean, or absent');
-    }
-    var commaRoundTrip = generateArrayPrefix === 'comma' && opts && opts.commaRoundTrip;
-    if (!objKeys) {
-      objKeys = Object.keys(obj);
-    }
-    if (options.sort) {
-      objKeys.sort(options.sort);
-    }
-    var sideChannel = getSideChannel();
-    for (var i = 0; i < objKeys.length; ++i) {
-      var key = objKeys[i];
-      if (options.skipNulls && obj[key] === null) {
-        continue;
-      }
-      pushToArray(keys, stringify(obj[key], key, generateArrayPrefix, commaRoundTrip, options.strictNullHandling, options.skipNulls, options.encode ? options.encoder : null, options.filter, options.sort, options.allowDots, options.serializeDate, options.format, options.formatter, options.encodeValuesOnly, options.charset, sideChannel));
-    }
-    var joined = keys.join(options.delimiter);
-    var prefix = options.addQueryPrefix === true ? '?' : '';
-    if (options.charsetSentinel) {
-      if (options.charset === 'iso-8859-1') {
-        // encodeURIComponent('&#10003;'), the "numeric entity" representation of a checkmark
-        prefix += 'utf8=%26%2310003%3B&';
-      } else {
-        // encodeURIComponent('✓')
-        prefix += 'utf8=%E2%9C%93&';
-      }
-    }
-    return joined.length > 0 ? prefix + joined : '';
-  };
-  return stringify_1;
-}
+  }
+  return joined.length > 0 ? prefix + joined : '';
+};
 
-var parse$7;
-var hasRequiredParse;
-function requireParse() {
-  if (hasRequiredParse) return parse$7;
-  hasRequiredParse = 1;
-  var utils = requireUtils();
-  var has = Object.prototype.hasOwnProperty;
-  var isArray = Array.isArray;
-  var defaults = {
-    allowDots: false,
-    allowPrototypes: false,
-    allowSparse: false,
-    arrayLimit: 20,
-    charset: 'utf-8',
-    charsetSentinel: false,
-    comma: false,
-    decoder: utils.decode,
-    delimiter: '&',
-    depth: 5,
-    ignoreQueryPrefix: false,
-    interpretNumericEntities: false,
-    parameterLimit: 1000,
-    parseArrays: true,
-    plainObjects: false,
-    strictNullHandling: false
-  };
-  var interpretNumericEntities = function interpretNumericEntities(str) {
-    return str.replace(/&#(\d+);/g, function ($0, numberStr) {
-      return String.fromCharCode(parseInt(numberStr, 10));
-    });
-  };
-  var parseArrayValue = function parseArrayValue(val, options) {
-    if (val && typeof val === 'string' && options.comma && val.indexOf(',') > -1) {
-      return val.split(',');
-    }
-    return val;
-  };
-
-  // This is what browsers will submit when the ✓ character occurs in an
-  // application/x-www-form-urlencoded body and the encoding of the page containing
-  // the form is iso-8859-1, or when the submitted form has an accept-charset
-  // attribute of iso-8859-1. Presumably also with other charsets that do not contain
-  // the ✓ character, such as us-ascii.
-  var isoSentinel = 'utf8=%26%2310003%3B'; // encodeURIComponent('&#10003;')
-
-  // These are the percent-encoded utf-8 octets representing a checkmark, indicating that the request actually is utf-8 encoded.
-  var charsetSentinel = 'utf8=%E2%9C%93'; // encodeURIComponent('✓')
-
-  var parseValues = function parseQueryStringValues(str, options) {
-    var obj = {};
-    var cleanStr = options.ignoreQueryPrefix ? str.replace(/^\?/, '') : str;
-    var limit = options.parameterLimit === Infinity ? undefined : options.parameterLimit;
-    var parts = cleanStr.split(options.delimiter, limit);
-    var skipIndex = -1; // Keep track of where the utf8 sentinel was found
-    var i;
-    var charset = options.charset;
-    if (options.charsetSentinel) {
-      for (i = 0; i < parts.length; ++i) {
-        if (parts[i].indexOf('utf8=') === 0) {
-          if (parts[i] === charsetSentinel) {
-            charset = 'utf-8';
-          } else if (parts[i] === isoSentinel) {
-            charset = 'iso-8859-1';
-          }
-          skipIndex = i;
-          i = parts.length; // The eslint settings do not allow break;
+var utils$1 = utils$3;
+var has = Object.prototype.hasOwnProperty;
+var isArray = Array.isArray;
+var defaults = {
+  allowDots: false,
+  allowEmptyArrays: false,
+  allowPrototypes: false,
+  allowSparse: false,
+  arrayLimit: 20,
+  charset: 'utf-8',
+  charsetSentinel: false,
+  comma: false,
+  decodeDotInKeys: false,
+  decoder: utils$1.decode,
+  delimiter: '&',
+  depth: 5,
+  duplicates: 'combine',
+  ignoreQueryPrefix: false,
+  interpretNumericEntities: false,
+  parameterLimit: 1000,
+  parseArrays: true,
+  plainObjects: false,
+  strictDepth: false,
+  strictMerge: true,
+  strictNullHandling: false,
+  throwOnLimitExceeded: false
+};
+var interpretNumericEntities = function interpretNumericEntities(str) {
+  return str.replace(/&#(\d+);/g, function ($0, numberStr) {
+    return String.fromCharCode(parseInt(numberStr, 10));
+  });
+};
+var parseArrayValue = function parseArrayValue(val, options, currentArrayLength, isFlatArrayValue) {
+  if (val && typeof val === 'string' && options.comma && val.indexOf(',') > -1) {
+    if (isFlatArrayValue && options.throwOnLimitExceeded) {
+      var commaCount = 0;
+      var commaIndex = val.indexOf(',');
+      while (commaIndex > -1) {
+        commaCount += 1;
+        if (commaCount >= options.arrayLimit) {
+          throw new RangeError('Array limit exceeded. Only ' + options.arrayLimit + ' element' + (options.arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
         }
+        commaIndex = val.indexOf(',', commaIndex + 1);
       }
     }
+    return val.split(',');
+  }
+  if (options.throwOnLimitExceeded && currentArrayLength >= options.arrayLimit) {
+    throw new RangeError('Array limit exceeded. Only ' + options.arrayLimit + ' element' + (options.arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
+  }
+  return val;
+};
+
+// This is what browsers will submit when the ✓ character occurs in an
+// application/x-www-form-urlencoded body and the encoding of the page containing
+// the form is iso-8859-1, or when the submitted form has an accept-charset
+// attribute of iso-8859-1. Presumably also with other charsets that do not contain
+// the ✓ character, such as us-ascii.
+var isoSentinel = 'utf8=%26%2310003%3B'; // encodeURIComponent('&#10003;')
+
+// These are the percent-encoded utf-8 octets representing a checkmark, indicating that the request actually is utf-8 encoded.
+var charsetSentinel = 'utf8=%E2%9C%93'; // encodeURIComponent('✓')
+
+var parseValues = function parseQueryStringValues(str, options) {
+  var obj = {
+    __proto__: null
+  };
+  var cleanStr = options.ignoreQueryPrefix ? str.replace(/^\?/, '') : str;
+  cleanStr = cleanStr.replace(/%5B/gi, '[').replace(/%5D/gi, ']');
+  var limit = options.parameterLimit === Infinity ? void undefined : options.parameterLimit;
+  var parts = cleanStr.split(options.delimiter, options.throwOnLimitExceeded && typeof limit !== 'undefined' ? limit + 1 : limit);
+  if (options.throwOnLimitExceeded && typeof limit !== 'undefined' && parts.length > limit) {
+    throw new RangeError('Parameter limit exceeded. Only ' + limit + ' parameter' + (limit === 1 ? '' : 's') + ' allowed.');
+  }
+  var skipIndex = -1; // Keep track of where the utf8 sentinel was found
+  var i;
+  var charset = options.charset;
+  if (options.charsetSentinel) {
     for (i = 0; i < parts.length; ++i) {
-      if (i === skipIndex) {
-        continue;
+      if (parts[i].indexOf('utf8=') === 0) {
+        if (parts[i] === charsetSentinel) {
+          charset = 'utf-8';
+        } else if (parts[i] === isoSentinel) {
+          charset = 'iso-8859-1';
+        }
+        skipIndex = i;
+        i = parts.length; // The eslint settings do not allow break;
       }
-      var part = parts[i];
-      var bracketEqualsPos = part.indexOf(']=');
-      var pos = bracketEqualsPos === -1 ? part.indexOf('=') : bracketEqualsPos + 1;
-      var key, val;
-      if (pos === -1) {
-        key = options.decoder(part, defaults.decoder, charset, 'key');
-        val = options.strictNullHandling ? null : '';
-      } else {
-        key = options.decoder(part.slice(0, pos), defaults.decoder, charset, 'key');
-        val = utils.maybeMap(parseArrayValue(part.slice(pos + 1), options), function (encodedVal) {
+    }
+  }
+  for (i = 0; i < parts.length; ++i) {
+    if (i === skipIndex) {
+      continue;
+    }
+    var part = parts[i];
+    var bracketEqualsPos = part.indexOf(']=');
+    var pos = bracketEqualsPos === -1 ? part.indexOf('=') : bracketEqualsPos + 1;
+    var key;
+    var val;
+    if (pos === -1) {
+      key = options.decoder(part, defaults.decoder, charset, 'key');
+      val = options.strictNullHandling ? null : '';
+    } else {
+      key = options.decoder(part.slice(0, pos), defaults.decoder, charset, 'key');
+      if (key !== null) {
+        val = utils$1.maybeMap(parseArrayValue(part.slice(pos + 1), options, isArray(obj[key]) ? obj[key].length : 0, part.indexOf('[]=') === -1), function (encodedVal) {
           return options.decoder(encodedVal, defaults.decoder, charset, 'value');
         });
       }
-      if (val && options.interpretNumericEntities && charset === 'iso-8859-1') {
-        val = interpretNumericEntities(val);
-      }
-      if (part.indexOf('[]=') > -1) {
-        val = isArray(val) ? [val] : val;
-      }
-      if (has.call(obj, key)) {
-        obj[key] = utils.combine(obj[key], val);
-      } else {
+    }
+    if (val && options.interpretNumericEntities && charset === 'iso-8859-1') {
+      val = interpretNumericEntities(String(val));
+    }
+    if (part.indexOf('[]=') > -1) {
+      val = isArray(val) ? [val] : val;
+    }
+    if (options.comma && isArray(val) && val.length > options.arrayLimit) {
+      val = utils$1.combine([], val, options.arrayLimit, options.plainObjects, options.throwOnLimitExceeded);
+    }
+    if (key !== null) {
+      var existing = has.call(obj, key);
+      if (existing && (options.duplicates === 'combine' || part.indexOf('[]=') > -1)) {
+        obj[key] = utils$1.combine(obj[key], val, options.arrayLimit, options.plainObjects, options.throwOnLimitExceeded);
+      } else if (!existing || options.duplicates === 'last') {
         obj[key] = val;
       }
     }
-    return obj;
-  };
-  var parseObject = function parseObject(chain, val, options, valuesParsed) {
-    var leaf = valuesParsed ? val : parseArrayValue(val, options);
-    for (var i = chain.length - 1; i >= 0; --i) {
-      var obj;
-      var root = chain[i];
-      if (root === '[]' && options.parseArrays) {
-        obj = [].concat(leaf);
+  }
+  return obj;
+};
+var parseObject = function parseObject(chain, val, options, valuesParsed) {
+  var currentArrayLength = 0;
+  if (chain.length > 0 && chain[chain.length - 1] === '[]') {
+    var parentKey = chain.slice(0, -1).join('');
+    currentArrayLength = Array.isArray(val) && val[parentKey] ? val[parentKey].length : 0;
+  }
+  var leaf = valuesParsed ? val : parseArrayValue(val, options, currentArrayLength);
+  for (var i = chain.length - 1; i >= 0; --i) {
+    var obj;
+    var root = chain[i];
+    if (root === '[]' && options.parseArrays) {
+      if (utils$1.isOverflow(leaf)) {
+        // leaf is already an overflow object, preserve it
+        obj = leaf;
       } else {
-        obj = options.plainObjects ? Object.create(null) : {};
-        var cleanRoot = root.charAt(0) === '[' && root.charAt(root.length - 1) === ']' ? root.slice(1, -1) : root;
-        var index = parseInt(cleanRoot, 10);
-        if (!options.parseArrays && cleanRoot === '') {
-          obj = {
-            0: leaf
-          };
-        } else if (!isNaN(index) && root !== cleanRoot && String(index) === cleanRoot && index >= 0 && options.parseArrays && index <= options.arrayLimit) {
-          obj = [];
-          obj[index] = leaf;
-        } else if (cleanRoot !== '__proto__') {
-          obj[cleanRoot] = leaf;
+        obj = options.allowEmptyArrays && (leaf === '' || options.strictNullHandling && leaf === null) ? [] : utils$1.combine([], leaf, options.arrayLimit, options.plainObjects, options.throwOnLimitExceeded);
+      }
+    } else {
+      obj = options.plainObjects ? {
+        __proto__: null
+      } : {};
+      var cleanRoot = root.charAt(0) === '[' && root.charAt(root.length - 1) === ']' ? root.slice(1, -1) : root;
+      var decodedRoot = options.decodeDotInKeys ? cleanRoot.replace(/%2E/g, '.') : cleanRoot;
+      var index = parseInt(decodedRoot, 10);
+      var isValidArrayIndex = !isNaN(index) && root !== decodedRoot && String(index) === decodedRoot && index >= 0 && options.parseArrays;
+      if (!options.parseArrays && decodedRoot === '') {
+        obj = {
+          0: leaf
+        };
+      } else if (isValidArrayIndex && index < options.arrayLimit) {
+        obj = [];
+        obj[index] = leaf;
+      } else if (isValidArrayIndex && options.throwOnLimitExceeded) {
+        throw new RangeError('Array limit exceeded. Only ' + options.arrayLimit + ' element' + (options.arrayLimit === 1 ? '' : 's') + ' allowed in an array.');
+      } else if (isValidArrayIndex) {
+        obj[index] = leaf;
+        utils$1.markOverflow(obj, index);
+      } else if (decodedRoot !== '__proto__') {
+        obj[decodedRoot] = leaf;
+      }
+    }
+    leaf = obj;
+  }
+  return leaf;
+};
+
+// Split a key like "a[b][c[]]" into ['a', '[b]', '[c[]]'] while preserving
+// qs parse semantics for depth/prototype guards.
+var splitKeyIntoSegments = function splitKeyIntoSegments(originalKey, options) {
+  var key = options.allowDots ? originalKey.replace(/\.([^.[]+)/g, '[$1]') : originalKey;
+
+  // depth <= 0 keeps the whole key as one segment
+  if (options.depth <= 0) {
+    if (!options.plainObjects && has.call(Object.prototype, key)) {
+      if (!options.allowPrototypes) {
+        return;
+      }
+    }
+    return [key];
+  }
+  var segments = [];
+
+  // parent before the first '[' (may be empty if key starts with '[')
+  var first = key.indexOf('[');
+  var parent = first >= 0 ? key.slice(0, first) : key;
+  if (parent) {
+    if (!options.plainObjects && has.call(Object.prototype, parent)) {
+      if (!options.allowPrototypes) {
+        return;
+      }
+    }
+    segments[segments.length] = parent;
+  }
+  var n = key.length;
+  var open = first;
+  var collected = 0;
+  while (open >= 0 && collected < options.depth) {
+    var level = 1;
+    var i = open + 1;
+    var close = -1;
+
+    // balance nested '[' and ']' inside this bracket group using a nesting level counter
+    while (i < n && close < 0) {
+      var cu = key.charCodeAt(i);
+      if (cu === 0x5B) {
+        // '['
+        level += 1;
+      } else if (cu === 0x5D) {
+        // ']'
+        level -= 1;
+        if (level === 0) {
+          close = i; // found matching close; loop will exit by condition
         }
       }
-      leaf = obj;
+      i += 1;
     }
-    return leaf;
-  };
-  var parseKeys = function parseQueryStringKeys(givenKey, val, options, valuesParsed) {
-    if (!givenKey) {
+    if (close < 0) {
+      // Unterminated group: wrap the raw remainder in one bracket pair so it stays
+      // a single literal segment (e.g. "[[]b" -> "[[]b]"); we do not infer missing ']'.
+      segments[segments.length] = '[' + key.slice(open) + ']';
+      return segments;
+    }
+    var seg = key.slice(open, close + 1);
+    // prototype guard for the content of this group
+    var content = seg.slice(1, -1);
+    if (!options.plainObjects && has.call(Object.prototype, content) && !options.allowPrototypes) {
       return;
     }
+    segments[segments.length] = seg;
+    collected += 1;
 
-    // Transform dot notation to bracket notation
-    var key = options.allowDots ? givenKey.replace(/\.([^.[]+)/g, '[$1]') : givenKey;
-
-    // The regex chunks
-
-    var brackets = /(\[[^[\]]*])/;
-    var child = /(\[[^[\]]*])/g;
-
-    // Get the parent
-
-    var segment = options.depth > 0 && brackets.exec(key);
-    var parent = segment ? key.slice(0, segment.index) : key;
-
-    // Stash the parent if it exists
-
-    var keys = [];
-    if (parent) {
-      // If we aren't using plain objects, optionally prefix keys that would overwrite object prototype properties
-      if (!options.plainObjects && has.call(Object.prototype, parent)) {
-        if (!options.allowPrototypes) {
-          return;
-        }
-      }
-      keys.push(parent);
+    // find the next '[' after this balanced group
+    open = key.indexOf('[', close + 1);
+  }
+  if (open >= 0) {
+    if (options.strictDepth === true) {
+      throw new RangeError('Input depth exceeded depth option of ' + options.depth + ' and strictDepth is true');
     }
-
-    // Loop through children appending to the array until we hit depth
-
-    var i = 0;
-    while (options.depth > 0 && (segment = child.exec(key)) !== null && i < options.depth) {
-      i += 1;
-      if (!options.plainObjects && has.call(Object.prototype, segment[1].slice(1, -1))) {
-        if (!options.allowPrototypes) {
-          return;
-        }
-      }
-      keys.push(segment[1]);
-    }
-
-    // If there's a remainder, just add whatever is left
-
-    if (segment) {
-      keys.push('[' + key.slice(segment.index) + ']');
-    }
-    return parseObject(keys, val, options, valuesParsed);
+    segments[segments.length] = '[' + key.slice(open) + ']';
+  }
+  return segments;
+};
+var parseKeys = function parseQueryStringKeys(givenKey, val, options, valuesParsed) {
+  if (!givenKey) {
+    return;
+  }
+  var keys = splitKeyIntoSegments(givenKey, options);
+  if (!keys) {
+    return;
+  }
+  return parseObject(keys, val, options, valuesParsed);
+};
+var normalizeParseOptions = function normalizeParseOptions(opts) {
+  if (!opts) {
+    return defaults;
+  }
+  if (typeof opts.allowEmptyArrays !== 'undefined' && typeof opts.allowEmptyArrays !== 'boolean') {
+    throw new TypeError('`allowEmptyArrays` option can only be `true` or `false`, when provided');
+  }
+  if (typeof opts.decodeDotInKeys !== 'undefined' && typeof opts.decodeDotInKeys !== 'boolean') {
+    throw new TypeError('`decodeDotInKeys` option can only be `true` or `false`, when provided');
+  }
+  if (opts.decoder !== null && typeof opts.decoder !== 'undefined' && typeof opts.decoder !== 'function') {
+    throw new TypeError('Decoder has to be a function.');
+  }
+  if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
+    throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
+  }
+  if (typeof opts.throwOnLimitExceeded !== 'undefined' && typeof opts.throwOnLimitExceeded !== 'boolean') {
+    throw new TypeError('`throwOnLimitExceeded` option must be a boolean');
+  }
+  var charset = typeof opts.charset === 'undefined' ? defaults.charset : opts.charset;
+  var duplicates = typeof opts.duplicates === 'undefined' ? defaults.duplicates : opts.duplicates;
+  if (duplicates !== 'combine' && duplicates !== 'first' && duplicates !== 'last') {
+    throw new TypeError('The duplicates option must be either combine, first, or last');
+  }
+  var allowDots = typeof opts.allowDots === 'undefined' ? opts.decodeDotInKeys === true ? true : defaults.allowDots : !!opts.allowDots;
+  return {
+    allowDots: allowDots,
+    allowEmptyArrays: typeof opts.allowEmptyArrays === 'boolean' ? !!opts.allowEmptyArrays : defaults.allowEmptyArrays,
+    allowPrototypes: typeof opts.allowPrototypes === 'boolean' ? opts.allowPrototypes : defaults.allowPrototypes,
+    allowSparse: typeof opts.allowSparse === 'boolean' ? opts.allowSparse : defaults.allowSparse,
+    arrayLimit: typeof opts.arrayLimit === 'number' ? opts.arrayLimit : defaults.arrayLimit,
+    charset: charset,
+    charsetSentinel: typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
+    comma: typeof opts.comma === 'boolean' ? opts.comma : defaults.comma,
+    decodeDotInKeys: typeof opts.decodeDotInKeys === 'boolean' ? opts.decodeDotInKeys : defaults.decodeDotInKeys,
+    decoder: typeof opts.decoder === 'function' ? opts.decoder : defaults.decoder,
+    delimiter: typeof opts.delimiter === 'string' || utils$1.isRegExp(opts.delimiter) ? opts.delimiter : defaults.delimiter,
+    // eslint-disable-next-line no-implicit-coercion, no-extra-parens
+    depth: typeof opts.depth === 'number' || opts.depth === false ? +opts.depth : defaults.depth,
+    duplicates: duplicates,
+    ignoreQueryPrefix: opts.ignoreQueryPrefix === true,
+    interpretNumericEntities: typeof opts.interpretNumericEntities === 'boolean' ? opts.interpretNumericEntities : defaults.interpretNumericEntities,
+    parameterLimit: typeof opts.parameterLimit === 'number' ? opts.parameterLimit : defaults.parameterLimit,
+    parseArrays: opts.parseArrays !== false,
+    plainObjects: typeof opts.plainObjects === 'boolean' ? opts.plainObjects : defaults.plainObjects,
+    strictDepth: typeof opts.strictDepth === 'boolean' ? !!opts.strictDepth : defaults.strictDepth,
+    strictMerge: typeof opts.strictMerge === 'boolean' ? !!opts.strictMerge : defaults.strictMerge,
+    strictNullHandling: typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling,
+    throwOnLimitExceeded: typeof opts.throwOnLimitExceeded === 'boolean' ? opts.throwOnLimitExceeded : false
   };
-  var normalizeParseOptions = function normalizeParseOptions(opts) {
-    if (!opts) {
-      return defaults;
-    }
-    if (opts.decoder !== null && opts.decoder !== undefined && typeof opts.decoder !== 'function') {
-      throw new TypeError('Decoder has to be a function.');
-    }
-    if (typeof opts.charset !== 'undefined' && opts.charset !== 'utf-8' && opts.charset !== 'iso-8859-1') {
-      throw new TypeError('The charset option must be either utf-8, iso-8859-1, or undefined');
-    }
-    var charset = typeof opts.charset === 'undefined' ? defaults.charset : opts.charset;
-    return {
-      allowDots: typeof opts.allowDots === 'undefined' ? defaults.allowDots : !!opts.allowDots,
-      allowPrototypes: typeof opts.allowPrototypes === 'boolean' ? opts.allowPrototypes : defaults.allowPrototypes,
-      allowSparse: typeof opts.allowSparse === 'boolean' ? opts.allowSparse : defaults.allowSparse,
-      arrayLimit: typeof opts.arrayLimit === 'number' ? opts.arrayLimit : defaults.arrayLimit,
-      charset: charset,
-      charsetSentinel: typeof opts.charsetSentinel === 'boolean' ? opts.charsetSentinel : defaults.charsetSentinel,
-      comma: typeof opts.comma === 'boolean' ? opts.comma : defaults.comma,
-      decoder: typeof opts.decoder === 'function' ? opts.decoder : defaults.decoder,
-      delimiter: typeof opts.delimiter === 'string' || utils.isRegExp(opts.delimiter) ? opts.delimiter : defaults.delimiter,
-      // eslint-disable-next-line no-implicit-coercion, no-extra-parens
-      depth: typeof opts.depth === 'number' || opts.depth === false ? +opts.depth : defaults.depth,
-      ignoreQueryPrefix: opts.ignoreQueryPrefix === true,
-      interpretNumericEntities: typeof opts.interpretNumericEntities === 'boolean' ? opts.interpretNumericEntities : defaults.interpretNumericEntities,
-      parameterLimit: typeof opts.parameterLimit === 'number' ? opts.parameterLimit : defaults.parameterLimit,
-      parseArrays: opts.parseArrays !== false,
-      plainObjects: typeof opts.plainObjects === 'boolean' ? opts.plainObjects : defaults.plainObjects,
-      strictNullHandling: typeof opts.strictNullHandling === 'boolean' ? opts.strictNullHandling : defaults.strictNullHandling
-    };
-  };
-  parse$7 = function parse(str, opts) {
-    var options = normalizeParseOptions(opts);
-    if (str === '' || str === null || typeof str === 'undefined') {
-      return options.plainObjects ? Object.create(null) : {};
-    }
-    var tempObj = typeof str === 'string' ? parseValues(str, options) : str;
-    var obj = options.plainObjects ? Object.create(null) : {};
+};
+var parse$8 = function parse(str, opts) {
+  var options = normalizeParseOptions(opts);
+  if (str === '' || str === null || typeof str === 'undefined') {
+    return options.plainObjects ? {
+      __proto__: null
+    } : {};
+  }
+  var tempObj = typeof str === 'string' ? parseValues(str, options) : str;
+  var obj = options.plainObjects ? {
+    __proto__: null
+  } : {};
 
-    // Iterate over the keys and setup the new object
+  // Iterate over the keys and setup the new object
 
-    var keys = Object.keys(tempObj);
-    for (var i = 0; i < keys.length; ++i) {
-      var key = keys[i];
-      var newObj = parseKeys(key, tempObj[key], options, typeof str === 'string');
-      obj = utils.merge(obj, newObj, options);
-    }
-    if (options.allowSparse === true) {
-      return obj;
-    }
-    return utils.compact(obj);
-  };
-  return parse$7;
-}
+  var keys = Object.keys(tempObj);
+  for (var i = 0; i < keys.length; ++i) {
+    var key = keys[i];
+    var newObj = parseKeys(key, tempObj[key], options, typeof str === 'string');
+    obj = utils$1.merge(obj, newObj, options);
+  }
+  if (options.allowSparse === true) {
+    return obj;
+  }
+  return utils$1.compact(obj);
+};
 
-var lib;
-var hasRequiredLib;
-function requireLib() {
-  if (hasRequiredLib) return lib;
-  hasRequiredLib = 1;
-  var stringify = requireStringify();
-  var parse = requireParse();
-  var formats = requireFormats();
-  lib = {
-    formats: formats,
-    parse: parse,
-    stringify: stringify
-  };
-  return lib;
-}
+var stringify$2 = stringify_1;
+var parse$7 = parse$8;
+var formats = formats$3;
+var lib = {
+  formats: formats,
+  parse: parse$7,
+  stringify: stringify$2
+};
 
 /*!
  * body-parser
@@ -37287,7 +38064,7 @@ function requireUrlencoded() {
   var bytes = requireBytes();
   var contentType$1 = contentType;
   var createError = httpErrorsExports;
-  var debug = srcExports('body-parser:urlencoded');
+  var debug = requireSrc()('body-parser:urlencoded');
   var deprecate = depd_1('body-parser');
   var read = requireRead();
   var typeis = typeIsExports;
@@ -37321,9 +38098,13 @@ function requireUrlencoded() {
     }
     var extended = opts.extended !== false;
     var inflate = opts.inflate !== false;
-    var limit = typeof opts.limit !== 'number' ? bytes.parse(opts.limit || '100kb') : opts.limit;
+    var limit = typeof opts.limit === 'undefined' || opts.limit === null ? 102400 // 100kb default
+    : bytes.parse(opts.limit);
     var type = opts.type || 'application/x-www-form-urlencoded';
     var verify = opts.verify || false;
+    if (limit === null) {
+      throw new TypeError('option limit "' + String(opts.limit) + '" is invalid');
+    }
     if (verify !== false && typeof verify !== 'function') {
       throw new TypeError('option verify must be function');
     }
@@ -37389,9 +38170,13 @@ function requireUrlencoded() {
 
   function extendedparser(options) {
     var parameterLimit = options.parameterLimit !== undefined ? options.parameterLimit : 1000;
+    var depth = options.depth !== undefined ? options.depth : 32;
     var parse = parser('qs');
     if (isNaN(parameterLimit) || parameterLimit < 1) {
       throw new TypeError('option parameterLimit must be a positive number');
+    }
+    if (isNaN(depth) || depth < 0) {
+      throw new TypeError('option depth must be a zero or a positive number');
     }
     if (isFinite(parameterLimit)) {
       parameterLimit = parameterLimit | 0;
@@ -37406,12 +38191,23 @@ function requireUrlencoded() {
       }
       var arrayLimit = Math.max(100, paramCount);
       debug('parse extended urlencoding');
-      return parse(body, {
-        allowPrototypes: true,
-        arrayLimit: arrayLimit,
-        depth: Infinity,
-        parameterLimit: parameterLimit
-      });
+      try {
+        return parse(body, {
+          allowPrototypes: true,
+          arrayLimit: arrayLimit,
+          depth: depth,
+          strictDepth: true,
+          parameterLimit: parameterLimit
+        });
+      } catch (err) {
+        if (err instanceof RangeError) {
+          throw createError(400, 'The input exceeded the depth', {
+            type: 'querystring.parse.rangeError'
+          });
+        } else {
+          throw err;
+        }
+      }
     };
   }
 
@@ -37440,14 +38236,14 @@ function requireUrlencoded() {
 
   function parameterCount(body, limit) {
     var count = 0;
-    var index = 0;
-    while ((index = body.indexOf('&', index)) !== -1) {
+    var index = -1;
+    do {
       count++;
-      index++;
-      if (count === limit) {
+      if (count > limit) {
         return undefined;
       }
-    }
+      index = body.indexOf('&', index + 1);
+    } while (index !== -1);
     return count;
   }
 
@@ -37468,7 +38264,7 @@ function requireUrlencoded() {
     // this uses a switch for static require analysis
     switch (name) {
       case 'qs':
-        mod = requireLib();
+        mod = lib;
         break;
       case 'querystring':
         mod = require$$8$1;
@@ -37722,7 +38518,7 @@ function merge$1(dest, src, redefine) {
   }
   Object.getOwnPropertyNames(src).forEach(function forEachOwnPropertyName(name) {
     if (!redefine && hasOwnProperty$1.call(dest, name)) {
-      // Skip desriptor
+      // Skip descriptor
       return;
     }
 
@@ -37734,6 +38530,773 @@ function merge$1(dest, src, redefine) {
 }
 
 var application = {exports: {}};
+
+var src$2 = {exports: {}};
+
+var browser$2 = {exports: {}};
+
+var debug$8 = {exports: {}};
+
+var ms$4;
+var hasRequiredMs$2;
+function requireMs$2() {
+  if (hasRequiredMs$2) return ms$4;
+  hasRequiredMs$2 = 1;
+  var s = 1000;
+  var m = s * 60;
+  var h = m * 60;
+  var d = h * 24;
+  var y = d * 365.25;
+
+  /**
+   * Parse or format the given `val`.
+   *
+   * Options:
+   *
+   *  - `long` verbose formatting [false]
+   *
+   * @param {String|Number} val
+   * @param {Object} [options]
+   * @throws {Error} throw an error if val is not a non-empty string or a number
+   * @return {String|Number}
+   * @api public
+   */
+
+  ms$4 = function ms(val, options) {
+    options = options || {};
+    var type = _typeof(val);
+    if (type === 'string' && val.length > 0) {
+      return parse(val);
+    } else if (type === 'number' && isNaN(val) === false) {
+      return options["long"] ? fmtLong(val) : fmtShort(val);
+    }
+    throw new Error('val is not a non-empty string or a valid number. val=' + JSON.stringify(val));
+  };
+
+  /**
+   * Parse the given `str` and return milliseconds.
+   *
+   * @param {String} str
+   * @return {Number}
+   * @api private
+   */
+
+  function parse(str) {
+    str = String(str);
+    if (str.length > 100) {
+      return;
+    }
+    var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);
+    if (!match) {
+      return;
+    }
+    var n = parseFloat(match[1]);
+    var type = (match[2] || 'ms').toLowerCase();
+    switch (type) {
+      case 'years':
+      case 'year':
+      case 'yrs':
+      case 'yr':
+      case 'y':
+        return n * y;
+      case 'days':
+      case 'day':
+      case 'd':
+        return n * d;
+      case 'hours':
+      case 'hour':
+      case 'hrs':
+      case 'hr':
+      case 'h':
+        return n * h;
+      case 'minutes':
+      case 'minute':
+      case 'mins':
+      case 'min':
+      case 'm':
+        return n * m;
+      case 'seconds':
+      case 'second':
+      case 'secs':
+      case 'sec':
+      case 's':
+        return n * s;
+      case 'milliseconds':
+      case 'millisecond':
+      case 'msecs':
+      case 'msec':
+      case 'ms':
+        return n;
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Short format for `ms`.
+   *
+   * @param {Number} ms
+   * @return {String}
+   * @api private
+   */
+
+  function fmtShort(ms) {
+    if (ms >= d) {
+      return Math.round(ms / d) + 'd';
+    }
+    if (ms >= h) {
+      return Math.round(ms / h) + 'h';
+    }
+    if (ms >= m) {
+      return Math.round(ms / m) + 'm';
+    }
+    if (ms >= s) {
+      return Math.round(ms / s) + 's';
+    }
+    return ms + 'ms';
+  }
+
+  /**
+   * Long format for `ms`.
+   *
+   * @param {Number} ms
+   * @return {String}
+   * @api private
+   */
+
+  function fmtLong(ms) {
+    return plural(ms, d, 'day') || plural(ms, h, 'hour') || plural(ms, m, 'minute') || plural(ms, s, 'second') || ms + ' ms';
+  }
+
+  /**
+   * Pluralization helper.
+   */
+
+  function plural(ms, n, name) {
+    if (ms < n) {
+      return;
+    }
+    if (ms < n * 1.5) {
+      return Math.floor(ms / n) + ' ' + name;
+    }
+    return Math.ceil(ms / n) + ' ' + name + 's';
+  }
+  return ms$4;
+}
+
+var hasRequiredDebug$2;
+function requireDebug$2() {
+  if (hasRequiredDebug$2) return debug$8.exports;
+  hasRequiredDebug$2 = 1;
+  (function (module, exports) {
+    /**
+     * This is the common logic for both the Node.js and web browser
+     * implementations of `debug()`.
+     *
+     * Expose `debug()` as the module.
+     */
+
+    exports = module.exports = createDebug.debug = createDebug['default'] = createDebug;
+    exports.coerce = coerce;
+    exports.disable = disable;
+    exports.enable = enable;
+    exports.enabled = enabled;
+    exports.humanize = requireMs$2();
+
+    /**
+     * The currently active debug mode names, and names to skip.
+     */
+
+    exports.names = [];
+    exports.skips = [];
+
+    /**
+     * Map of special "%n" handling functions, for the debug "format" argument.
+     *
+     * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+     */
+
+    exports.formatters = {};
+
+    /**
+     * Previous log timestamp.
+     */
+
+    var prevTime;
+
+    /**
+     * Select a color.
+     * @param {String} namespace
+     * @return {Number}
+     * @api private
+     */
+
+    function selectColor(namespace) {
+      var hash = 0,
+        i;
+      for (i in namespace) {
+        hash = (hash << 5) - hash + namespace.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+      }
+      return exports.colors[Math.abs(hash) % exports.colors.length];
+    }
+
+    /**
+     * Create a debugger with the given `namespace`.
+     *
+     * @param {String} namespace
+     * @return {Function}
+     * @api public
+     */
+
+    function createDebug(namespace) {
+      function debug() {
+        // disabled?
+        if (!debug.enabled) return;
+        var self = debug;
+
+        // set `diff` timestamp
+        var curr = +new Date();
+        var ms = curr - (prevTime || curr);
+        self.diff = ms;
+        self.prev = prevTime;
+        self.curr = curr;
+        prevTime = curr;
+
+        // turn the `arguments` into a proper Array
+        var args = new Array(arguments.length);
+        for (var i = 0; i < args.length; i++) {
+          args[i] = arguments[i];
+        }
+        args[0] = exports.coerce(args[0]);
+        if ('string' !== typeof args[0]) {
+          // anything else let's inspect with %O
+          args.unshift('%O');
+        }
+
+        // apply any `formatters` transformations
+        var index = 0;
+        args[0] = args[0].replace(/%([a-zA-Z%])/g, function (match, format) {
+          // if we encounter an escaped % then don't increase the array index
+          if (match === '%%') return match;
+          index++;
+          var formatter = exports.formatters[format];
+          if ('function' === typeof formatter) {
+            var val = args[index];
+            match = formatter.call(self, val);
+
+            // now we need to remove `args[index]` since it's inlined in the `format`
+            args.splice(index, 1);
+            index--;
+          }
+          return match;
+        });
+
+        // apply env-specific formatting (colors, etc.)
+        exports.formatArgs.call(self, args);
+        var logFn = debug.log || exports.log || console.log.bind(console);
+        logFn.apply(self, args);
+      }
+      debug.namespace = namespace;
+      debug.enabled = exports.enabled(namespace);
+      debug.useColors = exports.useColors();
+      debug.color = selectColor(namespace);
+
+      // env-specific initialization logic for debug instances
+      if ('function' === typeof exports.init) {
+        exports.init(debug);
+      }
+      return debug;
+    }
+
+    /**
+     * Enables a debug mode by namespaces. This can include modes
+     * separated by a colon and wildcards.
+     *
+     * @param {String} namespaces
+     * @api public
+     */
+
+    function enable(namespaces) {
+      exports.save(namespaces);
+      exports.names = [];
+      exports.skips = [];
+      var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+      var len = split.length;
+      for (var i = 0; i < len; i++) {
+        if (!split[i]) continue; // ignore empty strings
+        namespaces = split[i].replace(/\*/g, '.*?');
+        if (namespaces[0] === '-') {
+          exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+        } else {
+          exports.names.push(new RegExp('^' + namespaces + '$'));
+        }
+      }
+    }
+
+    /**
+     * Disable debug output.
+     *
+     * @api public
+     */
+
+    function disable() {
+      exports.enable('');
+    }
+
+    /**
+     * Returns true if the given mode name is enabled, false otherwise.
+     *
+     * @param {String} name
+     * @return {Boolean}
+     * @api public
+     */
+
+    function enabled(name) {
+      var i, len;
+      for (i = 0, len = exports.skips.length; i < len; i++) {
+        if (exports.skips[i].test(name)) {
+          return false;
+        }
+      }
+      for (i = 0, len = exports.names.length; i < len; i++) {
+        if (exports.names[i].test(name)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Coerce `val`.
+     *
+     * @param {Mixed} val
+     * @return {Mixed}
+     * @api private
+     */
+
+    function coerce(val) {
+      if (val instanceof Error) return val.stack || val.message;
+      return val;
+    }
+  })(debug$8, debug$8.exports);
+  return debug$8.exports;
+}
+
+var hasRequiredBrowser$2;
+function requireBrowser$2() {
+  if (hasRequiredBrowser$2) return browser$2.exports;
+  hasRequiredBrowser$2 = 1;
+  (function (module, exports) {
+    exports = module.exports = requireDebug$2();
+    exports.log = log;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load;
+    exports.useColors = useColors;
+    exports.storage = 'undefined' != typeof chrome && 'undefined' != typeof chrome.storage ? chrome.storage.local : localstorage();
+
+    /**
+     * Colors.
+     */
+
+    exports.colors = ['lightseagreen', 'forestgreen', 'goldenrod', 'dodgerblue', 'darkorchid', 'crimson'];
+
+    /**
+     * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+     * and the Firebug extension (any Firefox version) are known
+     * to support "%c" CSS customizations.
+     *
+     * TODO: add a `localStorage` variable to explicitly enable/disable colors
+     */
+
+    function useColors() {
+      // NB: In an Electron preload script, document will be defined but not fully
+      // initialized. Since we know we're in Chrome, we'll just detect this case
+      // explicitly
+      if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
+        return true;
+      }
+
+      // is webkit? http://stackoverflow.com/a/16459606/376773
+      // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+      return typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance ||
+      // is firebug? http://stackoverflow.com/a/398120/376773
+      typeof window !== 'undefined' && window.console && (window.console.firebug || window.console.exception && window.console.table) ||
+      // is firefox >= v31?
+      // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+      typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 ||
+      // double check webkit in userAgent just in case we are in a worker
+      typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
+    }
+
+    /**
+     * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+     */
+
+    exports.formatters.j = function (v) {
+      try {
+        return JSON.stringify(v);
+      } catch (err) {
+        return '[UnexpectedJSONParseError]: ' + err.message;
+      }
+    };
+
+    /**
+     * Colorize log arguments if enabled.
+     *
+     * @api public
+     */
+
+    function formatArgs(args) {
+      var useColors = this.useColors;
+      args[0] = (useColors ? '%c' : '') + this.namespace + (useColors ? ' %c' : ' ') + args[0] + (useColors ? '%c ' : ' ') + '+' + exports.humanize(this.diff);
+      if (!useColors) return;
+      var c = 'color: ' + this.color;
+      args.splice(1, 0, c, 'color: inherit');
+
+      // the final "%c" is somewhat tricky, because there could be other
+      // arguments passed either before or after the %c, so we need to
+      // figure out the correct index to insert the CSS into
+      var index = 0;
+      var lastC = 0;
+      args[0].replace(/%[a-zA-Z%]/g, function (match) {
+        if ('%%' === match) return;
+        index++;
+        if ('%c' === match) {
+          // we only are interested in the *last* %c
+          // (the user may have provided their own)
+          lastC = index;
+        }
+      });
+      args.splice(lastC, 0, c);
+    }
+
+    /**
+     * Invokes `console.log()` when available.
+     * No-op when `console.log` is not a "function".
+     *
+     * @api public
+     */
+
+    function log() {
+      // this hackery is required for IE8/9, where
+      // the `console.log` function doesn't have 'apply'
+      return 'object' === (typeof console === "undefined" ? "undefined" : _typeof(console)) && console.log && Function.prototype.apply.call(console.log, console, arguments);
+    }
+
+    /**
+     * Save `namespaces`.
+     *
+     * @param {String} namespaces
+     * @api private
+     */
+
+    function save(namespaces) {
+      try {
+        if (null == namespaces) {
+          exports.storage.removeItem('debug');
+        } else {
+          exports.storage.debug = namespaces;
+        }
+      } catch (e) {}
+    }
+
+    /**
+     * Load `namespaces`.
+     *
+     * @return {String} returns the previously persisted debug modes
+     * @api private
+     */
+
+    function load() {
+      var r;
+      try {
+        r = exports.storage.debug;
+      } catch (e) {}
+
+      // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+      if (!r && typeof process !== 'undefined' && 'env' in process) {
+        r = process.env.DEBUG;
+      }
+      return r;
+    }
+
+    /**
+     * Enable namespaces listed in `localStorage.debug` initially.
+     */
+
+    exports.enable(load());
+
+    /**
+     * Localstorage attempts to return the localstorage.
+     *
+     * This is necessary because safari throws
+     * when a user disables cookies/localstorage
+     * and you attempt to access it.
+     *
+     * @return {LocalStorage}
+     * @api private
+     */
+
+    function localstorage() {
+      try {
+        return window.localStorage;
+      } catch (e) {}
+    }
+  })(browser$2, browser$2.exports);
+  return browser$2.exports;
+}
+
+var node$2 = {exports: {}};
+
+/**
+ * Module dependencies.
+ */
+var hasRequiredNode$2;
+function requireNode$2() {
+  if (hasRequiredNode$2) return node$2.exports;
+  hasRequiredNode$2 = 1;
+  (function (module, exports) {
+    var tty = require$$0$5;
+    var util = require$$1$1;
+
+    /**
+     * This is the Node.js implementation of `debug()`.
+     *
+     * Expose `debug()` as the module.
+     */
+
+    exports = module.exports = requireDebug$2();
+    exports.init = init;
+    exports.log = log;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load;
+    exports.useColors = useColors;
+
+    /**
+     * Colors.
+     */
+
+    exports.colors = [6, 2, 3, 4, 5, 1];
+
+    /**
+     * Build up the default `inspectOpts` object from the environment variables.
+     *
+     *   $ DEBUG_COLORS=no DEBUG_DEPTH=10 DEBUG_SHOW_HIDDEN=enabled node script.js
+     */
+
+    exports.inspectOpts = Object.keys(process.env).filter(function (key) {
+      return /^debug_/i.test(key);
+    }).reduce(function (obj, key) {
+      // camel-case
+      var prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, function (_, k) {
+        return k.toUpperCase();
+      });
+
+      // coerce string value into JS value
+      var val = process.env[key];
+      if (/^(yes|on|true|enabled)$/i.test(val)) val = true;else if (/^(no|off|false|disabled)$/i.test(val)) val = false;else if (val === 'null') val = null;else val = Number(val);
+      obj[prop] = val;
+      return obj;
+    }, {});
+
+    /**
+     * The file descriptor to write the `debug()` calls to.
+     * Set the `DEBUG_FD` env variable to override with another value. i.e.:
+     *
+     *   $ DEBUG_FD=3 node script.js 3>debug.log
+     */
+
+    var fd = parseInt(process.env.DEBUG_FD, 10) || 2;
+    if (1 !== fd && 2 !== fd) {
+      util.deprecate(function () {}, 'except for stderr(2) and stdout(1), any other usage of DEBUG_FD is deprecated. Override debug.log if you want to use a different log function (https://git.io/debug_fd)')();
+    }
+    var stream = 1 === fd ? process.stdout : 2 === fd ? process.stderr : createWritableStdioStream(fd);
+
+    /**
+     * Is stdout a TTY? Colored output is enabled when `true`.
+     */
+
+    function useColors() {
+      return 'colors' in exports.inspectOpts ? Boolean(exports.inspectOpts.colors) : tty.isatty(fd);
+    }
+
+    /**
+     * Map %o to `util.inspect()`, all on a single line.
+     */
+
+    exports.formatters.o = function (v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts).split('\n').map(function (str) {
+        return str.trim();
+      }).join(' ');
+    };
+
+    /**
+     * Map %o to `util.inspect()`, allowing multiple lines if needed.
+     */
+
+    exports.formatters.O = function (v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts);
+    };
+
+    /**
+     * Adds ANSI color escape codes if enabled.
+     *
+     * @api public
+     */
+
+    function formatArgs(args) {
+      var name = this.namespace;
+      var useColors = this.useColors;
+      if (useColors) {
+        var c = this.color;
+        var prefix = "  \x1B[3" + c + ';1m' + name + ' ' + "\x1B[0m";
+        args[0] = prefix + args[0].split('\n').join('\n' + prefix);
+        args.push("\x1B[3" + c + 'm+' + exports.humanize(this.diff) + "\x1B[0m");
+      } else {
+        args[0] = new Date().toUTCString() + ' ' + name + ' ' + args[0];
+      }
+    }
+
+    /**
+     * Invokes `util.format()` with the specified arguments and writes to `stream`.
+     */
+
+    function log() {
+      return stream.write(util.format.apply(util, arguments) + '\n');
+    }
+
+    /**
+     * Save `namespaces`.
+     *
+     * @param {String} namespaces
+     * @api private
+     */
+
+    function save(namespaces) {
+      if (null == namespaces) {
+        // If you set a process.env field to null or undefined, it gets cast to the
+        // string 'null' or 'undefined'. Just delete instead.
+        delete process.env.DEBUG;
+      } else {
+        process.env.DEBUG = namespaces;
+      }
+    }
+
+    /**
+     * Load `namespaces`.
+     *
+     * @return {String} returns the previously persisted debug modes
+     * @api private
+     */
+
+    function load() {
+      return process.env.DEBUG;
+    }
+
+    /**
+     * Copied from `node/src/node.js`.
+     *
+     * XXX: It's lame that node doesn't expose this API out-of-the-box. It also
+     * relies on the undocumented `tty_wrap.guessHandleType()` which is also lame.
+     */
+
+    function createWritableStdioStream(fd) {
+      var stream;
+      var tty_wrap = process.binding('tty_wrap');
+
+      // Note stream._type is used for test-module-load-list.js
+
+      switch (tty_wrap.guessHandleType(fd)) {
+        case 'TTY':
+          stream = new tty.WriteStream(fd);
+          stream._type = 'tty';
+
+          // Hack to have stream not keep the event loop alive.
+          // See https://github.com/joyent/node/issues/1726
+          if (stream._handle && stream._handle.unref) {
+            stream._handle.unref();
+          }
+          break;
+        case 'FILE':
+          var fs = require$$3$3;
+          stream = new fs.SyncWriteStream(fd, {
+            autoClose: false
+          });
+          stream._type = 'fs';
+          break;
+        case 'PIPE':
+        case 'TCP':
+          var net = require$$4$2;
+          stream = new net.Socket({
+            fd: fd,
+            readable: false,
+            writable: true
+          });
+
+          // FIXME Should probably have an option in net.Socket to create a
+          // stream from an existing fd which is writable only. But for now
+          // we'll just add this hack and set the `readable` member to false.
+          // Test: ./node test/fixtures/echo.js < /etc/passwd
+          stream.readable = false;
+          stream.read = null;
+          stream._type = 'pipe';
+
+          // FIXME Hack to have stream not keep the event loop alive.
+          // See https://github.com/joyent/node/issues/1726
+          if (stream._handle && stream._handle.unref) {
+            stream._handle.unref();
+          }
+          break;
+        default:
+          // Probably an error on in uv_guess_handle()
+          throw new Error('Implement me. Unknown stream file type!');
+      }
+
+      // For supporting legacy API we put the FD here.
+      stream.fd = fd;
+      stream._isStdio = true;
+      return stream;
+    }
+
+    /**
+     * Init logic for `debug` instances.
+     *
+     * Create a new `inspectOpts` object in case `useColors` is set
+     * differently for a particular `debug` instance.
+     */
+
+    function init(debug) {
+      debug.inspectOpts = {};
+      var keys = Object.keys(exports.inspectOpts);
+      for (var i = 0; i < keys.length; i++) {
+        debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+      }
+    }
+
+    /**
+     * Enable namespaces listed in `process.env.DEBUG` initially.
+     */
+
+    exports.enable(load());
+  })(node$2, node$2.exports);
+  return node$2.exports;
+}
+
+/**
+ * Detect Electron renderer process, which is node, but we should
+ * treat as a browser.
+ */
+if (typeof process !== 'undefined' && process.type === 'renderer') {
+  src$2.exports = requireBrowser$2();
+} else {
+  src$2.exports = requireNode$2();
+}
+var srcExports$2 = src$2.exports;
 
 /*!
  * encodeurl
@@ -37754,7 +39317,7 @@ var encodeurl = encodeUrl$3;
  * @private
  */
 
-var ENCODE_CHARS_REGEXP = /(?:[^\x21\x25\x26-\x3B\x3D\x3F-\x5B\x5D\x5F\x61-\x7A\x7E]|%(?:[^0-9A-Fa-f]|[0-9A-Fa-f][^0-9A-Fa-f]|$))+/g;
+var ENCODE_CHARS_REGEXP = /(?:[^\x21\x23-\x3B\x3D\x3F-\x5F\x61-\x7A\x7C\x7E]|%(?:[^0-9A-Fa-f]|[0-9A-Fa-f][^0-9A-Fa-f]|$))+/g;
 
 /**
  * RegExp to match unmatched surrogate pair.
@@ -38007,7 +39570,7 @@ var parseurlExports = parseurl$1.exports;
  * @private
  */
 
-var debug$5 = srcExports('finalhandler');
+var debug$7 = srcExports$2('finalhandler');
 var encodeUrl$2 = encodeurl;
 var escapeHtml$2 = escapeHtml_1;
 var onFinished$2 = onFinishedExports;
@@ -38073,7 +39636,7 @@ function finalhandler(req, res, options) {
 
     // ignore 404 on in-flight response
     if (!err && headersSent$1(res)) {
-      debug$5('cannot 404 after headers sent');
+      debug$7('cannot 404 after headers sent');
       return;
     }
 
@@ -38096,7 +39659,7 @@ function finalhandler(req, res, options) {
       status = 404;
       msg = 'Cannot ' + req.method + ' ' + encodeUrl$2(getResourceName(req));
     }
-    debug$5('default %s', status);
+    debug$7('default %s', status);
 
     // schedule onerror callback
     if (err && onerror) {
@@ -38105,8 +39668,10 @@ function finalhandler(req, res, options) {
 
     // cannot actually respond
     if (headersSent$1(res)) {
-      debug$5('cannot %d after headers sent', status);
-      req.socket.destroy();
+      debug$7('cannot %d after headers sent', status);
+      if (req.socket) {
+        req.socket.destroy();
+      }
       return;
     }
 
@@ -38248,7 +39813,9 @@ function send$3(req, res, status, headers, message) {
 
     // response status
     res.statusCode = status;
-    res.statusMessage = statuses$2.message[status];
+    if (req.httpVersionMajor < 2) {
+      res.statusMessage = statuses$2.message[status];
+    }
 
     // remove any content headers
     res.removeHeader('Content-Encoding');
@@ -38304,6 +39871,773 @@ function setHeaders$1(res, headers) {
 }
 
 var router = {exports: {}};
+
+var src$1 = {exports: {}};
+
+var browser$1 = {exports: {}};
+
+var debug$6 = {exports: {}};
+
+var ms$3;
+var hasRequiredMs$1;
+function requireMs$1() {
+  if (hasRequiredMs$1) return ms$3;
+  hasRequiredMs$1 = 1;
+  var s = 1000;
+  var m = s * 60;
+  var h = m * 60;
+  var d = h * 24;
+  var y = d * 365.25;
+
+  /**
+   * Parse or format the given `val`.
+   *
+   * Options:
+   *
+   *  - `long` verbose formatting [false]
+   *
+   * @param {String|Number} val
+   * @param {Object} [options]
+   * @throws {Error} throw an error if val is not a non-empty string or a number
+   * @return {String|Number}
+   * @api public
+   */
+
+  ms$3 = function ms(val, options) {
+    options = options || {};
+    var type = _typeof(val);
+    if (type === 'string' && val.length > 0) {
+      return parse(val);
+    } else if (type === 'number' && isNaN(val) === false) {
+      return options["long"] ? fmtLong(val) : fmtShort(val);
+    }
+    throw new Error('val is not a non-empty string or a valid number. val=' + JSON.stringify(val));
+  };
+
+  /**
+   * Parse the given `str` and return milliseconds.
+   *
+   * @param {String} str
+   * @return {Number}
+   * @api private
+   */
+
+  function parse(str) {
+    str = String(str);
+    if (str.length > 100) {
+      return;
+    }
+    var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);
+    if (!match) {
+      return;
+    }
+    var n = parseFloat(match[1]);
+    var type = (match[2] || 'ms').toLowerCase();
+    switch (type) {
+      case 'years':
+      case 'year':
+      case 'yrs':
+      case 'yr':
+      case 'y':
+        return n * y;
+      case 'days':
+      case 'day':
+      case 'd':
+        return n * d;
+      case 'hours':
+      case 'hour':
+      case 'hrs':
+      case 'hr':
+      case 'h':
+        return n * h;
+      case 'minutes':
+      case 'minute':
+      case 'mins':
+      case 'min':
+      case 'm':
+        return n * m;
+      case 'seconds':
+      case 'second':
+      case 'secs':
+      case 'sec':
+      case 's':
+        return n * s;
+      case 'milliseconds':
+      case 'millisecond':
+      case 'msecs':
+      case 'msec':
+      case 'ms':
+        return n;
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Short format for `ms`.
+   *
+   * @param {Number} ms
+   * @return {String}
+   * @api private
+   */
+
+  function fmtShort(ms) {
+    if (ms >= d) {
+      return Math.round(ms / d) + 'd';
+    }
+    if (ms >= h) {
+      return Math.round(ms / h) + 'h';
+    }
+    if (ms >= m) {
+      return Math.round(ms / m) + 'm';
+    }
+    if (ms >= s) {
+      return Math.round(ms / s) + 's';
+    }
+    return ms + 'ms';
+  }
+
+  /**
+   * Long format for `ms`.
+   *
+   * @param {Number} ms
+   * @return {String}
+   * @api private
+   */
+
+  function fmtLong(ms) {
+    return plural(ms, d, 'day') || plural(ms, h, 'hour') || plural(ms, m, 'minute') || plural(ms, s, 'second') || ms + ' ms';
+  }
+
+  /**
+   * Pluralization helper.
+   */
+
+  function plural(ms, n, name) {
+    if (ms < n) {
+      return;
+    }
+    if (ms < n * 1.5) {
+      return Math.floor(ms / n) + ' ' + name;
+    }
+    return Math.ceil(ms / n) + ' ' + name + 's';
+  }
+  return ms$3;
+}
+
+var hasRequiredDebug$1;
+function requireDebug$1() {
+  if (hasRequiredDebug$1) return debug$6.exports;
+  hasRequiredDebug$1 = 1;
+  (function (module, exports) {
+    /**
+     * This is the common logic for both the Node.js and web browser
+     * implementations of `debug()`.
+     *
+     * Expose `debug()` as the module.
+     */
+
+    exports = module.exports = createDebug.debug = createDebug['default'] = createDebug;
+    exports.coerce = coerce;
+    exports.disable = disable;
+    exports.enable = enable;
+    exports.enabled = enabled;
+    exports.humanize = requireMs$1();
+
+    /**
+     * The currently active debug mode names, and names to skip.
+     */
+
+    exports.names = [];
+    exports.skips = [];
+
+    /**
+     * Map of special "%n" handling functions, for the debug "format" argument.
+     *
+     * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+     */
+
+    exports.formatters = {};
+
+    /**
+     * Previous log timestamp.
+     */
+
+    var prevTime;
+
+    /**
+     * Select a color.
+     * @param {String} namespace
+     * @return {Number}
+     * @api private
+     */
+
+    function selectColor(namespace) {
+      var hash = 0,
+        i;
+      for (i in namespace) {
+        hash = (hash << 5) - hash + namespace.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+      }
+      return exports.colors[Math.abs(hash) % exports.colors.length];
+    }
+
+    /**
+     * Create a debugger with the given `namespace`.
+     *
+     * @param {String} namespace
+     * @return {Function}
+     * @api public
+     */
+
+    function createDebug(namespace) {
+      function debug() {
+        // disabled?
+        if (!debug.enabled) return;
+        var self = debug;
+
+        // set `diff` timestamp
+        var curr = +new Date();
+        var ms = curr - (prevTime || curr);
+        self.diff = ms;
+        self.prev = prevTime;
+        self.curr = curr;
+        prevTime = curr;
+
+        // turn the `arguments` into a proper Array
+        var args = new Array(arguments.length);
+        for (var i = 0; i < args.length; i++) {
+          args[i] = arguments[i];
+        }
+        args[0] = exports.coerce(args[0]);
+        if ('string' !== typeof args[0]) {
+          // anything else let's inspect with %O
+          args.unshift('%O');
+        }
+
+        // apply any `formatters` transformations
+        var index = 0;
+        args[0] = args[0].replace(/%([a-zA-Z%])/g, function (match, format) {
+          // if we encounter an escaped % then don't increase the array index
+          if (match === '%%') return match;
+          index++;
+          var formatter = exports.formatters[format];
+          if ('function' === typeof formatter) {
+            var val = args[index];
+            match = formatter.call(self, val);
+
+            // now we need to remove `args[index]` since it's inlined in the `format`
+            args.splice(index, 1);
+            index--;
+          }
+          return match;
+        });
+
+        // apply env-specific formatting (colors, etc.)
+        exports.formatArgs.call(self, args);
+        var logFn = debug.log || exports.log || console.log.bind(console);
+        logFn.apply(self, args);
+      }
+      debug.namespace = namespace;
+      debug.enabled = exports.enabled(namespace);
+      debug.useColors = exports.useColors();
+      debug.color = selectColor(namespace);
+
+      // env-specific initialization logic for debug instances
+      if ('function' === typeof exports.init) {
+        exports.init(debug);
+      }
+      return debug;
+    }
+
+    /**
+     * Enables a debug mode by namespaces. This can include modes
+     * separated by a colon and wildcards.
+     *
+     * @param {String} namespaces
+     * @api public
+     */
+
+    function enable(namespaces) {
+      exports.save(namespaces);
+      exports.names = [];
+      exports.skips = [];
+      var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+      var len = split.length;
+      for (var i = 0; i < len; i++) {
+        if (!split[i]) continue; // ignore empty strings
+        namespaces = split[i].replace(/\*/g, '.*?');
+        if (namespaces[0] === '-') {
+          exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+        } else {
+          exports.names.push(new RegExp('^' + namespaces + '$'));
+        }
+      }
+    }
+
+    /**
+     * Disable debug output.
+     *
+     * @api public
+     */
+
+    function disable() {
+      exports.enable('');
+    }
+
+    /**
+     * Returns true if the given mode name is enabled, false otherwise.
+     *
+     * @param {String} name
+     * @return {Boolean}
+     * @api public
+     */
+
+    function enabled(name) {
+      var i, len;
+      for (i = 0, len = exports.skips.length; i < len; i++) {
+        if (exports.skips[i].test(name)) {
+          return false;
+        }
+      }
+      for (i = 0, len = exports.names.length; i < len; i++) {
+        if (exports.names[i].test(name)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Coerce `val`.
+     *
+     * @param {Mixed} val
+     * @return {Mixed}
+     * @api private
+     */
+
+    function coerce(val) {
+      if (val instanceof Error) return val.stack || val.message;
+      return val;
+    }
+  })(debug$6, debug$6.exports);
+  return debug$6.exports;
+}
+
+var hasRequiredBrowser$1;
+function requireBrowser$1() {
+  if (hasRequiredBrowser$1) return browser$1.exports;
+  hasRequiredBrowser$1 = 1;
+  (function (module, exports) {
+    exports = module.exports = requireDebug$1();
+    exports.log = log;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load;
+    exports.useColors = useColors;
+    exports.storage = 'undefined' != typeof chrome && 'undefined' != typeof chrome.storage ? chrome.storage.local : localstorage();
+
+    /**
+     * Colors.
+     */
+
+    exports.colors = ['lightseagreen', 'forestgreen', 'goldenrod', 'dodgerblue', 'darkorchid', 'crimson'];
+
+    /**
+     * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+     * and the Firebug extension (any Firefox version) are known
+     * to support "%c" CSS customizations.
+     *
+     * TODO: add a `localStorage` variable to explicitly enable/disable colors
+     */
+
+    function useColors() {
+      // NB: In an Electron preload script, document will be defined but not fully
+      // initialized. Since we know we're in Chrome, we'll just detect this case
+      // explicitly
+      if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
+        return true;
+      }
+
+      // is webkit? http://stackoverflow.com/a/16459606/376773
+      // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+      return typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance ||
+      // is firebug? http://stackoverflow.com/a/398120/376773
+      typeof window !== 'undefined' && window.console && (window.console.firebug || window.console.exception && window.console.table) ||
+      // is firefox >= v31?
+      // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+      typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 ||
+      // double check webkit in userAgent just in case we are in a worker
+      typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
+    }
+
+    /**
+     * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+     */
+
+    exports.formatters.j = function (v) {
+      try {
+        return JSON.stringify(v);
+      } catch (err) {
+        return '[UnexpectedJSONParseError]: ' + err.message;
+      }
+    };
+
+    /**
+     * Colorize log arguments if enabled.
+     *
+     * @api public
+     */
+
+    function formatArgs(args) {
+      var useColors = this.useColors;
+      args[0] = (useColors ? '%c' : '') + this.namespace + (useColors ? ' %c' : ' ') + args[0] + (useColors ? '%c ' : ' ') + '+' + exports.humanize(this.diff);
+      if (!useColors) return;
+      var c = 'color: ' + this.color;
+      args.splice(1, 0, c, 'color: inherit');
+
+      // the final "%c" is somewhat tricky, because there could be other
+      // arguments passed either before or after the %c, so we need to
+      // figure out the correct index to insert the CSS into
+      var index = 0;
+      var lastC = 0;
+      args[0].replace(/%[a-zA-Z%]/g, function (match) {
+        if ('%%' === match) return;
+        index++;
+        if ('%c' === match) {
+          // we only are interested in the *last* %c
+          // (the user may have provided their own)
+          lastC = index;
+        }
+      });
+      args.splice(lastC, 0, c);
+    }
+
+    /**
+     * Invokes `console.log()` when available.
+     * No-op when `console.log` is not a "function".
+     *
+     * @api public
+     */
+
+    function log() {
+      // this hackery is required for IE8/9, where
+      // the `console.log` function doesn't have 'apply'
+      return 'object' === (typeof console === "undefined" ? "undefined" : _typeof(console)) && console.log && Function.prototype.apply.call(console.log, console, arguments);
+    }
+
+    /**
+     * Save `namespaces`.
+     *
+     * @param {String} namespaces
+     * @api private
+     */
+
+    function save(namespaces) {
+      try {
+        if (null == namespaces) {
+          exports.storage.removeItem('debug');
+        } else {
+          exports.storage.debug = namespaces;
+        }
+      } catch (e) {}
+    }
+
+    /**
+     * Load `namespaces`.
+     *
+     * @return {String} returns the previously persisted debug modes
+     * @api private
+     */
+
+    function load() {
+      var r;
+      try {
+        r = exports.storage.debug;
+      } catch (e) {}
+
+      // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+      if (!r && typeof process !== 'undefined' && 'env' in process) {
+        r = process.env.DEBUG;
+      }
+      return r;
+    }
+
+    /**
+     * Enable namespaces listed in `localStorage.debug` initially.
+     */
+
+    exports.enable(load());
+
+    /**
+     * Localstorage attempts to return the localstorage.
+     *
+     * This is necessary because safari throws
+     * when a user disables cookies/localstorage
+     * and you attempt to access it.
+     *
+     * @return {LocalStorage}
+     * @api private
+     */
+
+    function localstorage() {
+      try {
+        return window.localStorage;
+      } catch (e) {}
+    }
+  })(browser$1, browser$1.exports);
+  return browser$1.exports;
+}
+
+var node$1 = {exports: {}};
+
+/**
+ * Module dependencies.
+ */
+var hasRequiredNode$1;
+function requireNode$1() {
+  if (hasRequiredNode$1) return node$1.exports;
+  hasRequiredNode$1 = 1;
+  (function (module, exports) {
+    var tty = require$$0$5;
+    var util = require$$1$1;
+
+    /**
+     * This is the Node.js implementation of `debug()`.
+     *
+     * Expose `debug()` as the module.
+     */
+
+    exports = module.exports = requireDebug$1();
+    exports.init = init;
+    exports.log = log;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load;
+    exports.useColors = useColors;
+
+    /**
+     * Colors.
+     */
+
+    exports.colors = [6, 2, 3, 4, 5, 1];
+
+    /**
+     * Build up the default `inspectOpts` object from the environment variables.
+     *
+     *   $ DEBUG_COLORS=no DEBUG_DEPTH=10 DEBUG_SHOW_HIDDEN=enabled node script.js
+     */
+
+    exports.inspectOpts = Object.keys(process.env).filter(function (key) {
+      return /^debug_/i.test(key);
+    }).reduce(function (obj, key) {
+      // camel-case
+      var prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, function (_, k) {
+        return k.toUpperCase();
+      });
+
+      // coerce string value into JS value
+      var val = process.env[key];
+      if (/^(yes|on|true|enabled)$/i.test(val)) val = true;else if (/^(no|off|false|disabled)$/i.test(val)) val = false;else if (val === 'null') val = null;else val = Number(val);
+      obj[prop] = val;
+      return obj;
+    }, {});
+
+    /**
+     * The file descriptor to write the `debug()` calls to.
+     * Set the `DEBUG_FD` env variable to override with another value. i.e.:
+     *
+     *   $ DEBUG_FD=3 node script.js 3>debug.log
+     */
+
+    var fd = parseInt(process.env.DEBUG_FD, 10) || 2;
+    if (1 !== fd && 2 !== fd) {
+      util.deprecate(function () {}, 'except for stderr(2) and stdout(1), any other usage of DEBUG_FD is deprecated. Override debug.log if you want to use a different log function (https://git.io/debug_fd)')();
+    }
+    var stream = 1 === fd ? process.stdout : 2 === fd ? process.stderr : createWritableStdioStream(fd);
+
+    /**
+     * Is stdout a TTY? Colored output is enabled when `true`.
+     */
+
+    function useColors() {
+      return 'colors' in exports.inspectOpts ? Boolean(exports.inspectOpts.colors) : tty.isatty(fd);
+    }
+
+    /**
+     * Map %o to `util.inspect()`, all on a single line.
+     */
+
+    exports.formatters.o = function (v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts).split('\n').map(function (str) {
+        return str.trim();
+      }).join(' ');
+    };
+
+    /**
+     * Map %o to `util.inspect()`, allowing multiple lines if needed.
+     */
+
+    exports.formatters.O = function (v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts);
+    };
+
+    /**
+     * Adds ANSI color escape codes if enabled.
+     *
+     * @api public
+     */
+
+    function formatArgs(args) {
+      var name = this.namespace;
+      var useColors = this.useColors;
+      if (useColors) {
+        var c = this.color;
+        var prefix = "  \x1B[3" + c + ';1m' + name + ' ' + "\x1B[0m";
+        args[0] = prefix + args[0].split('\n').join('\n' + prefix);
+        args.push("\x1B[3" + c + 'm+' + exports.humanize(this.diff) + "\x1B[0m");
+      } else {
+        args[0] = new Date().toUTCString() + ' ' + name + ' ' + args[0];
+      }
+    }
+
+    /**
+     * Invokes `util.format()` with the specified arguments and writes to `stream`.
+     */
+
+    function log() {
+      return stream.write(util.format.apply(util, arguments) + '\n');
+    }
+
+    /**
+     * Save `namespaces`.
+     *
+     * @param {String} namespaces
+     * @api private
+     */
+
+    function save(namespaces) {
+      if (null == namespaces) {
+        // If you set a process.env field to null or undefined, it gets cast to the
+        // string 'null' or 'undefined'. Just delete instead.
+        delete process.env.DEBUG;
+      } else {
+        process.env.DEBUG = namespaces;
+      }
+    }
+
+    /**
+     * Load `namespaces`.
+     *
+     * @return {String} returns the previously persisted debug modes
+     * @api private
+     */
+
+    function load() {
+      return process.env.DEBUG;
+    }
+
+    /**
+     * Copied from `node/src/node.js`.
+     *
+     * XXX: It's lame that node doesn't expose this API out-of-the-box. It also
+     * relies on the undocumented `tty_wrap.guessHandleType()` which is also lame.
+     */
+
+    function createWritableStdioStream(fd) {
+      var stream;
+      var tty_wrap = process.binding('tty_wrap');
+
+      // Note stream._type is used for test-module-load-list.js
+
+      switch (tty_wrap.guessHandleType(fd)) {
+        case 'TTY':
+          stream = new tty.WriteStream(fd);
+          stream._type = 'tty';
+
+          // Hack to have stream not keep the event loop alive.
+          // See https://github.com/joyent/node/issues/1726
+          if (stream._handle && stream._handle.unref) {
+            stream._handle.unref();
+          }
+          break;
+        case 'FILE':
+          var fs = require$$3$3;
+          stream = new fs.SyncWriteStream(fd, {
+            autoClose: false
+          });
+          stream._type = 'fs';
+          break;
+        case 'PIPE':
+        case 'TCP':
+          var net = require$$4$2;
+          stream = new net.Socket({
+            fd: fd,
+            readable: false,
+            writable: true
+          });
+
+          // FIXME Should probably have an option in net.Socket to create a
+          // stream from an existing fd which is writable only. But for now
+          // we'll just add this hack and set the `readable` member to false.
+          // Test: ./node test/fixtures/echo.js < /etc/passwd
+          stream.readable = false;
+          stream.read = null;
+          stream._type = 'pipe';
+
+          // FIXME Hack to have stream not keep the event loop alive.
+          // See https://github.com/joyent/node/issues/1726
+          if (stream._handle && stream._handle.unref) {
+            stream._handle.unref();
+          }
+          break;
+        default:
+          // Probably an error on in uv_guess_handle()
+          throw new Error('Implement me. Unknown stream file type!');
+      }
+
+      // For supporting legacy API we put the FD here.
+      stream.fd = fd;
+      stream._isStdio = true;
+      return stream;
+    }
+
+    /**
+     * Init logic for `debug` instances.
+     *
+     * Create a new `inspectOpts` object in case `useColors` is set
+     * differently for a particular `debug` instance.
+     */
+
+    function init(debug) {
+      debug.inspectOpts = {};
+      var keys = Object.keys(exports.inspectOpts);
+      for (var i = 0; i < keys.length; i++) {
+        debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+      }
+    }
+
+    /**
+     * Enable namespaces listed in `process.env.DEBUG` initially.
+     */
+
+    exports.enable(load());
+  })(node$1, node$1.exports);
+  return node$1.exports;
+}
+
+/**
+ * Detect Electron renderer process, which is node, but we should
+ * treat as a browser.
+ */
+if (typeof process !== 'undefined' && process.type === 'renderer') {
+  src$1.exports = requireBrowser$1();
+} else {
+  src$1.exports = requireNode$1();
+}
+var srcExports$1 = src$1.exports;
 
 /**
  * Expose `arrayFlatten`.
@@ -38364,14 +40698,14 @@ function arrayFlatten(array, depth) {
 }
 
 /**
- * Expose `pathtoRegexp`.
+ * Expose `pathToRegexp`.
  */
-var pathToRegexp = pathtoRegexp;
+var pathToRegexp_1 = pathToRegexp;
 
 /**
  * Match matching groups in a regular expression.
  */
-var MATCHING_GROUP_REGEXP = /\((?!\?)/g;
+var MATCHING_GROUP_REGEXP = /\\.|\((?:\?<(.*?)>)?(?!\?)/g;
 
 /**
  * Normalize the given path string,
@@ -38389,21 +40723,25 @@ var MATCHING_GROUP_REGEXP = /\((?!\?)/g;
  * @api private
  */
 
-function pathtoRegexp(path, keys, options) {
+function pathToRegexp(path, keys, options) {
   options = options || {};
   keys = keys || [];
   var strict = options.strict;
   var end = options.end !== false;
   var flags = options.sensitive ? '' : 'i';
+  var lookahead = options.lookahead !== false;
   var extraOffset = 0;
   var keysOffset = keys.length;
   var i = 0;
   var name = 0;
+  var pos = 0;
+  var backtrack = '';
   var m;
   if (path instanceof RegExp) {
     while (m = MATCHING_GROUP_REGEXP.exec(path.source)) {
+      if (m[0][0] === '\\') continue;
       keys.push({
-        name: name++,
+        name: m[1] || name++,
         optional: false,
         offset: m.index
       });
@@ -38415,43 +40753,61 @@ function pathtoRegexp(path, keys, options) {
     // the same keys and options instance into every generation to get
     // consistent matching groups before we join the sources together.
     path = path.map(function (value) {
-      return pathtoRegexp(value, keys, options).source;
+      return pathToRegexp(value, keys, options).source;
     });
-    return new RegExp('(?:' + path.join('|') + ')', flags);
+    return new RegExp(path.join('|'), flags);
   }
-  path = ('^' + path + (strict ? '' : path[path.length - 1] === '/' ? '?' : '/?')).replace(/\/\(/g, '/(?:').replace(/([\/\.])/g, '\\$1').replace(/(\\\/)?(\\\.)?:(\w+)(\(.*?\))?(\*)?(\?)?/g, function (match, slash, format, key, capture, star, optional, offset) {
+  if (typeof path !== 'string') {
+    throw new TypeError('path must be a string, array of strings, or regular expression');
+  }
+  path = path.replace(/\\.|(\/)?(\.)?:(\w+)(\(.*?\))?(\*)?(\?)?|[.*]|\/\(/g, function (match, slash, format, key, capture, star, optional, offset) {
+    if (match[0] === '\\') {
+      backtrack += match;
+      pos += 2;
+      return match;
+    }
+    if (match === '.') {
+      backtrack += '\\.';
+      extraOffset += 1;
+      pos += 1;
+      return '\\.';
+    }
+    if (slash || format) {
+      backtrack = '';
+    } else {
+      backtrack += path.slice(pos, offset);
+    }
+    pos = offset + match.length;
+    if (match === '*') {
+      backtrack = '';
+      extraOffset += 3;
+      return '(.*)';
+    }
+    if (match === '/(') {
+      backtrack += '/';
+      extraOffset += 2;
+      return '/(?:';
+    }
     slash = slash || '';
-    format = format || '';
-    capture = capture || '([^\\/' + format + ']+?)';
+    format = format ? '\\.' : '';
     optional = optional || '';
+    capture = capture ? capture.replace(/\\.|\*/, function (m) {
+      return m === '*' ? '(.*)' : m;
+    }) : backtrack ? '((?:(?!/|' + backtrack + ').)+?)' : '([^/' + format + ']+?)';
     keys.push({
       name: key,
       optional: !!optional,
       offset: offset + extraOffset
     });
-    var result = '' + (optional ? '' : slash) + '(?:' + format + (optional ? slash : '') + capture + (star ? '((?:[\\/' + format + '].+?)?)' : '') + ')' + optional;
+    var result = '(?:' + format + slash + capture + (star ? '((?:[/' + format + '].+?)?)' : '') + ')' + optional;
+    backtrack = '';
     extraOffset += result.length - match.length;
     return result;
-  }).replace(/\*/g, function (star, index) {
-    var len = keys.length;
-    while (len-- > keysOffset && keys[len].offset > index) {
-      keys[len].offset += 3; // Replacement length minus asterisk length.
-    }
-    return '(.*)';
   });
 
   // This is a workaround for handling unnamed matching groups.
   while (m = MATCHING_GROUP_REGEXP.exec(path)) {
-    var escapeCount = 0;
-    var index = m.index;
-    while (path.charAt(--index) === '\\') {
-      escapeCount++;
-    }
-
-    // It's possible to escape the bracket.
-    if (escapeCount % 2 === 1) {
-      continue;
-    }
+    if (m[0][0] === '\\') continue;
     if (keysOffset + i === keys.length || keys[keysOffset + i].offset > m.index) {
       keys.splice(keysOffset + i, 0, {
         name: name++,
@@ -38462,10 +40818,15 @@ function pathtoRegexp(path, keys, options) {
     }
     i++;
   }
+  path += strict ? '' : path[path.length - 1] === '/' ? '?' : '/?';
 
   // If the path is non-ending, match until the end or a slash.
-  path += end ? '$' : path[path.length - 1] === '/' ? '' : '(?=\\/|$)';
-  return new RegExp(path, flags);
+  if (end) {
+    path += '$';
+  } else if (path[path.length - 1] !== '/') {
+    path += lookahead ? '(?=/|$)' : '(?:/|$)';
+  }
+  return new RegExp('^' + path, flags);
 }
 
 /*!
@@ -38481,8 +40842,8 @@ function pathtoRegexp(path, keys, options) {
  * @private
  */
 
-var pathRegexp = pathToRegexp;
-var debug$4 = srcExports('express:router:layer');
+var pathRegexp = pathToRegexp_1;
+var debug$5 = srcExports$1('express:router:layer');
 
 /**
  * Module variables.
@@ -38501,7 +40862,7 @@ function Layer$2(path, options, fn) {
   if (!(this instanceof Layer$2)) {
     return new Layer$2(path, options, fn);
   }
-  debug$4('new %o', path);
+  debug$5('new %o', path);
   var opts = options || {};
   this.handle = fn;
   this.name = fn.name || '<anonymous>';
@@ -38689,7 +41050,7 @@ function getBasicNodeMethods() {
  * @private
  */
 
-var debug$3 = srcExports('express:router:route');
+var debug$4 = srcExports$1('express:router:route');
 var flatten$1 = arrayFlatten_1;
 var Layer$1 = layer;
 var methods$1 = methods$2;
@@ -38719,7 +41080,7 @@ var route = Route$1;
 function Route$1(path) {
   this.path = path;
   this.stack = [];
-  debug$3('new %o', path);
+  debug$4('new %o', path);
 
   // route handlers for various http methods
   this.methods = {};
@@ -38866,7 +41227,7 @@ methods$1.forEach(function (method) {
         var msg = 'Route.' + method + '() requires a callback function but got a ' + type;
         throw new Error(msg);
       }
-      debug$3('%s %o', method, this.path);
+      debug$4('%s %o', method, this.path);
       var layer = Layer$1('/', {}, handle);
       layer.method = method;
       this.methods[method] = true;
@@ -38913,7 +41274,7 @@ var Route = route;
 var Layer = layer;
 var methods = methods$2;
 var mixin = utilsMergeExports;
-var debug$2 = srcExports('express:router');
+var debug$3 = srcExports$1('express:router');
 var deprecate$3 = depd_1('express');
 var flatten = arrayFlatten_1;
 var parseUrl = parseurlExports;
@@ -39025,7 +41386,7 @@ proto.param = function param(name, fn) {
 
 proto.handle = function handle(req, res, out) {
   var self = this;
-  debug$2('dispatching %s %s', req.method, req.url);
+  debug$3('dispatching %s %s', req.method, req.url);
   var idx = 0;
   var protohost = getProtohost(req.url) || '';
   var removed = '';
@@ -39177,7 +41538,7 @@ proto.handle = function handle(req, res, out) {
 
       // Trim off the part of the url that matches the route
       // middleware (.use stuff) needs to have the path stripped
-      debug$2('trim prefix (%s) from url %s', layerPath, req.url);
+      debug$3('trim prefix (%s) from url %s', layerPath, req.url);
       removed = layerPath;
       req.url = protohost + req.url.slice(protohost.length + removed.length);
 
@@ -39190,7 +41551,7 @@ proto.handle = function handle(req, res, out) {
       // Setup base URL (no trailing slash)
       req.baseUrl = parentUrl + (removed[removed.length - 1] === '/' ? removed.substring(0, removed.length - 1) : removed);
     }
-    debug$2('%s %s : %s', layer.name, layerPath, req.originalUrl);
+    debug$3('%s %s : %s', layer.name, layerPath, req.originalUrl);
     if (layerError) {
       layer.handle_error(layerError, req, res, next);
     } else {
@@ -39323,7 +41684,7 @@ proto.use = function use(fn) {
     }
 
     // add the middleware
-    debug$2('use %o %s', path, fn.name || '<anonymous>');
+    debug$3('use %o %s', path, fn.name || '<anonymous>');
     var layer = new Layer(path, {
       sensitive: this.caseSensitive,
       strict: false,
@@ -39562,7 +41923,7 @@ function requireQuery() {
 
   var merge = utilsMergeExports;
   var parseUrl = parseurlExports;
-  var qs = requireLib();
+  var qs = lib;
 
   /**
    * @param {Object} options
@@ -39609,9 +41970,9 @@ function commonjsRequire(path) {
  * @private
  */
 
-var debug$1 = srcExports('express:view');
+var debug$2 = srcExports$1('express:view');
 var path$2 = require$$1$3;
-var fs$2 = require$$1$2;
+var fs$2 = require$$3$3;
 
 /**
  * Module variables.
@@ -39663,7 +42024,7 @@ function View(name, options) {
   if (!opts.engines[this.ext]) {
     // load engine
     var mod = this.ext.slice(1);
-    debug$1('require "%s"', mod);
+    debug$2('require "%s"', mod);
 
     // default engine export
     var fn = commonjsRequire(mod).__express;
@@ -39690,7 +42051,7 @@ function View(name, options) {
 View.prototype.lookup = function lookup(name) {
   var path;
   var roots = [].concat(this.root);
-  debug$1('lookup "%s"', name);
+  debug$2('lookup "%s"', name);
   for (var i = 0; i < roots.length && !path; i++) {
     var root = roots[i];
 
@@ -39714,7 +42075,7 @@ View.prototype.lookup = function lookup(name) {
  */
 
 View.prototype.render = function render(options, callback) {
-  debug$1('render "%s"', this.path);
+  debug$2('render "%s"', this.path);
   this.engine(this.path, options, callback);
 };
 
@@ -39753,7 +42114,7 @@ View.prototype.resolve = function resolve(dir, file) {
  */
 
 function tryStat(path) {
-  debug$1('stat "%s"', path);
+  debug$2('stat "%s"', path);
   try {
     return fs$2.statSync(path);
   } catch (e) {
@@ -39768,7 +42129,7 @@ var safeBuffer = {exports: {}};
 /*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
 (function (module, exports) {
   /* eslint-disable node/no-deprecated-api */
-  var buffer = require$$0$7;
+  var buffer = require$$0$6;
   var Buffer = buffer.Buffer;
 
   // alternative to using Object.keys for old browsers
@@ -40242,6 +42603,773 @@ var contentDispositionExports = contentDisposition$2.exports;
 
 var send$2 = {exports: {}};
 
+var src = {exports: {}};
+
+var browser = {exports: {}};
+
+var debug$1 = {exports: {}};
+
+var ms$2;
+var hasRequiredMs;
+function requireMs() {
+  if (hasRequiredMs) return ms$2;
+  hasRequiredMs = 1;
+  var s = 1000;
+  var m = s * 60;
+  var h = m * 60;
+  var d = h * 24;
+  var y = d * 365.25;
+
+  /**
+   * Parse or format the given `val`.
+   *
+   * Options:
+   *
+   *  - `long` verbose formatting [false]
+   *
+   * @param {String|Number} val
+   * @param {Object} [options]
+   * @throws {Error} throw an error if val is not a non-empty string or a number
+   * @return {String|Number}
+   * @api public
+   */
+
+  ms$2 = function ms(val, options) {
+    options = options || {};
+    var type = _typeof(val);
+    if (type === 'string' && val.length > 0) {
+      return parse(val);
+    } else if (type === 'number' && isNaN(val) === false) {
+      return options["long"] ? fmtLong(val) : fmtShort(val);
+    }
+    throw new Error('val is not a non-empty string or a valid number. val=' + JSON.stringify(val));
+  };
+
+  /**
+   * Parse the given `str` and return milliseconds.
+   *
+   * @param {String} str
+   * @return {Number}
+   * @api private
+   */
+
+  function parse(str) {
+    str = String(str);
+    if (str.length > 100) {
+      return;
+    }
+    var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str);
+    if (!match) {
+      return;
+    }
+    var n = parseFloat(match[1]);
+    var type = (match[2] || 'ms').toLowerCase();
+    switch (type) {
+      case 'years':
+      case 'year':
+      case 'yrs':
+      case 'yr':
+      case 'y':
+        return n * y;
+      case 'days':
+      case 'day':
+      case 'd':
+        return n * d;
+      case 'hours':
+      case 'hour':
+      case 'hrs':
+      case 'hr':
+      case 'h':
+        return n * h;
+      case 'minutes':
+      case 'minute':
+      case 'mins':
+      case 'min':
+      case 'm':
+        return n * m;
+      case 'seconds':
+      case 'second':
+      case 'secs':
+      case 'sec':
+      case 's':
+        return n * s;
+      case 'milliseconds':
+      case 'millisecond':
+      case 'msecs':
+      case 'msec':
+      case 'ms':
+        return n;
+      default:
+        return undefined;
+    }
+  }
+
+  /**
+   * Short format for `ms`.
+   *
+   * @param {Number} ms
+   * @return {String}
+   * @api private
+   */
+
+  function fmtShort(ms) {
+    if (ms >= d) {
+      return Math.round(ms / d) + 'd';
+    }
+    if (ms >= h) {
+      return Math.round(ms / h) + 'h';
+    }
+    if (ms >= m) {
+      return Math.round(ms / m) + 'm';
+    }
+    if (ms >= s) {
+      return Math.round(ms / s) + 's';
+    }
+    return ms + 'ms';
+  }
+
+  /**
+   * Long format for `ms`.
+   *
+   * @param {Number} ms
+   * @return {String}
+   * @api private
+   */
+
+  function fmtLong(ms) {
+    return plural(ms, d, 'day') || plural(ms, h, 'hour') || plural(ms, m, 'minute') || plural(ms, s, 'second') || ms + ' ms';
+  }
+
+  /**
+   * Pluralization helper.
+   */
+
+  function plural(ms, n, name) {
+    if (ms < n) {
+      return;
+    }
+    if (ms < n * 1.5) {
+      return Math.floor(ms / n) + ' ' + name;
+    }
+    return Math.ceil(ms / n) + ' ' + name + 's';
+  }
+  return ms$2;
+}
+
+var hasRequiredDebug;
+function requireDebug() {
+  if (hasRequiredDebug) return debug$1.exports;
+  hasRequiredDebug = 1;
+  (function (module, exports) {
+    /**
+     * This is the common logic for both the Node.js and web browser
+     * implementations of `debug()`.
+     *
+     * Expose `debug()` as the module.
+     */
+
+    exports = module.exports = createDebug.debug = createDebug['default'] = createDebug;
+    exports.coerce = coerce;
+    exports.disable = disable;
+    exports.enable = enable;
+    exports.enabled = enabled;
+    exports.humanize = requireMs();
+
+    /**
+     * The currently active debug mode names, and names to skip.
+     */
+
+    exports.names = [];
+    exports.skips = [];
+
+    /**
+     * Map of special "%n" handling functions, for the debug "format" argument.
+     *
+     * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+     */
+
+    exports.formatters = {};
+
+    /**
+     * Previous log timestamp.
+     */
+
+    var prevTime;
+
+    /**
+     * Select a color.
+     * @param {String} namespace
+     * @return {Number}
+     * @api private
+     */
+
+    function selectColor(namespace) {
+      var hash = 0,
+        i;
+      for (i in namespace) {
+        hash = (hash << 5) - hash + namespace.charCodeAt(i);
+        hash |= 0; // Convert to 32bit integer
+      }
+      return exports.colors[Math.abs(hash) % exports.colors.length];
+    }
+
+    /**
+     * Create a debugger with the given `namespace`.
+     *
+     * @param {String} namespace
+     * @return {Function}
+     * @api public
+     */
+
+    function createDebug(namespace) {
+      function debug() {
+        // disabled?
+        if (!debug.enabled) return;
+        var self = debug;
+
+        // set `diff` timestamp
+        var curr = +new Date();
+        var ms = curr - (prevTime || curr);
+        self.diff = ms;
+        self.prev = prevTime;
+        self.curr = curr;
+        prevTime = curr;
+
+        // turn the `arguments` into a proper Array
+        var args = new Array(arguments.length);
+        for (var i = 0; i < args.length; i++) {
+          args[i] = arguments[i];
+        }
+        args[0] = exports.coerce(args[0]);
+        if ('string' !== typeof args[0]) {
+          // anything else let's inspect with %O
+          args.unshift('%O');
+        }
+
+        // apply any `formatters` transformations
+        var index = 0;
+        args[0] = args[0].replace(/%([a-zA-Z%])/g, function (match, format) {
+          // if we encounter an escaped % then don't increase the array index
+          if (match === '%%') return match;
+          index++;
+          var formatter = exports.formatters[format];
+          if ('function' === typeof formatter) {
+            var val = args[index];
+            match = formatter.call(self, val);
+
+            // now we need to remove `args[index]` since it's inlined in the `format`
+            args.splice(index, 1);
+            index--;
+          }
+          return match;
+        });
+
+        // apply env-specific formatting (colors, etc.)
+        exports.formatArgs.call(self, args);
+        var logFn = debug.log || exports.log || console.log.bind(console);
+        logFn.apply(self, args);
+      }
+      debug.namespace = namespace;
+      debug.enabled = exports.enabled(namespace);
+      debug.useColors = exports.useColors();
+      debug.color = selectColor(namespace);
+
+      // env-specific initialization logic for debug instances
+      if ('function' === typeof exports.init) {
+        exports.init(debug);
+      }
+      return debug;
+    }
+
+    /**
+     * Enables a debug mode by namespaces. This can include modes
+     * separated by a colon and wildcards.
+     *
+     * @param {String} namespaces
+     * @api public
+     */
+
+    function enable(namespaces) {
+      exports.save(namespaces);
+      exports.names = [];
+      exports.skips = [];
+      var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+      var len = split.length;
+      for (var i = 0; i < len; i++) {
+        if (!split[i]) continue; // ignore empty strings
+        namespaces = split[i].replace(/\*/g, '.*?');
+        if (namespaces[0] === '-') {
+          exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+        } else {
+          exports.names.push(new RegExp('^' + namespaces + '$'));
+        }
+      }
+    }
+
+    /**
+     * Disable debug output.
+     *
+     * @api public
+     */
+
+    function disable() {
+      exports.enable('');
+    }
+
+    /**
+     * Returns true if the given mode name is enabled, false otherwise.
+     *
+     * @param {String} name
+     * @return {Boolean}
+     * @api public
+     */
+
+    function enabled(name) {
+      var i, len;
+      for (i = 0, len = exports.skips.length; i < len; i++) {
+        if (exports.skips[i].test(name)) {
+          return false;
+        }
+      }
+      for (i = 0, len = exports.names.length; i < len; i++) {
+        if (exports.names[i].test(name)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /**
+     * Coerce `val`.
+     *
+     * @param {Mixed} val
+     * @return {Mixed}
+     * @api private
+     */
+
+    function coerce(val) {
+      if (val instanceof Error) return val.stack || val.message;
+      return val;
+    }
+  })(debug$1, debug$1.exports);
+  return debug$1.exports;
+}
+
+var hasRequiredBrowser;
+function requireBrowser() {
+  if (hasRequiredBrowser) return browser.exports;
+  hasRequiredBrowser = 1;
+  (function (module, exports) {
+    exports = module.exports = requireDebug();
+    exports.log = log;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load;
+    exports.useColors = useColors;
+    exports.storage = 'undefined' != typeof chrome && 'undefined' != typeof chrome.storage ? chrome.storage.local : localstorage();
+
+    /**
+     * Colors.
+     */
+
+    exports.colors = ['lightseagreen', 'forestgreen', 'goldenrod', 'dodgerblue', 'darkorchid', 'crimson'];
+
+    /**
+     * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+     * and the Firebug extension (any Firefox version) are known
+     * to support "%c" CSS customizations.
+     *
+     * TODO: add a `localStorage` variable to explicitly enable/disable colors
+     */
+
+    function useColors() {
+      // NB: In an Electron preload script, document will be defined but not fully
+      // initialized. Since we know we're in Chrome, we'll just detect this case
+      // explicitly
+      if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
+        return true;
+      }
+
+      // is webkit? http://stackoverflow.com/a/16459606/376773
+      // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+      return typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance ||
+      // is firebug? http://stackoverflow.com/a/398120/376773
+      typeof window !== 'undefined' && window.console && (window.console.firebug || window.console.exception && window.console.table) ||
+      // is firefox >= v31?
+      // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+      typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31 ||
+      // double check webkit in userAgent just in case we are in a worker
+      typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/);
+    }
+
+    /**
+     * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+     */
+
+    exports.formatters.j = function (v) {
+      try {
+        return JSON.stringify(v);
+      } catch (err) {
+        return '[UnexpectedJSONParseError]: ' + err.message;
+      }
+    };
+
+    /**
+     * Colorize log arguments if enabled.
+     *
+     * @api public
+     */
+
+    function formatArgs(args) {
+      var useColors = this.useColors;
+      args[0] = (useColors ? '%c' : '') + this.namespace + (useColors ? ' %c' : ' ') + args[0] + (useColors ? '%c ' : ' ') + '+' + exports.humanize(this.diff);
+      if (!useColors) return;
+      var c = 'color: ' + this.color;
+      args.splice(1, 0, c, 'color: inherit');
+
+      // the final "%c" is somewhat tricky, because there could be other
+      // arguments passed either before or after the %c, so we need to
+      // figure out the correct index to insert the CSS into
+      var index = 0;
+      var lastC = 0;
+      args[0].replace(/%[a-zA-Z%]/g, function (match) {
+        if ('%%' === match) return;
+        index++;
+        if ('%c' === match) {
+          // we only are interested in the *last* %c
+          // (the user may have provided their own)
+          lastC = index;
+        }
+      });
+      args.splice(lastC, 0, c);
+    }
+
+    /**
+     * Invokes `console.log()` when available.
+     * No-op when `console.log` is not a "function".
+     *
+     * @api public
+     */
+
+    function log() {
+      // this hackery is required for IE8/9, where
+      // the `console.log` function doesn't have 'apply'
+      return 'object' === (typeof console === "undefined" ? "undefined" : _typeof(console)) && console.log && Function.prototype.apply.call(console.log, console, arguments);
+    }
+
+    /**
+     * Save `namespaces`.
+     *
+     * @param {String} namespaces
+     * @api private
+     */
+
+    function save(namespaces) {
+      try {
+        if (null == namespaces) {
+          exports.storage.removeItem('debug');
+        } else {
+          exports.storage.debug = namespaces;
+        }
+      } catch (e) {}
+    }
+
+    /**
+     * Load `namespaces`.
+     *
+     * @return {String} returns the previously persisted debug modes
+     * @api private
+     */
+
+    function load() {
+      var r;
+      try {
+        r = exports.storage.debug;
+      } catch (e) {}
+
+      // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+      if (!r && typeof process !== 'undefined' && 'env' in process) {
+        r = process.env.DEBUG;
+      }
+      return r;
+    }
+
+    /**
+     * Enable namespaces listed in `localStorage.debug` initially.
+     */
+
+    exports.enable(load());
+
+    /**
+     * Localstorage attempts to return the localstorage.
+     *
+     * This is necessary because safari throws
+     * when a user disables cookies/localstorage
+     * and you attempt to access it.
+     *
+     * @return {LocalStorage}
+     * @api private
+     */
+
+    function localstorage() {
+      try {
+        return window.localStorage;
+      } catch (e) {}
+    }
+  })(browser, browser.exports);
+  return browser.exports;
+}
+
+var node = {exports: {}};
+
+/**
+ * Module dependencies.
+ */
+var hasRequiredNode;
+function requireNode() {
+  if (hasRequiredNode) return node.exports;
+  hasRequiredNode = 1;
+  (function (module, exports) {
+    var tty = require$$0$5;
+    var util = require$$1$1;
+
+    /**
+     * This is the Node.js implementation of `debug()`.
+     *
+     * Expose `debug()` as the module.
+     */
+
+    exports = module.exports = requireDebug();
+    exports.init = init;
+    exports.log = log;
+    exports.formatArgs = formatArgs;
+    exports.save = save;
+    exports.load = load;
+    exports.useColors = useColors;
+
+    /**
+     * Colors.
+     */
+
+    exports.colors = [6, 2, 3, 4, 5, 1];
+
+    /**
+     * Build up the default `inspectOpts` object from the environment variables.
+     *
+     *   $ DEBUG_COLORS=no DEBUG_DEPTH=10 DEBUG_SHOW_HIDDEN=enabled node script.js
+     */
+
+    exports.inspectOpts = Object.keys(process.env).filter(function (key) {
+      return /^debug_/i.test(key);
+    }).reduce(function (obj, key) {
+      // camel-case
+      var prop = key.substring(6).toLowerCase().replace(/_([a-z])/g, function (_, k) {
+        return k.toUpperCase();
+      });
+
+      // coerce string value into JS value
+      var val = process.env[key];
+      if (/^(yes|on|true|enabled)$/i.test(val)) val = true;else if (/^(no|off|false|disabled)$/i.test(val)) val = false;else if (val === 'null') val = null;else val = Number(val);
+      obj[prop] = val;
+      return obj;
+    }, {});
+
+    /**
+     * The file descriptor to write the `debug()` calls to.
+     * Set the `DEBUG_FD` env variable to override with another value. i.e.:
+     *
+     *   $ DEBUG_FD=3 node script.js 3>debug.log
+     */
+
+    var fd = parseInt(process.env.DEBUG_FD, 10) || 2;
+    if (1 !== fd && 2 !== fd) {
+      util.deprecate(function () {}, 'except for stderr(2) and stdout(1), any other usage of DEBUG_FD is deprecated. Override debug.log if you want to use a different log function (https://git.io/debug_fd)')();
+    }
+    var stream = 1 === fd ? process.stdout : 2 === fd ? process.stderr : createWritableStdioStream(fd);
+
+    /**
+     * Is stdout a TTY? Colored output is enabled when `true`.
+     */
+
+    function useColors() {
+      return 'colors' in exports.inspectOpts ? Boolean(exports.inspectOpts.colors) : tty.isatty(fd);
+    }
+
+    /**
+     * Map %o to `util.inspect()`, all on a single line.
+     */
+
+    exports.formatters.o = function (v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts).split('\n').map(function (str) {
+        return str.trim();
+      }).join(' ');
+    };
+
+    /**
+     * Map %o to `util.inspect()`, allowing multiple lines if needed.
+     */
+
+    exports.formatters.O = function (v) {
+      this.inspectOpts.colors = this.useColors;
+      return util.inspect(v, this.inspectOpts);
+    };
+
+    /**
+     * Adds ANSI color escape codes if enabled.
+     *
+     * @api public
+     */
+
+    function formatArgs(args) {
+      var name = this.namespace;
+      var useColors = this.useColors;
+      if (useColors) {
+        var c = this.color;
+        var prefix = "  \x1B[3" + c + ';1m' + name + ' ' + "\x1B[0m";
+        args[0] = prefix + args[0].split('\n').join('\n' + prefix);
+        args.push("\x1B[3" + c + 'm+' + exports.humanize(this.diff) + "\x1B[0m");
+      } else {
+        args[0] = new Date().toUTCString() + ' ' + name + ' ' + args[0];
+      }
+    }
+
+    /**
+     * Invokes `util.format()` with the specified arguments and writes to `stream`.
+     */
+
+    function log() {
+      return stream.write(util.format.apply(util, arguments) + '\n');
+    }
+
+    /**
+     * Save `namespaces`.
+     *
+     * @param {String} namespaces
+     * @api private
+     */
+
+    function save(namespaces) {
+      if (null == namespaces) {
+        // If you set a process.env field to null or undefined, it gets cast to the
+        // string 'null' or 'undefined'. Just delete instead.
+        delete process.env.DEBUG;
+      } else {
+        process.env.DEBUG = namespaces;
+      }
+    }
+
+    /**
+     * Load `namespaces`.
+     *
+     * @return {String} returns the previously persisted debug modes
+     * @api private
+     */
+
+    function load() {
+      return process.env.DEBUG;
+    }
+
+    /**
+     * Copied from `node/src/node.js`.
+     *
+     * XXX: It's lame that node doesn't expose this API out-of-the-box. It also
+     * relies on the undocumented `tty_wrap.guessHandleType()` which is also lame.
+     */
+
+    function createWritableStdioStream(fd) {
+      var stream;
+      var tty_wrap = process.binding('tty_wrap');
+
+      // Note stream._type is used for test-module-load-list.js
+
+      switch (tty_wrap.guessHandleType(fd)) {
+        case 'TTY':
+          stream = new tty.WriteStream(fd);
+          stream._type = 'tty';
+
+          // Hack to have stream not keep the event loop alive.
+          // See https://github.com/joyent/node/issues/1726
+          if (stream._handle && stream._handle.unref) {
+            stream._handle.unref();
+          }
+          break;
+        case 'FILE':
+          var fs = require$$3$3;
+          stream = new fs.SyncWriteStream(fd, {
+            autoClose: false
+          });
+          stream._type = 'fs';
+          break;
+        case 'PIPE':
+        case 'TCP':
+          var net = require$$4$2;
+          stream = new net.Socket({
+            fd: fd,
+            readable: false,
+            writable: true
+          });
+
+          // FIXME Should probably have an option in net.Socket to create a
+          // stream from an existing fd which is writable only. But for now
+          // we'll just add this hack and set the `readable` member to false.
+          // Test: ./node test/fixtures/echo.js < /etc/passwd
+          stream.readable = false;
+          stream.read = null;
+          stream._type = 'pipe';
+
+          // FIXME Hack to have stream not keep the event loop alive.
+          // See https://github.com/joyent/node/issues/1726
+          if (stream._handle && stream._handle.unref) {
+            stream._handle.unref();
+          }
+          break;
+        default:
+          // Probably an error on in uv_guess_handle()
+          throw new Error('Implement me. Unknown stream file type!');
+      }
+
+      // For supporting legacy API we put the FD here.
+      stream.fd = fd;
+      stream._isStdio = true;
+      return stream;
+    }
+
+    /**
+     * Init logic for `debug` instances.
+     *
+     * Create a new `inspectOpts` object in case `useColors` is set
+     * differently for a particular `debug` instance.
+     */
+
+    function init(debug) {
+      debug.inspectOpts = {};
+      var keys = Object.keys(exports.inspectOpts);
+      for (var i = 0; i < keys.length; i++) {
+        debug.inspectOpts[keys[i]] = exports.inspectOpts[keys[i]];
+      }
+    }
+
+    /**
+     * Enable namespaces listed in `process.env.DEBUG` initially.
+     */
+
+    exports.enable(load());
+  })(node, node.exports);
+  return node.exports;
+}
+
+/**
+ * Detect Electron renderer process, which is node, but we should
+ * treat as a browser.
+ */
+if (typeof process !== 'undefined' && process.type === 'renderer') {
+  src.exports = requireBrowser();
+} else {
+  src.exports = requireNode();
+}
+var srcExports = src.exports;
+
 /**
  * Module exports.
  * @public
@@ -40254,8 +43382,8 @@ var etag_1 = etag$1;
  * @private
  */
 
-var crypto$1 = require$$0$3;
-var Stats = require$$1$2.Stats;
+var crypto$1 = require$$0$7;
+var Stats = require$$3$3.Stats;
 
 /**
  * Module variables.
@@ -43237,7 +46365,7 @@ var require$$2 = {
 ]
 };
 
-var fs$1 = require$$1$2;
+var fs$1 = require$$3$3;
 function Mime() {
   // Map of extension -> mime type
   this.types = Object.create(null);
@@ -43663,15 +46791,15 @@ var encodeUrl$1 = encodeurl;
 var escapeHtml$1 = escapeHtml_1;
 var etag = etag_1;
 var fresh$1 = fresh_1;
-var fs = require$$1$2;
+var fs = require$$3$3;
 var mime$2 = mime_1;
 var ms = ms$1;
 var onFinished$1 = onFinishedExports;
 var parseRange$1 = rangeParser_1;
 var path$1 = require$$1$3;
 var statuses$1 = statuses$3;
-var Stream = require$$1$6;
-var util = require$$0$4;
+var Stream = require$$1$5;
+var util = require$$1$1;
 
 /**
  * Path function references.
@@ -44068,7 +47196,7 @@ SendStream.prototype.redirect = function redirect(path) {
     return;
   }
   var loc = encodeUrl$1(collapseLeadingSlashes(this.path + '/'));
-  var doc = createHtmlDocument('Redirecting', 'Redirecting to <a href="' + escapeHtml$1(loc) + '">' + escapeHtml$1(loc) + '</a>');
+  var doc = createHtmlDocument('Redirecting', 'Redirecting to ' + escapeHtml$1(loc));
 
   // redirect
   res.statusCode = 301;
@@ -44764,7 +47892,6 @@ function parse$3(header) {
 
 var ipaddr$1 = {exports: {}};
 
-ipaddr$1.exports;
 (function (module) {
   (function () {
     var expandIPv6, ipaddr, ipv4Part, ipv4Regexes, ipv6Part, ipv6Regexes, matchCIDR, root, zoneIndex;
@@ -45673,7 +48800,7 @@ var proxyAddrExports = proxyAddr.exports;
   var mime = sendExports.mime;
   var etag = etag_1;
   var proxyaddr = proxyAddrExports;
-  var qs = requireLib();
+  var qs = lib;
   var querystring = require$$8$1;
 
   /**
@@ -45935,7 +49062,8 @@ var proxyAddrExports = proxyAddr.exports;
 
   function parseExtendedQueryString(str) {
     return qs.parse(str, {
-      allowPrototypes: true
+      allowPrototypes: true,
+      arrayLimit: 1000
     });
   }
 
@@ -45969,7 +49097,7 @@ var proxyAddrExports = proxyAddr.exports;
   var methods = methods$2;
   var middleware = init;
   var query = requireQuery();
-  var debug = srcExports('express:application');
+  var debug = srcExports$1('express:application');
   var View = view;
   var http = require$$7$1;
   var compileETag = utils.compileETag;
@@ -48136,20 +51264,20 @@ var cookieSignature = {};
  * Module dependencies.
  */
 (function (exports) {
-  var crypto = require$$0$3;
+  var crypto = require$$0$7;
 
   /**
    * Sign the given `val` with `secret`.
    *
    * @param {String} val
-   * @param {String} secret
+   * @param {String|NodeJS.ArrayBufferView|crypto.KeyObject} secret
    * @return {String}
    * @api private
    */
 
   exports.sign = function (val, secret) {
-    if ('string' != typeof val) throw new TypeError("Cookie value must be provided as a string.");
-    if ('string' != typeof secret) throw new TypeError("Secret string must be provided.");
+    if ('string' !== typeof val) throw new TypeError("Cookie value must be provided as a string.");
+    if (null == secret) throw new TypeError("Secret key must be provided.");
     return val + '.' + crypto.createHmac('sha256', secret).update(val).digest('base64').replace(/\=+$/, '');
   };
 
@@ -48158,14 +51286,14 @@ var cookieSignature = {};
    * returning `false` if the signature is invalid.
    *
    * @param {String} val
-   * @param {String} secret
+   * @param {String|NodeJS.ArrayBufferView|crypto.KeyObject} secret
    * @return {String|Boolean}
    * @api private
    */
 
   exports.unsign = function (val, secret) {
-    if ('string' != typeof val) throw new TypeError("Signed cookie string must be provided.");
-    if ('string' != typeof secret) throw new TypeError("Secret string must be provided.");
+    if ('string' !== typeof val) throw new TypeError("Signed cookie string must be provided.");
+    if (null == secret) throw new TypeError("Secret key must be provided.");
     var str = val.slice(0, val.lastIndexOf('.')),
       mac = exports.sign(str, secret);
     return sha1(mac) == sha1(val) ? str : false;
@@ -48203,16 +51331,69 @@ cookie$1.serialize = serialize;
  */
 
 var __toString = Object.prototype.toString;
+var __hasOwnProperty = Object.prototype.hasOwnProperty;
 
 /**
- * RegExp to match field-content in RFC 7230 sec 3.2
+ * RegExp to match cookie-name in RFC 6265 sec 4.1.1
+ * This refers out to the obsoleted definition of token in RFC 2616 sec 2.2
+ * which has been replaced by the token definition in RFC 7230 appendix B.
  *
- * field-content = field-vchar [ 1*( SP / HTAB ) field-vchar ]
- * field-vchar   = VCHAR / obs-text
- * obs-text      = %x80-FF
+ * cookie-name       = token
+ * token             = 1*tchar
+ * tchar             = "!" / "#" / "$" / "%" / "&" / "'" /
+ *                     "*" / "+" / "-" / "." / "^" / "_" /
+ *                     "`" / "|" / "~" / DIGIT / ALPHA
  */
 
-var fieldContentRegExp = /^[\u0009\u0020-\u007e\u0080-\u00ff]+$/;
+var cookieNameRegExp = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+
+/**
+ * RegExp to match cookie-value in RFC 6265 sec 4.1.1
+ *
+ * cookie-value      = *cookie-octet / ( DQUOTE *cookie-octet DQUOTE )
+ * cookie-octet      = %x21 / %x23-2B / %x2D-3A / %x3C-5B / %x5D-7E
+ *                     ; US-ASCII characters excluding CTLs,
+ *                     ; whitespace DQUOTE, comma, semicolon,
+ *                     ; and backslash
+ */
+
+var cookieValueRegExp = /^("?)[\u0021\u0023-\u002B\u002D-\u003A\u003C-\u005B\u005D-\u007E]*\1$/;
+
+/**
+ * RegExp to match domain-value in RFC 6265 sec 4.1.1
+ *
+ * domain-value      = <subdomain>
+ *                     ; defined in [RFC1034], Section 3.5, as
+ *                     ; enhanced by [RFC1123], Section 2.1
+ * <subdomain>       = <label> | <subdomain> "." <label>
+ * <label>           = <let-dig> [ [ <ldh-str> ] <let-dig> ]
+ *                     Labels must be 63 characters or less.
+ *                     'let-dig' not 'letter' in the first char, per RFC1123
+ * <ldh-str>         = <let-dig-hyp> | <let-dig-hyp> <ldh-str>
+ * <let-dig-hyp>     = <let-dig> | "-"
+ * <let-dig>         = <letter> | <digit>
+ * <letter>          = any one of the 52 alphabetic characters A through Z in
+ *                     upper case and a through z in lower case
+ * <digit>           = any one of the ten digits 0 through 9
+ *
+ * Keep support for leading dot: https://github.com/jshttp/cookie/issues/173
+ *
+ * > (Note that a leading %x2E ("."), if present, is ignored even though that
+ * character is not permitted, but a trailing %x2E ("."), if present, will
+ * cause the user agent to ignore the attribute.)
+ */
+
+var domainValueRegExp = /^([.]?[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
+
+/**
+ * RegExp to match path-value in RFC 6265 sec 4.1.1
+ *
+ * path-value        = <any CHAR except CTLs or ";">
+ * CHAR              = %x01-7F
+ *                     ; defined in RFC 5234 appendix B.1
+ */
+
+var pathValueRegExp = /^[\u0020-\u003A\u003D-\u007E]*$/;
 
 /**
  * Parse a cookie header.
@@ -48221,96 +51402,114 @@ var fieldContentRegExp = /^[\u0009\u0020-\u007e\u0080-\u00ff]+$/;
  * The object has the various cookies as keys(names) => values
  *
  * @param {string} str
- * @param {object} [options]
+ * @param {object} [opt]
  * @return {object}
  * @public
  */
 
-function parse$1(str, options) {
+function parse$1(str, opt) {
   if (typeof str !== 'string') {
     throw new TypeError('argument str must be a string');
   }
   var obj = {};
-  var opt = options || {};
-  var dec = opt.decode || decode;
+  var len = str.length;
+  // RFC 6265 sec 4.1.1, RFC 2616 2.2 defines a cookie name consists of one char minimum, plus '='.
+  if (len < 2) return obj;
+  var dec = opt && opt.decode || decode;
   var index = 0;
-  while (index < str.length) {
-    var eqIdx = str.indexOf('=', index);
+  var eqIdx = 0;
+  var endIdx = 0;
+  do {
+    eqIdx = str.indexOf('=', index);
+    if (eqIdx === -1) break; // No more cookie pairs.
 
-    // no more cookie pairs
-    if (eqIdx === -1) {
-      break;
-    }
-    var endIdx = str.indexOf(';', index);
+    endIdx = str.indexOf(';', index);
     if (endIdx === -1) {
-      endIdx = str.length;
-    } else if (endIdx < eqIdx) {
+      endIdx = len;
+    } else if (eqIdx > endIdx) {
       // backtrack on prior semicolon
       index = str.lastIndexOf(';', eqIdx - 1) + 1;
       continue;
     }
-    var key = str.slice(index, eqIdx).trim();
+    var keyStartIdx = startIndex(str, index, eqIdx);
+    var keyEndIdx = endIndex(str, eqIdx, keyStartIdx);
+    var key = str.slice(keyStartIdx, keyEndIdx);
 
     // only assign once
-    if (undefined === obj[key]) {
-      var val = str.slice(eqIdx + 1, endIdx).trim();
-
-      // quoted values
-      if (val.charCodeAt(0) === 0x22) {
-        val = val.slice(1, -1);
+    if (!__hasOwnProperty.call(obj, key)) {
+      var valStartIdx = startIndex(str, eqIdx + 1, endIdx);
+      var valEndIdx = endIndex(str, endIdx, valStartIdx);
+      if (str.charCodeAt(valStartIdx) === 0x22 /* " */ && str.charCodeAt(valEndIdx - 1) === 0x22 /* " */) {
+        valStartIdx++;
+        valEndIdx--;
       }
+      var val = str.slice(valStartIdx, valEndIdx);
       obj[key] = tryDecode(val, dec);
     }
     index = endIdx + 1;
-  }
+  } while (index < len);
   return obj;
+}
+function startIndex(str, index, max) {
+  do {
+    var code = str.charCodeAt(index);
+    if (code !== 0x20 /*   */ && code !== 0x09 /* \t */) return index;
+  } while (++index < max);
+  return max;
+}
+function endIndex(str, index, min) {
+  while (index > min) {
+    var code = str.charCodeAt(--index);
+    if (code !== 0x20 /*   */ && code !== 0x09 /* \t */) return index + 1;
+  }
+  return min;
 }
 
 /**
  * Serialize data into a cookie header.
  *
- * Serialize the a name value pair into a cookie string suitable for
- * http headers. An optional options object specified cookie parameters.
+ * Serialize a name value pair into a cookie string suitable for
+ * http headers. An optional options object specifies cookie parameters.
  *
  * serialize('foo', 'bar', { httpOnly: true })
  *   => "foo=bar; httpOnly"
  *
  * @param {string} name
  * @param {string} val
- * @param {object} [options]
+ * @param {object} [opt]
  * @return {string}
  * @public
  */
 
-function serialize(name, val, options) {
-  var opt = options || {};
-  var enc = opt.encode || encode;
+function serialize(name, val, opt) {
+  var enc = opt && opt.encode || encodeURIComponent;
   if (typeof enc !== 'function') {
     throw new TypeError('option encode is invalid');
   }
-  if (!fieldContentRegExp.test(name)) {
+  if (!cookieNameRegExp.test(name)) {
     throw new TypeError('argument name is invalid');
   }
   var value = enc(val);
-  if (value && !fieldContentRegExp.test(value)) {
+  if (!cookieValueRegExp.test(value)) {
     throw new TypeError('argument val is invalid');
   }
   var str = name + '=' + value;
+  if (!opt) return str;
   if (null != opt.maxAge) {
-    var maxAge = opt.maxAge - 0;
-    if (isNaN(maxAge) || !isFinite(maxAge)) {
+    var maxAge = Math.floor(opt.maxAge);
+    if (!isFinite(maxAge)) {
       throw new TypeError('option maxAge is invalid');
     }
-    str += '; Max-Age=' + Math.floor(maxAge);
+    str += '; Max-Age=' + maxAge;
   }
   if (opt.domain) {
-    if (!fieldContentRegExp.test(opt.domain)) {
+    if (!domainValueRegExp.test(opt.domain)) {
       throw new TypeError('option domain is invalid');
     }
     str += '; Domain=' + opt.domain;
   }
   if (opt.path) {
-    if (!fieldContentRegExp.test(opt.path)) {
+    if (!pathValueRegExp.test(opt.path)) {
       throw new TypeError('option path is invalid');
     }
     str += '; Path=' + opt.path;
@@ -48381,17 +51580,6 @@ function decode(str) {
 }
 
 /**
- * URL-encode value.
- *
- * @param {string} val
- * @returns {string}
- */
-
-function encode(val) {
-  return encodeURIComponent(val);
-}
-
-/**
  * Determine if value is a Date.
  *
  * @param {*} val
@@ -48399,7 +51587,7 @@ function encode(val) {
  */
 
 function isDate(val) {
-  return __toString.call(val) === '[object Date]' || val instanceof Date;
+  return __toString.call(val) === '[object Date]';
 }
 
 /**
@@ -48466,7 +51654,6 @@ var response = res;
  */
 
 var charsetRegExp = /;\s*charset\s*=/;
-var schemaAndHostRegExp = /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?\/\/[^\\\/\?]+/;
 
 /**
  * Set status `code`.
@@ -49196,6 +52383,14 @@ res.get = function (field) {
  */
 
 res.clearCookie = function clearCookie(name, options) {
+  if (options) {
+    if (options.maxAge) {
+      deprecate('res.clearCookie: Passing "options.maxAge" is deprecated. In v5.0.0 of Express, this option will be ignored, as res.clearCookie will automatically set cookies to expire immediately. Please update your code to omit this option.');
+    }
+    if (options.expires) {
+      deprecate('res.clearCookie: Passing "options.expires" is deprecated. In v5.0.0 of Express, this option will be ignored, as res.clearCookie will automatically set cookies to expire immediately. Please update your code to omit this option.');
+    }
+  }
   var opts = merge({
     expires: new Date(1),
     path: '/'
@@ -49274,17 +52469,12 @@ res.location = function location(url) {
 
   // "back" is an alias for the referrer
   if (url === 'back') {
+    deprecate('res.location("back"): use res.location(req.get("Referrer") || "/") and refer to https://dub.sh/security-redirect for best practices');
     loc = this.req.get('Referrer') || '/';
   } else {
     loc = String(url);
   }
-  var m = schemaAndHostRegExp.exec(loc);
-  var pos = m ? m[0].length + 1 : 0;
-
-  // Only encode after host to avoid invalid encoding which can introduce
-  // vulnerabilities (e.g. `\\` to `%5C`).
-  loc = loc.slice(0, pos) + encodeUrl(loc.slice(pos));
-  return this.set('Location', loc);
+  return this.set('Location', encodeUrl(loc));
 };
 
 /**
@@ -49331,7 +52521,7 @@ res.redirect = function redirect(url) {
     },
     html: function html() {
       var u = escapeHtml(address);
-      body = '<p>' + statuses.message[status] + '. Redirecting to <a href="' + u + '">' + u + '</a></p>';
+      body = '<p>' + statuses.message[status] + '. Redirecting to ' + u + '</p>';
     },
     "default": function _default() {
       body = '';
@@ -49706,7 +52896,7 @@ function requireServeStatic() {
 
       // reformat the URL
       var loc = encodeUrl(url.format(originalUrl));
-      var doc = createHtmlDocument('Redirecting', 'Redirecting to <a href="' + escapeHtml(loc) + '">' + escapeHtml(loc) + '</a>');
+      var doc = createHtmlDocument('Redirecting', 'Redirecting to ' + escapeHtml(loc));
 
       // send redirect response
       res.statusCode = 301;
@@ -49734,7 +52924,7 @@ function requireServeStatic() {
    * Module dependencies.
    */
   var bodyParser = bodyParserExports;
-  var EventEmitter = require$$1$1.EventEmitter;
+  var EventEmitter = require$$1$2.EventEmitter;
   var mixin = mergeDescriptors;
   var proto = applicationExports;
   var Route = route;
@@ -49756,33 +52946,33 @@ function requireServeStatic() {
    */
 
   function createApplication() {
-    var app = function app(req, res, next) {
-      app.handle(req, res, next);
+    var _app = function app(req, res, next) {
+      _app.handle(req, res, next);
     };
-    mixin(app, EventEmitter.prototype, false);
-    mixin(app, proto, false);
+    mixin(_app, EventEmitter.prototype, false);
+    mixin(_app, proto, false);
 
     // expose the prototype that will get set on requests
-    app.request = Object.create(req, {
+    _app.request = Object.create(req, {
       app: {
         configurable: true,
         enumerable: true,
         writable: true,
-        value: app
+        value: _app
       }
     });
 
     // expose the prototype that will get set on responses
-    app.response = Object.create(res, {
+    _app.response = Object.create(res, {
       app: {
         configurable: true,
         enumerable: true,
         writable: true,
-        value: app
+        value: _app
       }
     });
-    app.init();
-    return app;
+    _app.init();
+    return _app;
   }
 
   /**
@@ -49929,7 +53119,6 @@ function updateV1State(state, now, rnds) {
   return state;
 }
 function v1Bytes(rnds, msecs, nsecs, clockseq, node, buf) {
-  var _msecs, _nsecs, _clockseq, _node;
   var offset = arguments.length > 6 && arguments[6] !== undefined ? arguments[6] : 0;
   if (rnds.length < 16) {
     throw new Error('Random bytes length must be >= 16');
@@ -49942,10 +53131,10 @@ function v1Bytes(rnds, msecs, nsecs, clockseq, node, buf) {
       throw new RangeError("UUID byte range ".concat(offset, ":").concat(offset + 15, " is out of buffer bounds"));
     }
   }
-  (_msecs = msecs) !== null && _msecs !== void 0 ? _msecs : msecs = Date.now();
-  (_nsecs = nsecs) !== null && _nsecs !== void 0 ? _nsecs : nsecs = 0;
-  (_clockseq = clockseq) !== null && _clockseq !== void 0 ? _clockseq : clockseq = (rnds[8] << 8 | rnds[9]) & 0x3fff;
-  (_node = node) !== null && _node !== void 0 ? _node : node = rnds.slice(10, 16);
+  msecs !== null && msecs !== void 0 ? msecs : msecs = Date.now();
+  nsecs !== null && nsecs !== void 0 ? nsecs : nsecs = 0;
+  clockseq !== null && clockseq !== void 0 ? clockseq : clockseq = (rnds[8] << 8 | rnds[9]) & 0x3fff;
+  node !== null && node !== void 0 ? node : node = rnds.slice(10, 16);
   msecs += 12219292800000;
   var tl = ((msecs & 0xfffffff) * 10000 + nsecs) % 0x100000000;
   buf[offset++] = tl >>> 24 & 0xff;
@@ -50257,9 +53446,8 @@ v5.DNS = DNS;
 v5.URL = URL;
 
 function v6(options, buf, offset) {
-  var _options, _offset;
-  (_options = options) !== null && _options !== void 0 ? _options : options = {};
-  (_offset = offset) !== null && _offset !== void 0 ? _offset : offset = 0;
+  options !== null && options !== void 0 ? options : options = {};
+  offset !== null && offset !== void 0 ? offset : offset = 0;
   var bytes = v1(_objectSpread2(_objectSpread2({}, options), {}, {
     _v6: true
   }), new Uint8Array(16));
@@ -50315,7 +53503,6 @@ function updateV7State(state, now, rnds) {
   return state;
 }
 function v7Bytes(rnds, msecs, seq, buf) {
-  var _msecs, _seq;
   var offset = arguments.length > 4 && arguments[4] !== undefined ? arguments[4] : 0;
   if (rnds.length < 16) {
     throw new Error('Random bytes length must be >= 16');
@@ -50328,8 +53515,8 @@ function v7Bytes(rnds, msecs, seq, buf) {
       throw new RangeError("UUID byte range ".concat(offset, ":").concat(offset + 15, " is out of buffer bounds"));
     }
   }
-  (_msecs = msecs) !== null && _msecs !== void 0 ? _msecs : msecs = Date.now();
-  (_seq = seq) !== null && _seq !== void 0 ? _seq : seq = rnds[6] * 0x7f << 24 | rnds[7] << 16 | rnds[8] << 8 | rnds[9];
+  msecs !== null && msecs !== void 0 ? msecs : msecs = Date.now();
+  seq !== null && seq !== void 0 ? seq : seq = rnds[6] * 0x7f << 24 | rnds[7] << 16 | rnds[8] << 8 | rnds[9];
   buf[offset++] = msecs / 0x10000000000 & 0xff;
   buf[offset++] = msecs / 0x100000000 & 0xff;
   buf[offset++] = msecs / 0x1000000 & 0xff;
@@ -50399,7 +53586,7 @@ var apps = {
     launch: function launch(launchData) {
       var tbPackageId = tizen.application.getAppInfo().packageId;
       tizen.application.launchAppControl(new tizen.ApplicationControl("http://tizen.org/appcontrol/operation/view", null, null, null, [new tizen.ApplicationControlData("module", [JSON.stringify({
-        moduleName: '@foxreis/tizentube',
+        moduleName: '@jensorx/tizentube',
         moduleType: 'npm',
         args: launchData
       })])]), "".concat(tbPackageId, ".").concat(commonjsGlobal.isTizenTube ? 'TizenTubeStandalone' : 'TizenBrewStandalone'));
