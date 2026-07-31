@@ -94,6 +94,19 @@
 		const serviceId = pkgId + ".StandaloneService";
 
 		let retryTimer = null;
+		const SERVICE_CHECK_TIMEOUT = 3000;
+
+		function launchService(callback) {
+			tizen.application.launchAppControl(
+				new tizen.ApplicationControl("http://tizen.org/appcontrol/operation/service"),
+				serviceId,
+				callback,
+				function (e) {
+					console.error("Launch Service failed: " + e.message);
+					callback();
+				}
+			);
+		}
 
 		function startApp() {
 			let args;
@@ -104,7 +117,11 @@
 				// No launch arguments.
 			}
 
-			fetch("http://localhost:8099/tizentube/getState", { cache: "no-store" })
+			const serviceRequest = fetch("http://localhost:8099/tizentube/getState", { cache: "no-store" });
+			const timeoutRequest = new Promise((resolve, reject) => {
+				setTimeout(() => reject(new Error("Service check timed out")), SERVICE_CHECK_TIMEOUT);
+			});
+			Promise.race([serviceRequest, timeoutRequest])
 				.then(response => {
 					if (!response.ok) throw new Error("Service not ready");
 					return response.json();
@@ -126,23 +143,13 @@
 					if (!retryTimer) {
 						retryTimer = setTimeout(() => {
 							retryTimer = null;
-							startApp();
-						}, 200);
+							launchService(startApp);
+						}, 1000);
 					}
 				});
 		}
 
-		tizen.application.launchAppControl(
-			new tizen.ApplicationControl("http://tizen.org/appcontrol/operation/service"),
-			serviceId,
-			function () {
-				startApp();
-			},
-			function (e) {
-				console.error("Launch Service failed: " + e.message);
-				startApp();
-			}
-		);
+		launchService(startApp);
 	</script>
 </body>
 

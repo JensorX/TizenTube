@@ -46,8 +46,8 @@ function canConnectToDaemon() {
 	const timeoutId = controller ? setTimeout(() => controller.abort(), 2000) : null;
 
 	return fetch('http://127.0.0.1:8001/api/v2/', {
-		signal: controller ? controller.signal : undefined
-	})
+			signal: controller ? controller.signal : undefined
+		})
 		.then((response) => response.json())
 		.then((json) => {
 			if (timeoutId) clearTimeout(timeoutId);
