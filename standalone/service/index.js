@@ -6,40 +6,15 @@ const express = require('express');
 const app = express();
 const PORT = 8099;
 const fetch = require('node-fetch');
-const http = require('http');
-const https = require('https');
 const URL = require('url');
 const injector = require('./injector.js');
 
 const USERSCRIPT_URL = 'https://github.com/JensorX/TizenTube/raw/refs/heads/main/dist/userScript.js';
 const STANDALONE_USER_AGENT = 'Mozilla/5.0 (Linux; Shield Android TV) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
-const httpAgent = new http.Agent({ maxHeaderSize: 5 * 1024 * 1024 });
-const httpsAgent = new https.Agent({ maxHeaderSize: 5 * 1024 * 1024 });
-const requestHeadersToRemove = [
-	'connection', 'content-length', 'keep-alive', 'proxy-authenticate',
-	'proxy-authorization', 'te', 'trailer', 'transfer-encoding', 'upgrade'
-];
 
 function applyStandaloneUserAgent(headers) {
 	headers['user-agent'] = STANDALONE_USER_AGENT;
 	return headers;
-}
-
-function isProxyableHost(hostname) {
-	const normalizedHostname = String(hostname || '').toLowerCase();
-	return ['googlevideo.com', 'youtube.com', 'gstatic.com', 'google.com', 'googleapis.com', 'googleusercontent.com', 'ggpht.com']
-		.some((domain) => normalizedHostname === domain || normalizedHostname.endsWith(`.${domain}`));
-}
-
-function readRequestBody(req) {
-	if (req.method === 'GET' || req.method === 'HEAD') return Promise.resolve(undefined);
-	return new Promise((resolve, reject) => {
-		const chunks = [];
-		req.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-		req.on('end', () => resolve(Buffer.concat(chunks)));
-		req.on('error', reject);
-		req.on('aborted', () => reject(new Error('Client aborted the request body')));
-	});
 }
 
 app.use((req, res, next) => {
@@ -55,9 +30,7 @@ let cachedETag = null;
 
 function fetchAndUpdateUserScriptInBackground() {
 	const headers = {};
-	if (cachedETag) {
-		headers['If-None-Match'] = cachedETag;
-	}
+	if (cachedETag) headers['If-None-Match'] = cachedETag;
 	const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
 	const timeoutId = controller ? setTimeout(() => controller.abort(), 3000) : null;
 
@@ -67,17 +40,13 @@ function fetchAndUpdateUserScriptInBackground() {
 	})
 		.then((response) => {
 			if (timeoutId) clearTimeout(timeoutId);
-			if (response.status === 304) {
-				return cachedUserScript;
-			}
+			if (response.status === 304) return cachedUserScript;
 			if (!response.ok) throw new Error(`Userscript download failed with status ${response.status}`);
 			const etag = response.headers.get('etag');
 			if (etag) cachedETag = etag;
 
 			return response.text().then((script) => {
-				if (script && script.trim().length > 0) {
-					cachedUserScript = script;
-				}
+				if (script && script.trim().length > 0) cachedUserScript = script;
 				return cachedUserScript;
 			});
 		})
@@ -115,82 +84,120 @@ app.get('/tizentube/debugger', (req, res) => {
 	const interval = setInterval(() => {
 		tizen.application.getAppsContext((appsContext) => {
 			const packageId = tizen.application.getAppInfo().packageId;
-			const appContext = appsContext.find((context) => context.appId === `${packageId}.TizenTubeStandalone`);
-			if (!appContext) {
+			const app = appsContext.find(app => app.appId === `${packageId}.TizenTubeStandalone`);
+			if (!app) {
 				injector.startDebugger(args);
 				clearInterval(interval);
 			}
 		});
 	}, 50);
-	res.status(204).end();
 });
 
 app.all('*', (req, res) => {
 	const isCorsBypass = req.path.indexOf('/cors-bypass/') === 0;
-	const proxyPath = '/cors-bypass/';
-	const rawTarget = isCorsBypass ? req.url.substring(proxyPath.length) : req.url;
-	const targetUrl = isCorsBypass ?
-		(rawTarget.indexOf('http') === 0 ? rawTarget : `https://${rawTarget}`) :
-		`https://www.youtube.com${req.url}`;
 
-	let parsedUrl;
-	try {
-		parsedUrl = URL.parse(targetUrl);
-	} catch (error) {
-		return res.status(400).send('Invalid proxy target');
+	let targetUrl;
+	if (isCorsBypass) {
+		const rawTarget = req.url.substring('/cors-bypass/'.length);
+		targetUrl = rawTarget.indexOf('http') === 0 ? rawTarget : `https://${rawTarget}`;
+	} else {
+		targetUrl = `https://www.youtube.com${req.url}`;
 	}
-	if (isCorsBypass && !isProxyableHost(parsedUrl.hostname)) return res.status(403).send('Unsupported proxy target');
 
 	const headers = {};
-	Object.keys(req.headers).forEach((key) => {
-		if (key !== 'cookie') headers[key] = req.headers[key];
-	});
-	headers.host = parsedUrl.host;
+	for (const key in req.headers) {
+		if (Object.prototype.hasOwnProperty.call(req.headers, key)) {
+			if (key === 'cookie') {
+				headers[key] = req.headers[key]
+					.replace(/__LocalSecure-/g, '__Secure-')
+					.replace(/__LocalHost-/g, '__Host-');
+				continue;
+			}
+			headers[key] = req.headers[key];
+		}
+	}
+
+	try {
+		const parsedUrl = URL.parse(targetUrl);
+		headers.host = parsedUrl.host;
+	} catch (e) {
+		headers.host = 'www.youtube.com';
+	}
+
 	headers.origin = 'https://www.youtube.com';
+	if (headers['referer']) headers['referer'] = 'https://www.youtube.com/tv';
 	headers['accept-encoding'] = 'gzip, deflate';
 	applyStandaloneUserAgent(headers);
-	requestHeadersToRemove.forEach((header) => delete headers[header]);
 
-	readRequestBody(req).then((body) => {
-		if (body !== undefined) headers['content-length'] = String(body.length);
-		return fetch(targetUrl, {
-			method: req.method,
-			headers,
-			body,
-			redirect: 'manual',
-			agent: (parsedTarget) => parsedTarget.protocol === 'https:' ? httpsAgent : httpAgent
-		});
-	}).then((response) => {
-		res.status(req.method === 'OPTIONS' ? 200 : response.status);
+	const hasBody = ['POST', 'PUT', 'PATCH'].indexOf(req.method) !== -1;
+	const fetchOptions = {
+		method: req.method,
+		headers,
+		body: hasBody ? req : undefined,
+		redirect: 'manual'
+	};
+
+	fetch(targetUrl, fetchOptions).then((response) => {
+		if (req.method === 'OPTIONS') {
+			res.status(200);
+		} else {
+			res.status(response.status);
+		}
+
 		const headerKeys = response.headers.raw();
-		Object.keys(headerKeys).forEach((key) => {
-			const lowerKey = key.toLowerCase();
-			const skipHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'content-security-policy', 'alt-svc'];
-			if (isCorsBypass) skipHeaders.push('access-control-allow-origin');
-			if (skipHeaders.indexOf(lowerKey) !== -1) return;
-			const value = response.headers.get(key);
-			if (lowerKey === 'location') {
-				const location = URL.parse(value);
-				res.setHeader(key, isProxyableHost(location.hostname) ? `http://localhost:${PORT}/cors-bypass/${value}` : value);
-			} else {
+		for (const key in headerKeys) {
+			if (Object.prototype.hasOwnProperty.call(headerKeys, key)) {
+				const lowerKey = key.toLowerCase();
+				const skipHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'content-security-policy', 'alt-svc'];
+				if (isCorsBypass) skipHeaders.push('access-control-allow-origin');
+
+				if (skipHeaders.indexOf(lowerKey) !== -1) continue;
+
+				const value = response.headers.get(key);
+				if (lowerKey === 'set-cookie') {
+					const rawCookies = headerKeys[key];
+					if (Array.isArray(rawCookies)) {
+						const modifiedCookies = rawCookies.map(cookieString => cookieString
+							.replace(/^__Secure-/i, '__LocalSecure-')
+							.replace(/^__Host-/i, '__LocalHost-')
+							.replace(/Domain=[^;]+/i, 'Domain=localhost')
+							.replace(/;\s*Secure/i, '')
+							.replace(/;\s*SameSite=None/i, '')
+							.replace(/;\s*;/g, ';')
+							.replace(/;\s*$/, ''));
+						res.setHeader('Set-Cookie', modifiedCookies);
+						continue;
+					}
+				}
+
 				res.setHeader(key, value);
 			}
-		});
+		}
 		res.setHeader('Access-Control-Allow-Origin', '*');
 
 		const contentType = response.headers.get('content-type') || '';
 		if (contentType.indexOf('text/html') !== -1 || contentType.indexOf('application/json') !== -1 ||
 			contentType.indexOf('javascript') !== -1 || contentType.indexOf('text/css') !== -1) {
 			return response.text().then((text) => {
-				if (req.url.indexOf('/tv') === 0 && text.indexOf('dist/userScript.js') === -1) {
+				if (req.url.indexOf('/tv') === 0 && req.url.indexOf('/tv_config') === -1 && text.indexOf('dist/userScript.js') === -1) {
 					text += `<script src="/tizentube/userScript.js?ver=${Date.now()}"></script>`;
 				}
+
 				const proxyPrefix = `http://localhost:${PORT}/cors-bypass/`;
 				text = text.replace(/https:\/\/([a-zA-Z0-9-.]+)\.googlevideo\.com/g, `${proxyPrefix}https://$1.googlevideo.com`);
 				text = text.replace(/https:\/\/www\.gstatic\.com/g, `${proxyPrefix}https://www.gstatic.com`);
+				text = text.replace(/https:\/\/yt3\.ggpht\.com/g, `${proxyPrefix}https://yt3.ggpht.com`);
+				text = text.replace(/https:\/\/clients1\.google\.com/g, `${proxyPrefix}https://clients1.google.com`);
+				text = text.replace('Set(["www.youtube.com","accounts.google.com"]);', 'Set(["www.youtube.com", "accounts.google.com", "localhost"]);');
+				text = text.replace(/:document\.location\.toString\(\)/g, ':document.location.toString().replace("http://localhost:8099", "https://www.youtube.com")');
+				text = text.replace(/euri:[^,]+,/g, 'euri:document.location.toString().replace("http://localhost:8099", "https://www.youtube.com"),');
 				text = text.replace(/https:\/\/s\.youtube\.com/g, `${proxyPrefix}https://s.youtube.com`);
-				text = text.replace(/https:\/\/jnn-pa\.googleapis\.com/g, `${proxyPrefix}https://jnn-pa.googleapis.com`);
-				text = text.replace(/redirector\.googlevideo\.com/g, `${proxyPrefix}https://redirector.googlevideo.com`);
+				text = text.replace(/redirector.googlevideo.com/g, `${proxyPrefix}https://redirector.googlevideo.com`);
+				text = text.replace(/this.scheme="https"/, 'this.scheme="http"');
+				text = text.replace(/https\:\/\/jnn-pa.googleapis.com/g, `${proxyPrefix}https://jnn-pa.googleapis.com`);
+				text = text.replace(/https:\/\/yt3\.googleusercontent\.com/g, `${proxyPrefix}https://yt3.googleusercontent.com`);
+				text = text.replace(/"\/\/yt3\.googleusercontent\.com/g, `"${proxyPrefix}https://yt3.googleusercontent.com`);
+				text = text.replace(/=window\.location\.href;/, '=window.location.href.replace("http://localhost:8099", "https://www.youtube.com");');
 				text = text.replace(/=document\.location\.href/g, '=document.location.href.replace("http://localhost:8099", "https://www.youtube.com")');
 				res.send(text);
 			});
@@ -199,6 +206,7 @@ app.all('*', (req, res) => {
 		else res.end();
 	}).catch((error) => {
 		console.error(`Proxy Error for [${targetUrl}]: ${error}`);
+		console.error(error.stack);
 		if (!res.headersSent) res.status(500).send('Proxy Connection Broken');
 	});
 });
@@ -211,8 +219,5 @@ if (process.env.TIZENTUBE_NO_LISTEN !== '1') {
 
 module.exports = {
 	STANDALONE_USER_AGENT,
-	app,
-	applyStandaloneUserAgent,
-	isProxyableHost,
-	readRequestBody
+	applyStandaloneUserAgent
 };
