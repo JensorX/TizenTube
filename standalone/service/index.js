@@ -11,6 +11,9 @@ const injector = require('./injector.js');
 
 const USERSCRIPT_URL = 'https://github.com/JensorX/TizenTube/raw/refs/heads/main/dist/userScript.js';
 const STANDALONE_USER_AGENT = 'Mozilla/5.0 (Linux; Shield Android TV) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
+const APP_EXIT_TIMEOUT = 5000;
+
+let debuggerStartPending = false;
 
 function applyStandaloneUserAgent(headers) {
 	headers['user-agent'] = STANDALONE_USER_AGENT;
@@ -35,9 +38,9 @@ function fetchAndUpdateUserScriptInBackground() {
 	const timeoutId = controller ? setTimeout(() => controller.abort(), 3000) : null;
 
 	return fetch(USERSCRIPT_URL, {
-		headers,
-		signal: controller ? controller.signal : undefined
-	})
+			headers,
+			signal: controller ? controller.signal : undefined
+		})
 		.then((response) => {
 			if (timeoutId) clearTimeout(timeoutId);
 			if (response.status === 304) return cachedUserScript;
@@ -76,21 +79,41 @@ app.get('/tizentube/userScript.js', (req, res) => {
 });
 
 app.get('/tizentube/getState', (req, res) => {
-	injector.canConnectToDaemon().then((state) => res.json(state));
+	injector.canConnectToDaemon().then((state) => res.json({
+		...state,
+		isConnecting: state.isConnecting || debuggerStartPending
+	}));
 });
 
 app.get('/tizentube/debugger', (req, res) => {
+	if (debuggerStartPending) return res.status(202).end();
+
+	debuggerStartPending = true;
 	const args = req.originalUrl.split('?')[1] || '';
-	const interval = setInterval(() => {
+	const startedAt = Date.now();
+	let completed = false;
+
+	function startDebugger() {
+		if (completed) return;
+		completed = true;
+		injector.startDebugger(args).then(() => {
+			debuggerStartPending = false;
+		}, () => {
+			debuggerStartPending = false;
+		});
+	}
+
+	function waitForAppExit() {
 		tizen.application.getAppsContext((appsContext) => {
 			const packageId = tizen.application.getAppInfo().packageId;
 			const app = appsContext.find(app => app.appId === `${packageId}.TizenTubeStandalone`);
-			if (!app) {
-				injector.startDebugger(args);
-				clearInterval(interval);
-			}
-		});
-	}, 50);
+			if (!app || Date.now() - startedAt >= APP_EXIT_TIMEOUT) return startDebugger();
+			setTimeout(waitForAppExit, 50);
+		}, startDebugger);
+	}
+
+	waitForAppExit();
+	res.status(202).end();
 });
 
 app.all('*', (req, res) => {
