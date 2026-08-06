@@ -40,31 +40,19 @@ function fetchUserScript() {
 }
 
 function navigateWithUserScript(client, script, args) {
-	let completed = false;
-	const timeoutId = setTimeout(() => complete(new Error('Document-start injection timed out')), DEBUGGER_CONNECT_TIMEOUT);
-
-	function complete(error) {
-		if (completed) return;
-		completed = true;
-		clearTimeout(timeoutId);
-
-		if (error) {
-			console.warn('Document-start injection unavailable, using execution context fallback:', error.message || error);
-			client.on('Runtime.executionContextCreated', (message) => {
-				client.Runtime.evaluate({
-					expression: script,
-					contextId: message.context.id
-				}, () => {});
-			});
-		}
-
-		isConnecting = false;
-		client.Page.navigate({
-			url: `https://youtube.com/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8085%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ''}`
+	client.on('Runtime.executionContextCreated', (message) => {
+		client.Runtime.evaluate({
+			expression: script,
+			contextId: message.context.id
+		}, (error) => {
+			if (error) console.warn('Userscript injection failed:', error.message || error);
 		});
-	}
+	});
 
-	client.Page.addScriptToEvaluateOnNewDocument({ source: script }, complete);
+	isConnecting = false;
+	client.Page.navigate({
+		url: `https://youtube.com/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8085%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ''}`
+	});
 }
 
 function connectToDebugger(host, port, args, attempt = 0) {
