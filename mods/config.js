@@ -71,6 +71,7 @@ const defaultConfig = {
   autoFrameRatePauseVideoFor: 0,
   enableSigninReminder: false,
   force1xForMusic: false,
+  force1xForLiveStreams: false,
   sortSubscriptionsByAlphabet: false,
   enableClock: false,
   isClock12HourFormat: false,

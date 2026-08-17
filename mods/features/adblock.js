@@ -26,9 +26,10 @@ JSON.parse = function () {
       console.log(r.playbackContext.contentPlaybackContext);
     }
 
-    // Music Video Detection
+    // Video type detection for playback-speed overrides.
     if (r.videoDetails) {
       window.musicVideoType = r.videoDetails.musicVideoType || null;
+      window.isLiveStream = r.videoDetails.isLiveContent === true || r.videoDetails.isLive === true;
     }
 
     if (r.adPlacements && adBlockEnabled) {

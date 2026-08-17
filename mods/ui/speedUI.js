@@ -41,10 +41,14 @@ function execute_once_dom_loaded_speed() {
         const defaultSpeed = configRead('videoSpeed');
         video.playbackRate = defaultSpeed;
 
-        if (!configRead('force1xForMusic')) return;
+        const force1xForMusic = configRead('force1xForMusic');
+        const force1xForLiveStreams = configRead('force1xForLiveStreams');
+        if (!force1xForMusic && !force1xForLiveStreams) return;
 
         setTimeout(() => {
-            if (isMusicVideoType(window.musicVideoType)) {
+            const isMusicVideo = force1xForMusic && isMusicVideoType(window.musicVideoType);
+            const isLiveStream = force1xForLiveStreams && window.isLiveStream === true;
+            if (isMusicVideo || isLiveStream) {
                 video.playbackRate = 1;
             }
         }, 25);

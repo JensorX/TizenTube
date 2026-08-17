@@ -496,6 +496,12 @@ export default function modernUI(update, parameters) {
                     value: 'force1xForMusic',
                     subtitle: 'Force 1x speed for music videos'
                 },
+                {
+                    name: 'Default Speed for Live Streams',
+                    icon: 'LIVE_TV',
+                    value: 'force1xForLiveStreams',
+                    subtitle: 'Force 1x speed for live streams'
+                },
                 window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate ? {
                     name: t('settings.options.videoPlayer.options.afr'),
                     icon: 'SLOW_MOTION_VIDEO',
