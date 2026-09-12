@@ -18,6 +18,10 @@ const TAG = '[TizenTube/TvEngineTamer]';
 /** @type {boolean} */
 let activated = false;
 
+export function isCobaltRuntime(win = window) {
+    return String(win.navigator?.userAgent || '').includes('Cobalt/');
+}
+
 /**
  * Activate the TV Engine Tamer.
  * Safe to call multiple times — subsequent calls are no-ops.
@@ -26,9 +30,15 @@ let activated = false;
  */
 export function activate() {
     if (activated) return true;
-    activated = true;
 
     const win = window;
+
+    if (isCobaltRuntime(win)) {
+        console.warn(TAG, 'Disabled on Cobalt because global scheduler and timer patches can block startup');
+        return false;
+    }
+
+    activated = true;
 
     // Duplicate guard
     const hkey = '__ttTvEngineTamerActive__';
