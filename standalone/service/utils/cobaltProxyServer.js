@@ -7,6 +7,7 @@ const https = require('./https.js');
 const net = require('net');
 const tls = require('tls');
 const forge = require('node-forge');
+const fetch = require('node-fetch');
 const url = require('url');
 const {
     LOCAL_USERSCRIPT_URL,
@@ -64,6 +65,27 @@ function startServer() {
             key: forge.pki.privateKeyToPem(keys.privateKey),
             cert: forge.pki.certificateToPem(certificate) + forge.pki.certificateToPem(caCertificate)
         };
+    }
+
+    function fetchUserScript() {
+        return fetch(LOCAL_USERSCRIPT_URL).then(response => {
+            if (!response.ok) {
+                throw new Error(`Userscript request returned ${response.status}`);
+            }
+            return response.text();
+        });
+    }
+
+    function injectUserScript(body, script) {
+        const safeScript = script.replace(/<\/script/gi, '<\\/script');
+        const scriptTag = `<script>${safeScript}</script>`;
+        const bodyTag = /<body\b[^>]*>/i;
+
+        if (bodyTag.test(body)) {
+            return body.replace(bodyTag, match => `${match}${scriptTag}`);
+        }
+
+        return `${scriptTag}${body}`;
     }
 
     function tunnel(hostname, port, clientSocket, initialData) {
@@ -158,18 +180,22 @@ function startServer() {
                                 ''
                             );
 
-                            body = body.replace("<body>", `<body><script src="${LOCAL_USERSCRIPT_URL}"></script>`);
+                            fetchUserScript().then(script => {
+                                body = injectUserScript(body, script);
+                                headers['content-length'] = Buffer.byteLength(body, 'utf8');
+                                headers['connection'] = 'close';
+                                headers['content-encoding'] = 'identity';
 
-                            headers['content-length'] = Buffer.byteLength(body, 'utf8');
-                            headers['connection'] = 'close';
-                            headers['content-encoding'] = 'identity';
+                                response.writeHead(
+                                    targetResponse.statusCode,
+                                    headers
+                                );
 
-                            response.writeHead(
-                                targetResponse.statusCode,
-                                headers
-                            );
-
-                            response.end(body);
+                                response.end(body);
+                            }).catch(error => {
+                                console.error(`Userscript injection failed: ${error.message}`);
+                                response.destroy(error);
+                            });
                         });
                     });
 
