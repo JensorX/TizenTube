@@ -9,7 +9,11 @@
         "options": {
             "socialMedia": {
                 "title": "Social Media Links",
-                "qrCodeScanMessage": "You can visit the {{name}} page by scanning the QR code below."
+                "qrCodeScanMessage": "You can visit the {{name}} page by scanning the QR code below.",
+                "announcements": "Announcements",
+                "group": "Group",
+                "website": "Website",
+                "githubSponsors": "GitHub Sponsors"
             },
             "adBlock": "Ad Block",
             "returnYoutubeDislike": "Return YouTube Dislike",
@@ -108,8 +112,17 @@
                     "afrPauseDuration": {
                         "title": "Auto Frame Rate Pause Duration",
                         "subtitle": "Set the duration (in seconds) to pause video playback when adjusting frame rate"
-                    }
+                    },
+                    "codecAny": "Any",
+                    "qualityAuto": "Auto",
+                    "hideRelatedVideosPlayer": "Hide Related Videos"
                 }
+            },
+            "time": {
+                "second": "{{count}} second",
+                "seconds": "{{count}} seconds",
+                "minute": "{{count}} minute",
+                "minutes": "{{count}} minutes"
             },
             "uiSettings": {
                 "title": "User Interface Settings",
@@ -144,21 +157,54 @@
                         "title": "Disable Sidebar Contents",
                         "subtitle": "Select sidebar contents to disable"
                     },
+                    "sortSidebarContents": {
+                        "title": "Sort Sidebar Contents",
+                        "subtitle": "Reorder sidebar contents to your preference",
+                        "moveUp": {
+                            "title": "Move Up",
+                            "subtitle": "Move this item up in the sidebar"
+                        },
+                        "moveDown": {
+                            "title": "Move Down",
+                            "subtitle": "Move this item down in the sidebar"
+                        },
+                        "addToSidebar": "Add Channel to Sidebar",
+                        "removeFromSidebar": "Remove Channel from Sidebar"
+                    },
                     "launchToOnStartup": {
                         "title": "Launch To on Startup",
                         "subtitle": "Choose the default page TizenTube opens to on startup"
                     },
                     "sortSubscriptionsByAlphabet": "Sort Subscriptions Alphabetically",
                     "disableChannelsOnSidebar": "Disable Channels on Sidebar",
+                    "categories": {
+                        "search": "Search",
+                        "home": "Home",
+                        "sports": "Sports",
+                        "news": "News",
+                        "music": "Music",
+                        "podcasts": "Podcasts",
+                        "moviesAndTv": "Movies & TV",
+                        "live": "Live",
+                        "gaming": "Gaming",
+                        "subscriptions": "Subscriptions",
+                        "library": "Library",
+                        "more": "More",
+                        "shorts": "Shorts",
+                        "searchResults": "Search Results"
+                    },
                     "clock": {
                         "title": "Clock",
                         "subtitle": "Display a clock on the screen",
                         "options": {
                             "enableClock": "Enable Clock",
                             "isClock12HourFormat": "Use 12-Hour Format for Clock",
-                            "clockShowSeconds": "Show Seconds on Clock"
+                            "clockShowSeconds": "Show Seconds on Clock",
+                            "clockHideWhenVideoPlaying": "Hide Clock While Video is Playing"
                         }
-                    }
+                    },
+                    "disableEnlargingThumbnails": "Disable Enlarged Thumbnails",
+                    "enableShrinkingThumbnails": "Enable Shrinked Thumbnails"
                 }
             },
             "updater": {
@@ -168,6 +214,10 @@
                 "options": {
                     "checkForUpdates": "Check for updates",
                     "checkForUpdatesOnStartup": "Check for updates on startup"
+                },
+                "downloading": {
+                    "title": "TizenTube Update",
+                    "subtitle": "Downloading update, please wait..."
                 }
             }
         },
@@ -210,6 +260,32 @@
             "notSkipping": "Not skipping {{segment}} (was skipped {{count}} times)",
             "skip": "Skip {{segment}}",
             "skipToHighlight": "Skip to highlight"
+        }
+    },
+    "player": {
+        "playbackSpeed": {
+            "title": "Playback Speed",
+            "button": "Speed Controls",
+            "fixStuttering": "Fix stuttering (1.0001x)"
+        },
+        "miniPlayer": "Mini Player",
+        "pictureInPicture": "Picture in Picture",
+        "withTizenTube": "with TizenTube",
+        "previous": "Previous",
+        "next": "Next",
+        "share": {
+            "title": "Share",
+            "button": "Share",
+            "qrCodeScanMessage": "Scan the QR code below to share this video."
+        },
+        "screenOff": "Turn off screen"
+    },
+    "toasts": {
+        "videoAddedToQueue": "Video added to queue.",
+        "videoQueueCleared": "Video queue cleared.",
+        "sidebarContentsUpdated": {
+            "title": "Sidebar Contents Updated",
+            "subtitle": "The sidebar contents have been updated."
         }
     }
 }

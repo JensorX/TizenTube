@@ -1,7 +1,7 @@
 import initPatches from './features/standaloneUserscript.js';
 
 if (window.location.hostname === 'localhost') {
-    const logicalUrl = window.location.href.replace('http://localhost:8099', 'https://www.youtube.com');
+    const logicalUrl = window.location.href.replace('http://localhost:8100', 'https://www.youtube.com');
     const logicalLocation = new URL(logicalUrl);
 
     Object.defineProperty(window, '__tizentubeLogicalUrl', {

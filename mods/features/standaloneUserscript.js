@@ -14,19 +14,19 @@ export function redirectUrl(originalUrl) {
 
 		if (hostname === 'youtube.com' || hostname === 'www.youtube.com') {
 			url.protocol = 'http:';
-			url.host = 'localhost:8099';
+			url.host = 'localhost:8100';
 			return url.toString();
 		}
 
 		if (isHostOrSubdomain(hostname, 'googlevideo.com')) {
-			return 'http://localhost:8099/media/' + url.toString();
+			return 'http://localhost:8100/media/' + url.toString();
 		}
 
 		if (isHostOrSubdomain(hostname, 'youtube.com') ||
 			isHostOrSubdomain(hostname, 'gstatic.com') || isHostOrSubdomain(hostname, 'google.com') ||
 			isHostOrSubdomain(hostname, 'googleapis.com') || isHostOrSubdomain(hostname, 'googleusercontent.com') ||
 			isHostOrSubdomain(hostname, 'ggpht.com')) {
-			return 'http://localhost:8099/cors-bypass/' + url.toString();
+			return 'http://localhost:8100/cors-bypass/' + url.toString();
 		}
 	} catch (e) {
 		console.error('Failed to parse URL during interception:', e);

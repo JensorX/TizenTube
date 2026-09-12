@@ -2,8 +2,12 @@ import { configWrite, configRead } from './config.js';
 import { enablePip } from './features/pictureInPicture.js';
 import modernUI, { optionShow } from './ui/settings.js';
 import { speedSettings } from './ui/speedUI.js';
-import { showToast, buttonItem } from './ui/ytUI.js';
+import { showToast, buttonItem, showModal, QrCodeRenderer, overlayPanelItemListRenderer, overlayMessageRenderer } from './ui/ytUI.js';
 import checkForUpdates from './features/updater.js';
+import { t } from 'i18next';
+import { requestNextAndNavigateChannel } from './utils/innerTubeCalls.js';
+import qrcode from 'qrcode-npm';
+import showGuideSettings from './ui/sidebarModification.js';
 
 export default function resolveCommand(cmd, _) {
     // resolveCommand function is pretty OP, it can do from opening modals, changing client settings and way more.
@@ -79,7 +83,7 @@ export function patchResolveCommand() {
                     const items = cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items;
                     for (const item of items) {
                         if (item?.compactLinkRenderer?.icon?.iconType === 'SLOW_MOTION_VIDEO') {
-                            item.compactLinkRenderer.subtitle && (item.compactLinkRenderer.subtitle.simpleText = 'with TizenTube');
+                            item.compactLinkRenderer.subtitle && (item.compactLinkRenderer.subtitle.simpleText = t('player.withTizenTube'));
                             item.compactLinkRenderer.serviceEndpoint = {
                                 clickTrackingParams: "null",
                                 signalAction: {
@@ -94,7 +98,7 @@ export function patchResolveCommand() {
 
                     cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(2, 0,
                         buttonItem(
-                            { title: 'Mini Player' },
+                            { title: t('player.miniPlayer') },
                             { icon: 'CLEAR_COOKIES' }, [
                             {
                                 customAction: {
@@ -104,12 +108,26 @@ export function patchResolveCommand() {
                         ])
                     );
 
+                    cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(3, 0,
+                        buttonItem(
+                            { title: t('player.share.button') },
+                            { icon: 'OPEN_IN_NEW' }, [{ customAction: { action: 'SHARE' } }]
+                        )
+                    );
+
+                    cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(3, 0,
+                        buttonItem(
+                            { title: t('player.screenOff') },
+                            { icon: 'EYE_OFF' }, [{ customAction: { action: 'SCREEN_OFF' } }]
+                        )
+                    );
+
                     if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.HasSystemFeature && 
                         window.h5vcc.tizentube.HasSystemFeature('android.software.picture_in_picture')) {
                         cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(3, 0,
                             buttonItem(
-                                { title: 'Picture in Picture' },
-                                { icon: 'PIP' }, [
+                                { title: t('player.pictureInPicture') },
+                                { icon: 'TV' }, [
                                 {
                                     customAction: {
                                         action: 'ENTER_PIP'
@@ -194,7 +212,7 @@ function customAction(action, parameters) {
             break;
         case 'UPDATE_DOWNLOAD':
             window.h5vcc.tizentube.InstallAppFromURL(parameters);
-            showToast('TizenTube Update', 'Downloading update, please wait...');
+            showToast(t('settings.options.updater.downloading.title'), t('settings.options.updater.downloading.subtitle'));
             break;
         case 'SET_PLAYER_SPEED':
             const speed = Number(parameters);
@@ -211,14 +229,68 @@ function customAction(action, parameters) {
             break;
         case 'ADD_TO_QUEUE':
             window.queuedVideos.videos.push(parameters);
-            showToast('TizenTube', 'Video added to queue.');
+            showToast('TizenTube', t('toasts.videoAddedToQueue'));
             break;
         case 'CLEAR_QUEUE':
             window.queuedVideos.videos = [];
-            showToast('TizenTube', 'Video queue cleared.');
+            showToast('TizenTube', t('toasts.videoQueueCleared'));
             break;
         case 'CHECK_FOR_UPDATES':
             checkForUpdates(true);
+            break;
+        case 'GO_TO_CHANNEL':
+            requestNextAndNavigateChannel(parameters);
+            break;
+        case 'SHARE': {
+            const videoData = document.querySelector('.html5-video-player')?.getVideoData();
+            const videoId = videoData?.video_id;
+            if (!videoId) break;
+
+            const qr = qrcode.qrcode(6, 'H');
+            qr.addData(`https://www.youtube.com/watch?v=${videoId}`);
+            qr.make();
+            const qrDataImgTag = qr.createImgTag(8, 8);
+            const qrDataUrl = qrDataImgTag.match(/src="([^"]+)"/)?.[1];
+            if (!qrDataUrl) break;
+
+            showModal({ title: t('player.share.title') }, overlayPanelItemListRenderer([
+                overlayMessageRenderer(t('player.share.qrCodeScanMessage')),
+                QrCodeRenderer(qrDataUrl)
+            ]), 'tt-share-modal');
+            break;
+        }
+        case 'SHOW_GUIDE_BUTTONS':
+            showGuideSettings('SHOW_GUIDE_BUTTONS', parameters);
+            break;
+        case 'RELOAD_GUIDE_OPTIONS':
+            showGuideSettings(parameters.settingType, true);
+            break;
+        case 'MOVE_GUIDE_BUTTON':
+            showGuideSettings('MOVE_GUIDE_BUTTON', parameters);
+            break;
+        case 'SHOW_GUIDE_SETTINGS':
+            showGuideSettings(parameters);
+            break;
+        case 'ADD_OR_REMOVE_CHANNEL_TO_SIDEBAR': {
+            const sidebarContentsOrder = configRead('sidebarContentsOrder');
+            const index = sidebarContentsOrder.findIndex(item =>
+                (typeof item === 'object' ? item.browseId : item) === parameters.browseId
+            );
+            if (index === -1) {
+                sidebarContentsOrder.push({ browseId: parameters.browseId, title: parameters.title });
+            } else {
+                sidebarContentsOrder.splice(index, 1);
+            }
+            configWrite('sidebarContentsOrder', sidebarContentsOrder);
+            showToast(t('toasts.sidebarContentsUpdated.title'), t('toasts.sidebarContentsUpdated.subtitle'));
+            break;
+        }
+        case 'SCREEN_OFF':
+            for (const child of document.body.children) {
+                if (['script', 'svg'].includes(child.tagName.toLowerCase())) continue;
+                child.style.setProperty('display', 'none', 'important');
+            }
+            window.screenTurnedOffAt = Date.now();
             break;
     }
 }

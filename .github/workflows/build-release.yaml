@@ -33,6 +33,12 @@ jobs:
       - name: Fetch tags (safety)
         run: |
           git fetch --tags --force --prune
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Determine release tag
         id: version
         run: |
@@ -85,22 +91,21 @@ jobs:
         run: |
           echo "${{ secrets.TIZEN_AUTHOR_KEY }}" | base64 -d > "${GITHUB_WORKSPACE}/TizenTube-author.p12"
 
-      - name: Build TizenTube
+      - name: Build TizenTube Cobalt
         working-directory: standalone
         run: |
           mkdir release
-          tizenjs build . -t wgt -o release/TizenTube.wgt --author "${GITHUB_WORKSPACE}/TizenTube-author.p12" --authorPwd '${{ secrets.TIZEN_AUTHOR_KEY_PW }}' -p public --ignore node_modules,/.*\.wgt$/,/userwidget/,/release/
+          tizenjs build . -t wgt -o release/TizenTubeCobalt.wgt --author "${GITHUB_WORKSPACE}/TizenTube-author.p12" --authorPwd '${{ secrets.TIZEN_AUTHOR_KEY_PW }}' -p public --ignore node_modules,/.*\.wgt$/,/userwidget/,/release/
 
-      - name: Upload TizenTube package artifact for Old Tizen
+      - name: Upload TizenTube Cobalt package artifact
         uses: actions/upload-artifact@v4
         with:
-            name: app-${{ env.RELEASE_SHA }}-old.wgt
-            path: standalone/release/TizenTube.wgt
+            name: app-${{ env.RELEASE_SHA }}-cobalt.wgt
+            path: standalone/release/TizenTubeCobalt.wgt
       
       - name: Release TizenTube Build Results
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.RELEASE_VERSION }}
           target_commitish: ${{ env.RELEASE_SHA }}
-          files: |
-            standalone/release/*
+          files: standalone/release/TizenTubeCobalt.wgt

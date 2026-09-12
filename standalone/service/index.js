@@ -4,16 +4,21 @@
 
 const express = require('express');
 const app = express();
-const PORT = 8099;
 const fetch = require('node-fetch');
 const URL = require('url');
 const injector = require('./injector.js');
-
-const USERSCRIPT_URL = 'https://github.com/JensorX/TizenTube/raw/refs/heads/main/dist/userScript.js';
-const STANDALONE_USER_AGENT = 'Mozilla/5.0 (Linux; Shield Android TV) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
+const cobaltSetup = require('./utils/cobaltSetup.js');
+const startCobaltProxy = require('./utils/cobaltProxyServer.js');
+const {
+	STANDALONE_PORT: PORT,
+	STANDALONE_DIAL_PORT,
+	STANDALONE_USER_AGENT,
+	USERSCRIPT_URL
+} = require('./constants.js');
 const APP_EXIT_TIMEOUT = 5000;
 
 let debuggerStartPending = false;
+let cobaltMode = false;
 
 function applyStandaloneUserAgent(headers) {
 	headers['user-agent'] = STANDALONE_USER_AGENT;
@@ -81,6 +86,7 @@ app.get('/tizentube/userScript.js', (req, res) => {
 app.get('/tizentube/getState', (req, res) => {
 	injector.canConnectToDaemon().then((state) => res.json({
 		...state,
+		dialPort: cobaltMode ? PORT : STANDALONE_DIAL_PORT,
 		isConnecting: state.isConnecting || debuggerStartPending
 	}));
 });
@@ -96,7 +102,7 @@ app.get('/tizentube/debugger', (req, res) => {
 	function startDebugger() {
 		if (completed) return;
 		completed = true;
-		injector.startDebugger(args).then(() => {
+		injector.startDebugger(args, cobaltMode ? PORT : STANDALONE_DIAL_PORT).then(() => {
 			debuggerStartPending = false;
 		}, () => {
 			debuggerStartPending = false;
@@ -212,16 +218,16 @@ app.all('*', (req, res) => {
 				text = text.replace(/https:\/\/yt3\.ggpht\.com/g, `${proxyPrefix}https://yt3.ggpht.com`);
 				text = text.replace(/https:\/\/clients1\.google\.com/g, `${proxyPrefix}https://clients1.google.com`);
 				text = text.replace('Set(["www.youtube.com","accounts.google.com"]);', 'Set(["www.youtube.com", "accounts.google.com", "localhost"]);');
-				text = text.replace(/:document\.location\.toString\(\)/g, ':document.location.toString().replace("http://localhost:8099", "https://www.youtube.com")');
-				text = text.replace(/euri:[^,]+,/g, 'euri:document.location.toString().replace("http://localhost:8099", "https://www.youtube.com"),');
+				text = text.replace(/:document\.location\.toString\(\)/g, `:document.location.toString().replace("http://localhost:${PORT}", "https://www.youtube.com")`);
+				text = text.replace(/euri:[^,]+,/g, `euri:document.location.toString().replace("http://localhost:${PORT}", "https://www.youtube.com"),`);
 				text = text.replace(/https:\/\/s\.youtube\.com/g, `${proxyPrefix}https://s.youtube.com`);
 				text = text.replace(/redirector.googlevideo.com/g, `${proxyPrefix}https://redirector.googlevideo.com`);
 				text = text.replace(/this.scheme="https"/, 'this.scheme="http"');
 				text = text.replace(/https\:\/\/jnn-pa.googleapis.com/g, `${proxyPrefix}https://jnn-pa.googleapis.com`);
 				text = text.replace(/https:\/\/yt3\.googleusercontent\.com/g, `${proxyPrefix}https://yt3.googleusercontent.com`);
 				text = text.replace(/"\/\/yt3\.googleusercontent\.com/g, `"${proxyPrefix}https://yt3.googleusercontent.com`);
-				text = text.replace(/=window\.location\.href;/, '=window.location.href.replace("http://localhost:8099", "https://www.youtube.com");');
-				text = text.replace(/=document\.location\.href/g, '=document.location.href.replace("http://localhost:8099", "https://www.youtube.com")');
+				text = text.replace(/=window\.location\.href;/, `=window.location.href.replace("http://localhost:${PORT}", "https://www.youtube.com");`);
+				text = text.replace(/=document\.location\.href/g, `=document.location.href.replace("http://localhost:${PORT}", "https://www.youtube.com")`);
 				res.send(text);
 			});
 		}
@@ -236,8 +242,13 @@ app.all('*', (req, res) => {
 
 if (process.env.TIZENTUBE_NO_LISTEN !== '1') {
 	app.listen(PORT, '127.0.0.1');
-	global.isTizenTube = true;
-	require('../../dist/service.js');
+	cobaltMode = cobaltSetup();
+	if (cobaltMode) {
+		startCobaltProxy();
+	} else {
+		global.isTizenTube = true;
+		require('../../dist/service.js');
+	}
 }
 
 module.exports = {

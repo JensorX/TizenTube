@@ -155,6 +155,14 @@ JSON.parse = function () {
       r.continuationContents.horizontalListContinuation.items = hideVideo(r.continuationContents.horizontalListContinuation.items);
     }
 
+    if (r?.contents?.tvBrowseRenderer?.content?.tvSurfaceContentRenderer?.content?.gridRenderer?.items) {
+      addLongPress(r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.gridRenderer.items);
+    }
+
+    if (r?.continuationContents?.gridContinuation?.items) {
+      addLongPress(r.continuationContents.gridContinuation.items);
+    }
+
     if (r?.contents?.tvBrowseRenderer?.content?.tvSecondaryNavRenderer?.sections) {
       for (let i = 0; i < r.contents.tvBrowseRenderer.content.tvSecondaryNavRenderer.sections.length; i++) {
         const section = r.contents.tvBrowseRenderer.content.tvSecondaryNavRenderer.sections[i].tvSecondaryNavSectionRenderer;
@@ -170,17 +178,25 @@ JSON.parse = function () {
 
         for (let j = 0; j < section.tabs.length; j++) {
           const tab = section.tabs[j];
-          if (tab.tabRenderer.content?.tvSurfaceContentRenderer?.content?.sectionListRenderer?.contents) {
+          const content = tab.tabRenderer.content?.tvSurfaceContentRenderer?.content;
+          if (content?.sectionListRenderer?.contents) {
             const index = section.tabs.indexOf(tab);
-            const clone = tab.tabRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents;
+            const clone = content.sectionListRenderer.contents;
             processShelves(clone);
             section.tabs[index].tabRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents = clone;
+          }
+          if (content?.gridRenderer?.items) {
+            addLongPress(content.gridRenderer.items);
           }
         }
       }
     }
 
     if (r?.contents?.singleColumnWatchNextResults?.pivot?.sectionListRenderer) {
+      if (configRead('hideRelatedVideosPlayer')) {
+        r.contents.singleColumnWatchNextResults.pivot.sectionListRenderer.contents = [{}];
+        r.contents.singleColumnWatchNextResults.pivot.sectionListRenderer.continuations = [];
+      }
       if (!signinReminderEnabled) {
         r.contents.singleColumnWatchNextResults.pivot.sectionListRenderer.contents =
           r.contents.singleColumnWatchNextResults.pivot.sectionListRenderer.contents.filter(
@@ -228,10 +244,18 @@ JSON.parse = function () {
 
     // Manual SponsorBlock Skips
 
-    if (configRead('sponsorBlockManualSkips').length > 0 && r?.playerOverlays?.playerOverlayRenderer) {
-      const manualSkippedSegments = configRead('sponsorBlockManualSkips');
-      let timelyActions = [];
-      if (window?.sponsorblock?.segments) {
+    if (r?.playerOverlays?.playerOverlayRenderer) {
+      const playerOverlay = r.playerOverlays.playerOverlayRenderer;
+      const existingTimelyActions = Array.isArray(playerOverlay.timelyActionRenderers)
+        ? playerOverlay.timelyActionRenderers.filter(action =>
+          action?.timelyActionRenderer?.type !== 'TIMELY_ACTION_TYPE_SHOPPING' &&
+          action?.timelyActionRenderer?.type !== 'TIMELY_ACTION_TYPE_NFL_WATERMARK'
+        )
+        : [];
+      playerOverlay.timelyActionRenderers = existingTimelyActions;
+
+      if (configRead('sponsorBlockManualSkips').length > 0 && window?.sponsorblock?.segments) {
+        const manualSkippedSegments = configRead('sponsorBlockManualSkips');
         for (const segment of window.sponsorblock.segments) {
           if (manualSkippedSegments.includes(segment.category)) {
             const timelyActionData = timelyAction(
@@ -251,13 +275,10 @@ JSON.parse = function () {
               segment.segment[0] * 1000,
               segment.segment[1] * 1000 - segment.segment[0] * 1000
             );
-            timelyActions.push(timelyActionData);
+            playerOverlay.timelyActionRenderers.push(timelyActionData);
           }
         }
-        r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = timelyActions;
       }
-    } else if (r?.playerOverlays?.playerOverlayRenderer) {
-      r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = [];
     }
 
     if (r?.transportControls?.transportControlsRenderer?.promotedActions && configRead('enableSponsorBlockHighlight')) {
@@ -283,6 +304,41 @@ JSON.parse = function () {
             }
           });
         }
+      }
+    }
+
+    if (r?.contents?.tvBrowseRenderer?.content?.tvSurfaceContentRenderer?.header?.channelHeaderRenderer?.buttons) {
+      const channelHeader = r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.header.channelHeaderRenderer;
+      let browseId = null;
+      for (const service of r.responseContext?.serviceTrackingParams || []) {
+        for (const param of service.params || []) {
+          if (param.key === 'browse_id') {
+            browseId = param.value;
+            break;
+          }
+        }
+        if (browseId) break;
+      }
+      const title = channelHeader.title?.simpleText;
+      if (browseId && title) {
+        const sidebarContentsOrder = configRead('sidebarContentsOrder');
+        const inSidebar = Array.isArray(sidebarContentsOrder) && sidebarContentsOrder.some(orderItem =>
+          (typeof orderItem === 'object' ? orderItem.browseId : orderItem) === browseId
+        );
+        channelHeader.buttons.push({
+          buttonRenderer: ButtonRenderer(
+            false,
+            inSidebar ? t('settings.options.uiSettings.options.sortSidebarContents.removeFromSidebar') :
+              t('settings.options.uiSettings.options.sortSidebarContents.addToSidebar'),
+            inSidebar ? 'REMOVE' : 'ADD',
+            {
+              customAction: {
+                action: 'ADD_OR_REMOVE_CHANNEL_TO_SIDEBAR',
+                parameters: { browseId, title }
+              }
+            }
+          )
+        });
       }
     }
   } catch (e) {
@@ -320,6 +376,9 @@ for (const key in window._yttv) {
 function processShelves(shelves, shouldAddPreviews = true) {
   for (const shelve of shelves) {
     if (shelve.shelfRenderer) {
+      if (!shelve.shelfRenderer.tvhtml5Style) shelve.shelfRenderer.tvhtml5Style = { effects: {} };
+      if (configRead('disableEnlargingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.enlarge = false;
+      if (configRead('enableShrinkingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.shrink = true;
       if (!shelve.shelfRenderer.content?.horizontalListRenderer?.items) continue;
       deArrowify(shelve.shelfRenderer.content.horizontalListRenderer.items);
       hqify(shelve.shelfRenderer.content.horizontalListRenderer.items);

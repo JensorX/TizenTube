@@ -1,5 +1,6 @@
 import { configRead } from '../config.js';
 import { showModal, buttonItem, overlayPanelItemListRenderer } from './ytUI.js';
+import { t } from 'i18next';
 
 function isMusicVideoType(musicType) {
     return typeof musicType === 'string' &&
@@ -126,7 +127,7 @@ function speedSettings() {
 
     buttons.push(
         buttonItem(
-            { title: `Fix stuttering (1.0001x)` },
+            { title: t('player.playbackSpeed.fixStuttering') },
             null,
             [
                 {
@@ -156,7 +157,7 @@ function speedSettings() {
         )
     );
 
-    showModal('Playback Speed', overlayPanelItemListRenderer(buttons, selectedIndex), 'tt-speed');
+    showModal(t('player.playbackSpeed.title'), overlayPanelItemListRenderer(buttons, selectedIndex), 'tt-speed');
 }
 
 export {

@@ -9,15 +9,15 @@ import {
 } from './standaloneUserscript.js';
 
 test('redirectUrl maps YouTube APIs and media URLs to their dedicated proxy routes', () => {
-    globalThis.window = { location: { origin: 'http://localhost:8099' } };
+    globalThis.window = { location: { origin: 'http://localhost:8100' } };
 
     assert.equal(
         redirectUrl('https://www.youtube.com/youtubei/v1/player?key=value'),
-        'http://localhost:8099/youtubei/v1/player?key=value'
+        'http://localhost:8100/youtubei/v1/player?key=value'
     );
     assert.equal(
         redirectUrl('https://r1---sn.example.googlevideo.com/videoplayback?id=1'),
-        'http://localhost:8099/media/https://r1---sn.example.googlevideo.com/videoplayback?id=1'
+        'http://localhost:8100/media/https://r1---sn.example.googlevideo.com/videoplayback?id=1'
     );
     assert.equal(
         redirectUrl('https://notyoutube.com/watch?v=1'),
@@ -42,9 +42,9 @@ test('fetchRedirectedRequest preserves a body without reading Request.body', asy
     await fetchRedirectedRequest((url, options) => {
         forwarded = { url, options };
         return Promise.resolve();
-    }, input, 'http://localhost:8099/youtubei/v1/player');
+    }, input, 'http://localhost:8100/youtubei/v1/player');
 
-    assert.equal(forwarded.url, 'http://localhost:8099/youtubei/v1/player');
+    assert.equal(forwarded.url, 'http://localhost:8100/youtubei/v1/player');
     assert.equal(forwarded.options.credentials, 'include');
     assert.equal(await forwarded.options.body.text(), 'history-payload');
 });
@@ -60,7 +60,7 @@ test('fetchRedirectedRequest rejects an already consumed body', async () => {
     };
 
     await assert.rejects(
-        fetchRedirectedRequest(() => Promise.resolve(), input, 'http://localhost:8099/youtubei/v1/player'),
+        fetchRedirectedRequest(() => Promise.resolve(), input, 'http://localhost:8100/youtubei/v1/player'),
         /already been consumed/
     );
 });

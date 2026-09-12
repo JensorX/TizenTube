@@ -3,8 +3,11 @@
 const adbhost = require('adbhost');
 const CDP = require('chrome-remote-interface');
 const fetch = require('node-fetch');
-
-const STANDALONE_USER_AGENT = 'Mozilla/5.0 (Linux; Shield Android TV) Cobalt/25.lts.30.1034958-gold (unlike Gecko) Starboard/15';
+const {
+	LOCAL_USERSCRIPT_URL,
+	STANDALONE_DIAL_PORT,
+	STANDALONE_USER_AGENT
+} = require('./constants.js');
 const DEBUGGER_CONNECT_TIMEOUT = 10000;
 const DEBUGGER_RETRY_DELAY = 200;
 const MAX_DEBUGGER_CONNECTION_ATTEMPTS = 25;
@@ -28,7 +31,7 @@ function fetchDebuggerEndpoint(host, port) {
 }
 
 function fetchUserScript() {
-	return fetch('http://127.0.0.1:8099/tizentube/userScript.js')
+	return fetch(LOCAL_USERSCRIPT_URL)
 		.then((response) => {
 			if (!response.ok) throw new Error(`Userscript request returned ${response.status}`);
 			return response.text();
@@ -51,18 +54,18 @@ function navigateWithUserScript(client, script, args) {
 
 	isConnecting = false;
 	client.Page.navigate({
-		url: `https://youtube.com/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8085%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ''}`
+		url: `https://youtube.com/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A${args.dialPort}%2Fdial%2Fapps%2FYouTube${args.query ? `&${args.query}` : ''}`
 	});
 }
 
-function connectToDebugger(host, port, args, attempt = 0) {
+function connectToDebugger(host, port, args, dialPort, attempt = 0) {
 	function retry(error) {
 		if (attempt >= MAX_DEBUGGER_CONNECTION_ATTEMPTS) {
 			console.error('Failed to connect to the Tizen debugger:', error && error.message ? error.message : error);
 			isConnecting = false;
 			return;
 		}
-		setTimeout(() => connectToDebugger(host, port, args, attempt + 1), DEBUGGER_RETRY_DELAY);
+		setTimeout(() => connectToDebugger(host, port, args, dialPort, attempt + 1), DEBUGGER_RETRY_DELAY);
 	}
 
 	fetchDebuggerEndpoint(host, port)
@@ -90,7 +93,7 @@ function connectToDebugger(host, port, args, attempt = 0) {
 					platform: 'Linux armv7l'
 				});
 				client.Page.setBypassCSP({ enabled: true });
-				navigateWithUserScript(client, script, args);
+				navigateWithUserScript(client, script, { dialPort, query: args });
 			});
 		})
 		.catch(retry);
@@ -123,7 +126,7 @@ function canConnectToDaemon() {
 		});
 }
 
-function startDebugger(args) {
+function startDebugger(args, dialPort = STANDALONE_DIAL_PORT) {
 	return canConnectToDaemon().then((state) => {
 		if (!state.canConnectToDaemon || isConnecting) return false;
 		isConnecting = true;
@@ -161,7 +164,7 @@ function startDebugger(args) {
 								const portMatch = output.match(/debug[\s\S]*?:\s*(\d+)/i);
 								if (portMatch) {
 									const port = Number(portMatch[1]);
-									connectToDebugger(state.ip, port, args);
+									connectToDebugger(state.ip, port, args, dialPort);
 									setTimeout(() => {
 										try { client._stream.end(); } catch (_) {}
 									}, 1000);

@@ -117,7 +117,7 @@
 				// No launch arguments.
 			}
 
-			const serviceRequest = fetch("http://localhost:8099/tizentube/getState", { cache: "no-store" });
+			const serviceRequest = fetch("http://localhost:8100/tizentube/getState", { cache: "no-store" });
 			const timeoutRequest = new Promise((resolve, reject) => {
 				setTimeout(() => reject(new Error("Service check timed out")), SERVICE_CHECK_TIMEOUT);
 			});
@@ -131,11 +131,12 @@
 						// Dev mode available: relaunch via SDB debugger for native YouTube access.
 						// This is required because Tizen blocks localhost navigation without debug mode.
 						// CDP then loads https://youtube.com/tv directly (best path: native context, watch history works).
-						fetch(`http://localhost:8099/tizentube/debugger${args ? `?${args}` : ""}`);
+						fetch(`http://localhost:8100/tizentube/debugger${args ? `?${args}` : ""}`);
 						tizen.application.getCurrentApplication().exit();
 					} else if (!state.canConnectToDaemon) {
 						// No dev mode: use local proxy fallback.
-						location.href = `http://localhost:8099/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A8095%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ""}`;
+						const dialPort = state.dialPort || 8100;
+						location.href = `http://localhost:8100/tv?additionalDataUrl=http%3A%2F%2Flocalhost%3A${dialPort}%2Fdial%2Fapps%2FYouTube${args ? `&${args}` : ""}`;
 					}
 					// If isConnecting, do nothing – the debugger is already starting the app.
 				})

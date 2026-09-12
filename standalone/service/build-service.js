@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 async function build() {
-    const { code, assets } = await ncc(path.join(__dirname, 'index.js'), {
+    const { code } = await ncc(path.join(__dirname, 'transpiled', 'index.js'), {
         minify: false
     });
 
@@ -23,6 +23,7 @@ async function build() {
         path.join(__dirname, '..', '..', 'dist', 'standalonePreload.js'),
         path.join(outDir, 'standalonePreload.js')
     );
+    fs.rmSync(path.join(__dirname, 'transpiled'), { recursive: true, force: true });
 }
 
 build();

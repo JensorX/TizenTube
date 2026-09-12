@@ -3,6 +3,7 @@ import { showModal, buttonItem, overlayPanelItemListRenderer, scrollPaneRenderer
 import qrcode from 'qrcode-npm';
 import { t } from 'i18next';
 import { getComprehensiveLanguageList } from '../features/moreSubtitles.js';
+import resolveCommand from '../resolveCommand.js';
 
 const qrcodes = {};
 
@@ -347,6 +348,11 @@ export default function modernUI(update, parameters) {
                     subtitle: t('settings.options.videoPlayer.options.forceDisableCaptions.subtitle'),
                     icon: 'TRANSLATE',
                     value: 'forceDisableCaptions'
+                },
+                {
+                    name: t('settings.options.videoPlayer.options.hideRelatedVideosPlayer'),
+                    icon: 'VISIBILITY_OFF',
+                    value: 'hideRelatedVideosPlayer'
                 },
                 {
                     name: t('settings.options.videoPlayer.options.patching.title'),
@@ -727,6 +733,17 @@ export default function modernUI(update, parameters) {
                     ]
                 },
                 {
+                    name: t('settings.options.uiSettings.options.sortSidebarContents.title'),
+                    icon: 'MENU',
+                    value: null,
+                    action: {
+                        customAction: {
+                            action: 'SHOW_GUIDE_SETTINGS',
+                            parameters: 'sortSidebarContents'
+                        }
+                    }
+                },
+                {
                     name: t('settings.options.uiSettings.options.launchToOnStartup.title'),
                     icon: 'TV',
                     value: null,
@@ -867,8 +884,21 @@ export default function modernUI(update, parameters) {
                             name: t('settings.options.uiSettings.options.clock.options.clockShowSeconds'),
                             icon: 'TIMER',
                             value: 'clockShowSeconds'
+                        },
+                        {
+                            name: t('settings.options.uiSettings.options.clock.options.clockHideWhenVideoPlaying'),
+                            icon: 'EYE_OFF',
+                            value: 'clockHideWhenVideoPlaying'
                         }
                     ]
+                },
+                {
+                    name: t('settings.options.uiSettings.options.disableEnlargingThumbnails'),
+                    value: 'disableEnlargingThumbnails'
+                },
+                {
+                    name: t('settings.options.uiSettings.options.enableShrinkingThumbnails'),
+                    value: 'enableShrinkingThumbnails'
                 }
             ]
         },
@@ -948,7 +978,8 @@ export default function modernUI(update, parameters) {
                                     update: setting.options?.title ? 'customUI' : false,
                                     menuId: setting.menuId,
                                     arrayToEdit: setting.arrayToEdit,
-                                    menuHeader: setting.menuHeader
+                                    menuHeader: setting.menuHeader,
+                                    action: setting.action
                                 }
                             }
                         }
@@ -982,6 +1013,10 @@ export function optionShow(parameters, update) {
             false
         );
         return;
+    }
+
+    if (parameters.action) {
+        return resolveCommand(parameters.action);
     }
     const buttons = [];
 
@@ -1021,7 +1056,8 @@ export function optionShow(parameters, update) {
                                     update: true,
                                     menuId: parameters.menuId,
                                     arrayToEdit: parameters.arrayToEdit,
-                                    menuHeader: parameters.menuHeader
+                                    menuHeader: parameters.menuHeader,
+                                    action: parameters.action
                                 }
                             }
                         }
@@ -1084,7 +1120,8 @@ export function optionShow(parameters, update) {
                                     update: parameters.options?.title ? 'customUI' : true,
                                     menuId: parameters.menuId,
                                     arrayToEdit: parameters.arrayToEdit,
-                                    menuHeader: parameters.menuHeader
+                                    menuHeader: parameters.menuHeader,
+                                    action: parameters.action
                                 }
                             }
                         }
@@ -1110,7 +1147,8 @@ export function optionShow(parameters, update) {
                                     update: parameters.options?.title ? 'customUI' : true,
                                     menuId: parameters.menuId,
                                     arrayToEdit: parameters.arrayToEdit,
-                                    menuHeader: parameters.menuHeader
+                                    menuHeader: parameters.menuHeader,
+                                    action: parameters.action
                                 }
                             }
                         }

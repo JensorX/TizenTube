@@ -40,6 +40,25 @@ function OverlayPanelHeaderRenderer(title, subtitle, thumbnails) {
     }
 }
 
+function GuideEntryRenderer(simpleText, navigationEndpoint, icon, thumbnail) {
+    const guideEntryRenderer = {
+        guideEntryRenderer: {
+            navigationEndpoint,
+            trackingParams: null,
+            formattedTitle: { simpleText }
+        }
+    };
+
+    if (icon) guideEntryRenderer.guideEntryRenderer.icon = { iconType: icon };
+    if (thumbnail) {
+        guideEntryRenderer.guideEntryRenderer.thumbnail = {
+            thumbnails: [{ url: thumbnail }]
+        };
+    }
+
+    return guideEntryRenderer;
+}
+
 function Modal(header, content, id, update) {
     const titleSubtitleObj = typeof header === 'string' ? { title: header, subtitle: '' } : header;
     const overlayPanelHeaderRenderer = header.overlayPanelHeaderRenderer || {
@@ -188,6 +207,15 @@ function timelyAction(text, icon, command, triggerTimeMs, timeoutMs) {
 }
 
 function longPressData(data) {
+    const isWatchLaterItem = data.watchEndpointData?.playlistId === 'WL';
+    const watchLaterAction = isWatchLaterItem ? {
+        removedVideoId: data.videoId,
+        action: 'ACTION_REMOVE_VIDEO_BY_VIDEO_ID'
+    } : {
+        addedVideoId: data.videoId,
+        action: 'ACTION_ADD_VIDEO'
+    };
+
     return {
         clickTrackingParams: null,
         showMenuCommand: {
@@ -208,15 +236,18 @@ function longPressData(data) {
                             clickTrackingParams: null,
                             watchEndpoint: data.watchEndpointData
                         }),
-                        MenuServiceItemRenderer('Save to Watch Later', {
+                        MenuServiceItemRenderer(isWatchLaterItem ? 'Remove from Watch Later' : 'Save to Watch Later', {
                             clickTrackingParams: null,
                             playlistEditEndpoint: {
                                 playlistId: 'WL',
-                                actions: [
-                                    {
-                                        addedVideoId: data.videoId,
-                                        action: 'ACTION_ADD_VIDEO'
+                                commandMetadata: {
+                                    webCommandMetadata: {
+                                        sendPost: true,
+                                        apiUrl: '/youtubei/v1/browse/edit_playlist'
                                     }
+                                },
+                                actions: [
+                                    watchLaterAction
                                 ]
                             }
                         }),
@@ -231,6 +262,15 @@ function longPressData(data) {
                             playlistEditEndpoint: {
                                 customAction: {
                                     action: 'ADD_TO_QUEUE',
+                                    parameters: data.item
+                                }
+                            }
+                        }),
+                        MenuServiceItemRenderer('Go To Channel', {
+                            clickTrackingParams: null,
+                            playlistEditEndpoint: {
+                                customAction: {
+                                    action: 'GO_TO_CHANNEL',
                                     parameters: data.item
                                 }
                             }
@@ -456,5 +496,6 @@ export {
     ShelfRenderer,
     TileRenderer,
     QrCodeRenderer,
-    ButtonRenderer
+    ButtonRenderer,
+    GuideEntryRenderer
 }
